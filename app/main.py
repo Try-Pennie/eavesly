@@ -77,7 +77,7 @@ async def log_requests(request: Request, call_next):
     request_id = f"req_{uuid.uuid4().hex[:12]}"
     
     # Use request context for correlation tracking
-    async with request_context(request_id=request_id) as context:
+    with request_context(request_id=request_id) as context:
         logger.info("Request started", extra={
             "method": request.method,
             "path": request.url.path,

@@ -1,6 +1,0 @@
-{
-  "type": "module",
-  "dependencies": {
-    "promptlayer": "^1.0.46"
-  }
-}

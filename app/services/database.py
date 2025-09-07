@@ -64,7 +64,7 @@ class DatabaseService:
         processing_time_ms: int
     ) -> None:
         """
-        Store evaluation results in eavesly_transcription_qa table.
+        Store evaluation results in eavesly_evaluation_results table.
         
         Uses upsert logic to handle duplicate call_ids and includes all
         metadata required for reporting and analysis.
@@ -106,7 +106,7 @@ class DatabaseService:
             })
 
             # Use upsert to handle potential duplicate call_ids
-            response = self.client.table("eavesly_transcription_qa").upsert(
+            response = self.client.table("eavesly_evaluation_results").upsert(
                 data,
                 on_conflict="call_id"
             ).execute()
@@ -136,7 +136,7 @@ class DatabaseService:
         http_method: str = "POST"
     ) -> None:
         """
-        Log API request metadata in api_logs table for audit trail.
+        Log API request metadata in eavesly_api_logs table for audit trail.
         
         This method is designed to be non-blocking - if logging fails,
         it won't break the main API functionality.
@@ -159,7 +159,7 @@ class DatabaseService:
             })
 
             # Insert API log entry
-            self.client.table("api_logs").insert(data).execute()
+            self.client.table("eavesly_api_logs").insert(data).execute()
 
             logger.debug("API request logged successfully", extra={
                 "correlation_id": correlation_id,
@@ -190,7 +190,7 @@ class DatabaseService:
             logger.debug("Performing database health check")
 
             # Simple query to test connectivity - try to read from one of our tables
-            response = self.client.table("eavesly_transcription_qa").select("call_id").limit(1).execute()
+            response = self.client.table("eavesly_evaluation_results").select("call_id").limit(1).execute()
 
             # If we get here without exception, database is accessible
             is_healthy = True

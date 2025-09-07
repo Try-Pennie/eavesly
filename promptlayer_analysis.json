@@ -1,0 +1,22 @@
+{
+  "call_qa_deep_dive": {
+    "expected_variables": ["evaluation_results", "red_flags", "transcript"],
+    "template_purpose": "Forensic analysis of problematic calls with root cause analysis"
+  },
+  "call_qa_communication": {
+    "expected_variables": ["transcript"],
+    "template_purpose": "Evaluates communication effectiveness and soft skills"
+  },
+  "call_qa_compliance": {
+    "expected_variables": ["transcript"],
+    "template_purpose": "Evaluates regulatory compliance and adherence to financial services rules"
+  },
+  "call_qa_script_deviation": {
+    "expected_variables": ["actual_transcript", "expected_sections", "ideal_transcript", "sections_attempted"],
+    "template_purpose": "Compares actual conversation with ideal script for deviation analysis"
+  },
+  "call_qa_router_classifier": {
+    "expected_variables": ["client_data", "migo_call_script", "transcript"],
+    "template_purpose": "Initial call analysis for progression tracking and critical issue detection"
+  }
+}
