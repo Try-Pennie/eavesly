@@ -28,6 +28,8 @@ dependencies = [
     "tenacity>=8.2.3",
     "python-dotenv>=1.0.0",
     "python-json-logger>=2.0.7",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
 ]
 
 [project.optional-dependencies]
