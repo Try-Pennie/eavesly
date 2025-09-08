@@ -1,0 +1,62 @@
+# Fly.io configuration for Eavesly FastAPI application
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "eavesly"
+primary_region = "ord"  # Chicago - adjust based on your target audience
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+
+[env]
+  # FastAPI production settings
+  PYTHONUNBUFFERED = "1"
+  PYTHONDONTWRITEBYTECODE = "1"
+  
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"    # Stop machines when no traffic
+  auto_start_machines = true     # Auto-start when traffic comes in
+  min_machines_running = 0       # Cost optimization - scale to zero
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+    protocol = "http"
+    headers = {}
+
+[machine]
+  # Optimize for cost and performance
+  cpu_kind = "shared"     # Use shared CPUs for cost efficiency
+  cpus = 1                # Start with 1 CPU
+  memory = "256mb"        # Minimal memory for FastAPI
+
+[deploy]
+  strategy = "rolling"    # Zero-downtime deployments
+  wait_timeout = "5m"
+
+# Auto-scaling configuration
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
+  
+  [[vm.mounts]]
+    source = "data"
+    destination = "/app/data"
+    
+# Metrics and monitoring (optional)
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Environment variable secrets (use `flyctl secrets` to set these)
+# OPENAI_API_KEY
+# SUPABASE_URL
+# SUPABASE_KEY
+# DATABASE_URL

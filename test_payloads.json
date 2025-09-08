@@ -1,0 +1,170 @@
+{
+  "single_call_evaluation": {
+    "description": "Test payload for POST /api/v1/evaluate-call endpoint",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-API-Key": "your_api_key_here"
+    },
+    "payload": {
+      "call_id": "call_test_001",
+      "agent_id": "agent_sarah_123",
+      "call_context": "First Call",
+      "transcript": {
+        "transcript": "Agent: Hello, this is Sarah from Pennie Financial. I understand you're interested in our personal loan services. May I get your name please?\nClient: Yes, this is John Smith.\nAgent: Thank you John. I see you've applied for a $15,000 personal loan. Can you tell me what you plan to use this loan for?\nClient: I want to consolidate some credit card debt and maybe do some home improvements.\nAgent: That's a great use of funds, John. Debt consolidation can really help lower your monthly payments. What's your current annual income?\nClient: I make about $75,000 a year at my job.\nAgent: Excellent. And what's your monthly housing payment including mortgage, insurance and taxes?\nClient: About $1,800 per month.\nAgent: Perfect. Based on your income and what I'm seeing here, I think we can definitely help you. Our current rates start at 8.99% APR for qualified borrowers. Would you like me to run your application through our system?\nClient: Yes, that sounds good.\nAgent: Great! I'm processing this now... Congratulations John! You've been approved for the full $15,000 at 9.5% APR. Your monthly payment would be $312 for 60 months. How does that sound?\nClient: That's actually perfect! Much better than what I'm paying on my credit cards now.\nAgent: Wonderful! I'll get the paperwork started for you right now. You should receive the loan documents via email within the next hour.",
+        "metadata": {
+          "duration": 420,
+          "timestamp": "2024-01-15T14:30:00Z",
+          "talk_time": 380,
+          "disposition": "loan_approved",
+          "campaign_name": "Q1 Personal Loans Campaign"
+        }
+      },
+      "ideal_script": "Section 1: Professional greeting and introduction\n- Introduce yourself and company\n- Confirm client interest\n- Get client name\n\nSection 2: Needs assessment and qualification\n- Understand loan purpose\n- Collect income information\n- Assess debt-to-income ratio\n- Verify employment status\n\nSection 3: Product presentation and benefits\n- Present appropriate loan options\n- Highlight competitive rates\n- Explain terms and benefits\n- Address consolidation advantages\n\nSection 4: Application processing and approval\n- Process application in real-time\n- Provide clear approval decision\n- Present final terms clearly\n\nSection 5: Closing and next steps\n- Confirm client acceptance\n- Explain documentation process\n- Set clear expectations for next steps\n- Thank client for their business",
+      "client_data": {
+        "lead_id": "lead_js_001",
+        "campaign_id": 2024001,
+        "script_progress": {
+          "sections_attempted": [1, 2, 3, 4, 5],
+          "last_completed_section": 5,
+          "termination_reason": "loan_approved",
+          "pitch_outcome": "approved"
+        },
+        "financial_profile": {
+          "annual_income": 75000.0,
+          "dti_ratio": 0.28,
+          "loan_approval_status": "approved",
+          "has_existing_debt": true
+        }
+      }
+    }
+  },
+  "batch_evaluation": {
+    "description": "Test payload for POST /api/v1/evaluate-batch endpoint",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-API-Key": "your_api_key_here"
+    },
+    "payload": [
+      {
+        "call_id": "call_batch_001",
+        "agent_id": "agent_mike_456",
+        "call_context": "First Call",
+        "transcript": {
+          "transcript": "Agent: Hi, this is Mike from Pennie Financial. I'm calling about your loan inquiry. Is this a good time to talk?\nClient: Um, I guess so. What's this about?\nAgent: You applied for a personal loan on our website. I wanted to discuss your options.\nClient: Oh right, yeah I did apply. What can you offer me?\nAgent: Well, I need to ask you some questions first. What's your income?\nClient: I make around $45,000.\nAgent: Okay, and what do you want the loan for?\nClient: Just some bills and stuff.\nAgent: I see. Well, I can probably get you approved for something, but the rate might be a bit higher than our advertised rates.\nClient: How much higher?\nAgent: Probably around 18-20% APR.\nClient: That seems really high. I think I need to think about it.\nAgent: Well, don't think too long. This offer might not be available tomorrow.\nClient: Okay, I'll call you back if I decide to move forward.\nAgent: Alright, have a good day.",
+          "metadata": {
+            "duration": 180,
+            "timestamp": "2024-01-15T15:45:00Z",
+            "talk_time": 165,
+            "disposition": "callback_scheduled",
+            "campaign_name": "Q1 Personal Loans Campaign"
+          }
+        },
+        "ideal_script": "Section 1: Professional greeting and introduction\n- Introduce yourself and company\n- Confirm client interest\n- Get client name\n\nSection 2: Needs assessment and qualification\n- Understand loan purpose\n- Collect income information\n- Assess debt-to-income ratio\n- Verify employment status\n\nSection 3: Product presentation and benefits\n- Present appropriate loan options\n- Highlight competitive rates\n- Explain terms and benefits\n\nSection 4: Objection handling\n- Address client concerns professionally\n- Provide reassurance about rates and terms\n- Offer alternatives if needed\n\nSection 5: Closing and next steps\n- Attempt to close or schedule follow-up\n- Provide clear next steps\n- Thank client for their time",
+        "client_data": {
+          "lead_id": "lead_batch_001",
+          "campaign_id": 2024001,
+          "script_progress": {
+            "sections_attempted": [1, 2, 3],
+            "last_completed_section": 2,
+            "termination_reason": "callback_scheduled",
+            "pitch_outcome": "pending"
+          },
+          "financial_profile": {
+            "annual_income": 45000.0,
+            "dti_ratio": null,
+            "loan_approval_status": "pending",
+            "has_existing_debt": null
+          }
+        }
+      },
+      {
+        "call_id": "call_batch_002",
+        "agent_id": "agent_lisa_789",
+        "call_context": "Follow-up Call",
+        "transcript": {
+          "transcript": "Agent: Hello Mrs. Johnson, this is Lisa from Pennie Financial. I'm following up on your loan application from last week.\nClient: Oh yes, hi Lisa. I've been thinking about it.\nAgent: Great! I wanted to let you know that we were able to get you an even better rate than what we initially discussed. We can offer you 7.99% APR for the $20,000 you requested.\nClient: That's much better than the 12% you mentioned before.\nAgent: Exactly! Our underwriting team was impressed with your credit profile. With your $85,000 income and excellent payment history, you qualified for our premium tier.\nClient: What would my monthly payment be?\nAgent: For 60 months, it would be $405 per month. And there are no prepayment penalties, so you can pay it off early if you'd like.\nClient: That fits within my budget perfectly. What do I need to do next?\nAgent: I can process your application right now if you're ready to move forward. It will just take a few minutes.\nClient: Yes, let's do it.\nAgent: Excellent! You're approved! I'll send you the loan documents via email, and you can expect to receive your funds within 2 business days once we receive your signed paperwork.\nClient: This is wonderful. Thank you so much for following up and getting me a better rate.\nAgent: It's my pleasure, Mrs. Johnson. We appreciate your business!",
+          "metadata": {
+            "duration": 300,
+            "timestamp": "2024-01-22T11:15:00Z",
+            "talk_time": 285,
+            "disposition": "loan_approved",
+            "campaign_name": "Follow-up Campaign"
+          }
+        },
+        "ideal_script": "Section 1: Warm follow-up greeting\n- Reference previous conversation\n- Thank client for their time\n- Present any updates or improvements\n\nSection 2: Value proposition enhancement\n- Present better terms if available\n- Highlight client's strong qualifications\n- Emphasize competitive advantages\n\nSection 3: Clear presentation of final terms\n- State exact APR and monthly payment\n- Explain loan features and benefits\n- Address any remaining questions\n\nSection 4: Professional closing\n- Secure commitment to move forward\n- Process application efficiently\n- Provide clear next steps and timeline\n\nSection 5: Relationship building\n- Thank client for their business\n- Set expectations for ongoing communication\n- Ensure client satisfaction",
+        "client_data": {
+          "lead_id": "lead_batch_002",
+          "campaign_id": 2024002,
+          "script_progress": {
+            "sections_attempted": [1, 2, 3, 4, 5],
+            "last_completed_section": 5,
+            "termination_reason": "loan_approved",
+            "pitch_outcome": "approved"
+          },
+          "financial_profile": {
+            "annual_income": 85000.0,
+            "dti_ratio": 0.24,
+            "loan_approval_status": "approved",
+            "has_existing_debt": false
+          }
+        }
+      }
+    ]
+  },
+  "minimal_payload": {
+    "description": "Minimal test payload with required fields only",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-API-Key": "your_api_key_here"
+    },
+    "payload": {
+      "call_id": "call_minimal_001",
+      "agent_id": "agent_test_001",
+      "call_context": "First Call",
+      "transcript": {
+        "transcript": "Agent: Hello, this is test agent.\nClient: Hi.\nAgent: Are you interested in a loan?\nClient: Maybe.\nAgent: Okay, thank you.",
+        "metadata": {
+          "duration": 30,
+          "timestamp": "2024-01-15T10:00:00Z",
+          "disposition": "completed"
+        }
+      },
+      "ideal_script": "Basic greeting and inquiry.",
+      "client_data": {
+        "script_progress": {
+          "sections_attempted": [1],
+          "last_completed_section": 1,
+          "termination_reason": "completed"
+        }
+      }
+    }
+  },
+  "curl_examples": {
+    "description": "Example curl commands to test the API",
+    "single_call": "curl -X POST http://localhost:3000/api/v1/evaluate-call \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: your_api_key_here\" \\\n  -d @test_payloads.json#single_call_evaluation.payload",
+    "batch_calls": "curl -X POST http://localhost:3000/api/v1/evaluate-batch \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: your_api_key_here\" \\\n  -d @test_payloads.json#batch_evaluation.payload",
+    "health_check": "curl -X GET http://localhost:3000/health",
+    "root_endpoint": "curl -X GET http://localhost:3000/",
+    "config_check": "curl -X GET http://localhost:3000/config"
+  },
+  "test_scenarios": {
+    "high_quality_call": {
+      "description": "Excellent agent performance - follows script, professional, gets approval",
+      "expected_score_range": "85-100"
+    },
+    "poor_quality_call": {
+      "description": "Poor agent performance - doesn't follow script, unprofessional, loses sale",
+      "expected_score_range": "20-40"
+    },
+    "average_call": {
+      "description": "Average performance with room for improvement",
+      "expected_score_range": "60-80"
+    }
+  },
+  "notes": {
+    "api_key": "Make sure to set X-API-Key header with a valid API key from your .env file",
+    "endpoints": "All evaluation endpoints are under /api/v1/ prefix",
+    "response_format": "All responses include correlation_id for tracking",
+    "batch_limits": "Batch endpoint has configurable limits via max_concurrent_evaluations setting"
+  }
+}
