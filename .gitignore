@@ -171,3 +171,16 @@ env/
 # UV
 uv.lock
 .python-version
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Test results and logs
+test_results.log
+*.log
+
+# IDE specific (personal preferences)
+.vscode/
+.idea/

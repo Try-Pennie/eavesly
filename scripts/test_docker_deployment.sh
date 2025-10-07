@@ -70,7 +70,7 @@ wait_for_service() {
     done
     
     print_status $RED "✗ Service failed to start after $max_attempts attempts"
-    docker-compose logs eavesly
+    docker-compose -f docker-compose.yml logs eavesly
     exit 1
 }
 
@@ -124,7 +124,7 @@ test_with_payload() {
     print_status $BLUE "Testing: $description"
     
     # Extract payload from test_payloads.json
-    local payload=$(cat test_payloads.json | jq ".${payload_key}.payload")
+    local payload=$(cat ../tests/fixtures/test_payloads.json | jq ".${payload_key}.payload")
     
     if [ "$payload" = "null" ]; then
         print_status $RED "✗ Payload not found for key: $payload_key"
@@ -206,8 +206,8 @@ main() {
     
     # Build and start containers
     print_status $BLUE "\n2. Building and starting containers..."
-    docker-compose down -v >/dev/null 2>&1 || true
-    docker-compose up --build -d
+    docker-compose -f docker-compose.yml down -v >/dev/null 2>&1 || true
+    docker-compose -f docker-compose.yml up --build -d
     
     # Wait for service to be ready
     wait_for_service
@@ -255,7 +255,7 @@ main() {
     # Check logs
     print_status $BLUE "\n9. Checking application logs..."
     echo "Recent logs:" >> $TEST_RESULTS_FILE
-    docker-compose logs --tail=20 eavesly >> $TEST_RESULTS_FILE
+    docker-compose -f docker-compose.yml logs --tail=20 eavesly >> $TEST_RESULTS_FILE
     
     # Final resource check
     print_status $BLUE "\n10. Final resource usage check..."
@@ -270,11 +270,11 @@ main() {
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_status $BLUE "Stopping containers..."
-        docker-compose down
+        docker-compose -f docker-compose.yml down
         print_status $GREEN "Containers stopped"
     else
         print_status $BLUE "Containers are still running at $BASE_URL"
-        print_status $BLUE "Use 'docker-compose down' to stop them later"
+        print_status $BLUE "Use 'docker-compose -f scripts/docker-compose.yml down' to stop them later"
     fi
 }
 
