@@ -11,6 +11,160 @@ An AI-enabled call quality assessment system built with FastAPI that provides co
 - **Data Persistence**: Supabase integration for reliable data storage
 - **Modern Tooling**: UV package management for fast, reliable dependency handling
 
+## 🔄 API Flow
+
+The Eavesly API processes call evaluations through a sophisticated multi-stage workflow:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI
+    participant Auth as Authentication
+    participant Orchestrator
+    participant PL as PromptLayer
+    participant LLM as OpenRouter
+    participant DB as Supabase
+
+    Client->>API: POST /evaluate-call
+    Note over Client,API: Call transcript + metadata + client data
+    
+    API->>Auth: Validate API key
+    Auth-->>API: ✓ Authenticated
+    
+    API->>Orchestrator: Process evaluation request
+    
+    Note over Orchestrator: Stage 1: Classification
+    Orchestrator->>PL: Get classification prompt
+    PL-->>Orchestrator: Prompt template + config
+    Orchestrator->>LLM: Classify call + determine scope
+    LLM-->>Orchestrator: CallClassification result
+    
+    Note over Orchestrator: Stage 2: Parallel Evaluations
+    par Script Adherence
+        Orchestrator->>PL: Get script deviation prompt
+        PL-->>Orchestrator: Template + config
+        Orchestrator->>LLM: Evaluate script adherence
+        LLM-->>Orchestrator: ScriptAdherence result
+    and Compliance
+        Orchestrator->>PL: Get compliance prompt
+        PL-->>Orchestrator: Template + config
+        Orchestrator->>LLM: Check compliance violations
+        LLM-->>Orchestrator: Compliance result
+    and Communication
+        Orchestrator->>PL: Get communication prompt
+        PL-->>Orchestrator: Template + config
+        Orchestrator->>LLM: Assess communication skills
+        LLM-->>Orchestrator: Communication result
+    end
+    
+    Note over Orchestrator: Stage 3: Conditional Deep Dive
+    alt Issues detected
+        Orchestrator->>PL: Get deep dive prompt
+        PL-->>Orchestrator: Template + config
+        Orchestrator->>LLM: Perform root cause analysis
+        LLM-->>Orchestrator: DeepDive result
+    end
+    
+    Orchestrator->>Orchestrator: Calculate overall score
+    Orchestrator->>Orchestrator: Generate summary
+    
+    Orchestrator->>DB: Store evaluation results
+    DB-->>Orchestrator: ✓ Stored
+    
+    Orchestrator-->>API: Complete EvaluationResult
+    API-->>Client: EvaluateCallResponse
+    Note over API,Client: Score + detailed evaluation + summary
+```
+
+### Key Evaluation Stages
+
+1. **🎯 Classification** - Determines call outcome and evaluation scope
+2. **⚡ Parallel Evaluations** - Concurrent analysis of:
+   - Script adherence and deviations
+   - Regulatory compliance (TCPA, CFPB, etc.)
+   - Communication skills and professionalism
+3. **🔍 Deep Dive** - Triggered when issues are detected for root cause analysis
+4. **📊 Scoring & Summary** - Weighted scoring algorithm with actionable insights
+
+### 📝 API Example
+
+**Request** (`POST /evaluate-call`)
+```json
+{
+  "call_id": "call_123456",
+  "agent_id": "agent_789",
+  "call_context": "First Call",
+  "transcript": {
+    "transcript": "Agent: Hello, this is Sarah from MigoLoans. May I speak with John? Customer: This is John. Agent: Great! I'm calling about your loan application...",
+    "metadata": {
+      "duration": 450,
+      "timestamp": "2024-01-15T10:30:00Z",
+      "disposition": "completed"
+    }
+  },
+  "client_data": {
+    "script_progress": {
+      "sections_attempted": [1, 2, 3, 4, 5],
+      "last_completed_section": 5,
+      "termination_reason": "completed"
+    },
+    "financial_profile": {
+      "annual_income": 75000,
+      "dti_ratio": 0.35,
+      "loan_approval_status": "approved"
+    }
+  },
+  "ideal_script": "Section 1: Introduction and verification..."
+}
+```
+
+**Response**
+```json
+{
+  "call_id": "call_123456",
+  "correlation_id": "eval_abc123def456",
+  "timestamp": "2024-01-15T10:35:00Z",
+  "processing_time_ms": 2847,
+  "overall_score": 87,
+  "summary": {
+    "strengths": [
+      "Excellent rapport building with client",
+      "Clear explanation of loan terms"
+    ],
+    "areas_for_improvement": [
+      "Could have addressed objections more thoroughly"
+    ],
+    "critical_issues": []
+  },
+  "evaluation": {
+    "classification": {
+      "call_outcome": "completed",
+      "early_termination_justified": true,
+      "requires_deep_dive": false
+    },
+    "script_deviation": {
+      "overall_adherence": "high",
+      "sections": {
+        "introduction": {"adherence_level": "high", "critical_misses": []},
+        "needs_assessment": {"adherence_level": "medium", "critical_misses": []}
+      }
+    },
+    "compliance": {
+      "summary": {
+        "violations": [],
+        "coaching_needed": ["Improve disclosure timing"]
+      }
+    },
+    "communication": {
+      "summary": {
+        "exceeded": ["Professionalism", "Empathy"],
+        "missed": ["Objection handling"]
+      }
+    }
+  }
+}
+```
+
 ## 📋 Prerequisites
 
 - **Python 3.9+**

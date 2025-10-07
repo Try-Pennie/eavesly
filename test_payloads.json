@@ -3,7 +3,7 @@
     "description": "Test payload for POST /api/v1/evaluate-call endpoint",
     "headers": {
       "Content-Type": "application/json",
-      "X-API-Key": "your_api_key_here"
+      "Authorization": "Bearer your_api_key_here"
     },
     "payload": {
       "call_id": "call_test_001",
@@ -42,7 +42,7 @@
     "description": "Test payload for POST /api/v1/evaluate-batch endpoint",
     "headers": {
       "Content-Type": "application/json",
-      "X-API-Key": "your_api_key_here"
+      "Authorization": "Bearer your_api_key_here"
     },
     "payload": [
       {
@@ -115,7 +115,7 @@
     "description": "Minimal test payload with required fields only",
     "headers": {
       "Content-Type": "application/json",
-      "X-API-Key": "your_api_key_here"
+      "Authorization": "Bearer your_api_key_here"
     },
     "payload": {
       "call_id": "call_minimal_001",
@@ -141,8 +141,8 @@
   },
   "curl_examples": {
     "description": "Example curl commands to test the API",
-    "single_call": "curl -X POST http://localhost:3000/api/v1/evaluate-call \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: your_api_key_here\" \\\n  -d @test_payloads.json#single_call_evaluation.payload",
-    "batch_calls": "curl -X POST http://localhost:3000/api/v1/evaluate-batch \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: your_api_key_here\" \\\n  -d @test_payloads.json#batch_evaluation.payload",
+    "single_call": "curl -X POST http://localhost:3000/api/v1/evaluate-call \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer: your_api_key_here\" \\\n  -d @test_payloads.json#single_call_evaluation.payload",
+    "batch_calls": "curl -X POST http://localhost:3000/api/v1/evaluate-batch \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer: your_api_key_here\" \\\n  -d @test_payloads.json#batch_evaluation.payload",
     "health_check": "curl -X GET http://localhost:3000/health",
     "root_endpoint": "curl -X GET http://localhost:3000/",
     "config_check": "curl -X GET http://localhost:3000/config"
@@ -162,7 +162,7 @@
     }
   },
   "notes": {
-    "api_key": "Make sure to set X-API-Key header with a valid API key from your .env file",
+    "api_key": "Make sure to set Authorization: Bearer header with a valid API key from your .env file",
     "endpoints": "All evaluation endpoints are under /api/v1/ prefix",
     "response_format": "All responses include correlation_id for tracking",
     "batch_limits": "Batch endpoint has configurable limits via max_concurrent_evaluations setting"

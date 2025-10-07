@@ -34,7 +34,7 @@ kill_timeout = 5
   # Optimize for cost and performance
   cpu_kind = "shared"     # Use shared CPUs for cost efficiency
   cpus = 1                # Start with 1 CPU
-  memory = "256mb"        # Minimal memory for FastAPI
+  memory = "512mb"        # Production memory for FastAPI with LLM processing
 
 [deploy]
   strategy = "rolling"    # Zero-downtime deployments
@@ -44,7 +44,7 @@ kill_timeout = 5
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory = "256mb"
+  memory = "512mb"
   
   [[vm.mounts]]
     source = "data"
