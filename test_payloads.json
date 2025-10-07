@@ -139,6 +139,35 @@
       }
     }
   },
+  "short_talk_time": {
+    "description": "Call with talk_time < 60 seconds - should be skipped",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer your_api_key_here"
+    },
+    "payload": {
+      "call_id": "call_short_001",
+      "agent_id": "agent_test_002",
+      "call_context": "First Call",
+      "transcript": {
+        "transcript": "Agent: Hello, this is John from Pennie.\nClient: Not interested.\nAgent: Okay, thank you.",
+        "metadata": {
+          "duration": 50,
+          "timestamp": "2024-01-15T10:00:00Z",
+          "talk_time": 45,
+          "disposition": "not_interested"
+        }
+      },
+      "ideal_script": "Basic greeting and inquiry.",
+      "client_data": {
+        "script_progress": {
+          "sections_attempted": [1],
+          "last_completed_section": 0,
+          "termination_reason": "not_interested"
+        }
+      }
+    }
+  },
   "curl_examples": {
     "description": "Example curl commands to test the API",
     "single_call": "curl -X POST http://localhost:3000/api/v1/evaluate-call \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer: your_api_key_here\" \\\n  -d @test_payloads.json#single_call_evaluation.payload",

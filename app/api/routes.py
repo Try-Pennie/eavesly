@@ -12,7 +12,7 @@ import asyncio
 from datetime import datetime
 
 from app.models.requests import EvaluateCallRequest
-from app.models.responses import EvaluateCallResponse, EvaluationSummary
+from app.models.responses import EvaluateCallResponse, EvaluationSummary, SkippedCallResponse
 from app.api.middleware import authenticate_api_key
 from app.utils.logger import get_structured_logger, request_context
 
@@ -35,7 +35,7 @@ def get_db_service():
     return db_service
 
 
-@router.post("/evaluate-call", response_model=EvaluateCallResponse, dependencies=[Depends(authenticate_api_key)])
+@router.post("/evaluate-call", dependencies=[Depends(authenticate_api_key)])
 async def evaluate_call(
     request: EvaluateCallRequest,
     orchestrator=Depends(get_orchestrator),
@@ -52,7 +52,33 @@ async def evaluate_call(
             "agent_id": request.agent_id,
             "call_context": request.call_context.value if request.call_context else "unknown"
         })
-        
+
+        # Check if talk_time is below minimum threshold
+        if request.transcript.metadata.talk_time is not None and request.transcript.metadata.talk_time < 60:
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            logger.info("Call skipped - talk_time below threshold", extra={
+                "call_id": request.call_id,
+                "correlation_id": correlation_id,
+                "talk_time": request.transcript.metadata.talk_time,
+                "threshold": 60,
+                "processing_time_ms": processing_time_ms
+            })
+
+            return SkippedCallResponse(
+                call_id=request.call_id,
+                correlation_id=correlation_id,
+                timestamp=datetime.utcnow(),
+                processing_time_ms=processing_time_ms,
+                status="skipped",
+                reason="talk_time_too_short",
+                details={
+                    "talk_time": request.transcript.metadata.talk_time,
+                    "minimum_required": 60,
+                    "message": f"Call was not evaluated because talk_time ({request.transcript.metadata.talk_time}s) is below minimum threshold of 60 seconds"
+                }
+            )
+
         # Perform evaluation using orchestrator
         evaluation_result = await orchestrator.evaluate_call(request)
         
@@ -169,7 +195,38 @@ async def evaluate_batch(
                 "correlation_id": call_correlation_id,
                 "batch_correlation_id": batch_correlation_id
             })
-            
+
+            # Check if talk_time is below minimum threshold
+            if call_request.transcript.metadata.talk_time is not None and call_request.transcript.metadata.talk_time < 60:
+                processing_time_ms = int((time.time() - call_start_time) * 1000)
+
+                logger.info("Call skipped in batch - talk_time below threshold", extra={
+                    "call_id": call_request.call_id,
+                    "correlation_id": call_correlation_id,
+                    "batch_correlation_id": batch_correlation_id,
+                    "talk_time": call_request.transcript.metadata.talk_time,
+                    "threshold": 60
+                })
+
+                return {
+                    "call_id": call_request.call_id,
+                    "success": True,
+                    "skipped": True,
+                    "response": SkippedCallResponse(
+                        call_id=call_request.call_id,
+                        correlation_id=call_correlation_id,
+                        timestamp=datetime.utcnow(),
+                        processing_time_ms=processing_time_ms,
+                        status="skipped",
+                        reason="talk_time_too_short",
+                        details={
+                            "talk_time": call_request.transcript.metadata.talk_time,
+                            "minimum_required": 60,
+                            "message": f"Call was not evaluated because talk_time ({call_request.transcript.metadata.talk_time}s) is below minimum threshold of 60 seconds"
+                        }
+                    )
+                }
+
             # Perform evaluation using orchestrator
             evaluation_result = await orchestrator.evaluate_call(call_request)
             

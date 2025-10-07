@@ -435,3 +435,275 @@ class TestResponseValidation(TestAPIEndpoints):
         assert isinstance(summary["strengths"], list)
         assert isinstance(summary["areas_for_improvement"], list)
         assert isinstance(summary["critical_issues"], list)
+
+
+class TestTalkTimeFiltering(TestAPIEndpoints):
+    """Tests for talk_time filtering logic"""
+
+    @patch.dict('os.environ', {'INTERNAL_API_KEY': 'test_api_key'})
+    @patch('app.api.routes.get_orchestrator')
+    @patch('app.api.routes.get_db_service')
+    def test_skip_call_with_short_talk_time(self, mock_get_db, mock_get_orch,
+                                           client, auth_headers):
+        """Test that calls with talk_time < 60 are skipped"""
+        # Create request with short talk_time
+        short_call_request = {
+            "call_id": "short_call_123",
+            "agent_id": "agent_456",
+            "call_context": "First Call",
+            "transcript": {
+                "transcript": "Agent: Hello?\nClient: Not interested.",
+                "metadata": {
+                    "duration": 50,
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "talk_time": 45,
+                    "disposition": "not_interested"
+                }
+            },
+            "ideal_script": "Basic greeting",
+            "client_data": {
+                "script_progress": {
+                    "sections_attempted": [1],
+                    "last_completed_section": 0,
+                    "termination_reason": "not_interested"
+                }
+            }
+        }
+
+        # Setup mocks (should NOT be called)
+        mock_orchestrator = AsyncMock()
+        mock_get_orch.return_value = mock_orchestrator
+        mock_db_service = AsyncMock()
+        mock_get_db.return_value = mock_db_service
+
+        # Make request
+        response = client.post("/api/v1/evaluate-call",
+                              json=short_call_request,
+                              headers=auth_headers)
+
+        # Assertions
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify skipped response structure
+        assert data["status"] == "skipped"
+        assert data["reason"] == "talk_time_too_short"
+        assert data["call_id"] == "short_call_123"
+        assert "correlation_id" in data
+        assert data["details"]["talk_time"] == 45
+        assert data["details"]["minimum_required"] == 60
+        assert "processing_time_ms" in data
+
+        # Verify orchestrator was NOT called
+        mock_orchestrator.evaluate_call.assert_not_called()
+        mock_orchestrator.calculate_overall_score.assert_not_called()
+        mock_orchestrator.generate_summary.assert_not_called()
+
+    @patch.dict('os.environ', {'INTERNAL_API_KEY': 'test_api_key'})
+    @patch('app.api.routes.get_orchestrator')
+    @patch('app.api.routes.get_db_service')
+    def test_process_call_with_sufficient_talk_time(self, mock_get_db, mock_get_orch,
+                                                    client, auth_headers,
+                                                    sample_evaluation_result, sample_summary):
+        """Test that calls with talk_time >= 60 are processed normally"""
+        # Create request with sufficient talk_time
+        good_call_request = {
+            "call_id": "good_call_123",
+            "agent_id": "agent_456",
+            "call_context": "First Call",
+            "transcript": {
+                "transcript": "Agent: Hello, this is a proper conversation.\nClient: Yes, I'm interested.",
+                "metadata": {
+                    "duration": 80,
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "talk_time": 75,
+                    "disposition": "completed"
+                }
+            },
+            "ideal_script": "Full script here",
+            "client_data": {
+                "script_progress": {
+                    "sections_attempted": [1, 2, 3],
+                    "last_completed_section": 3,
+                    "termination_reason": "completed"
+                }
+            }
+        }
+
+        # Setup mocks
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.evaluate_call.return_value = sample_evaluation_result
+        mock_orchestrator.calculate_overall_score.return_value = 85
+        mock_orchestrator.generate_summary.return_value = sample_summary
+        mock_get_orch.return_value = mock_orchestrator
+
+        mock_db_service = AsyncMock()
+        mock_get_db.return_value = mock_db_service
+
+        # Make request
+        response = client.post("/api/v1/evaluate-call",
+                              json=good_call_request,
+                              headers=auth_headers)
+
+        # Assertions
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify normal evaluation response (not skipped)
+        assert "evaluation" in data
+        assert "overall_score" in data
+        assert data["overall_score"] == 85
+        assert "status" not in data  # Normal response doesn't have status field
+
+        # Verify orchestrator WAS called
+        mock_orchestrator.evaluate_call.assert_called_once()
+        mock_orchestrator.calculate_overall_score.assert_called_once()
+        mock_orchestrator.generate_summary.assert_called_once()
+
+    @patch.dict('os.environ', {'INTERNAL_API_KEY': 'test_api_key'})
+    @patch('app.api.routes.get_orchestrator')
+    @patch('app.api.routes.get_db_service')
+    def test_process_call_with_no_talk_time(self, mock_get_db, mock_get_orch,
+                                           client, auth_headers,
+                                           sample_evaluation_result, sample_summary):
+        """Test that calls without talk_time field are processed normally"""
+        # Create request without talk_time
+        no_talk_time_request = {
+            "call_id": "no_talk_time_123",
+            "agent_id": "agent_456",
+            "call_context": "First Call",
+            "transcript": {
+                "transcript": "Agent: Hello.\nClient: Hi.",
+                "metadata": {
+                    "duration": 50,
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "disposition": "completed"
+                }
+            },
+            "ideal_script": "Basic script",
+            "client_data": {
+                "script_progress": {
+                    "sections_attempted": [1],
+                    "last_completed_section": 1,
+                    "termination_reason": "completed"
+                }
+            }
+        }
+
+        # Setup mocks
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.evaluate_call.return_value = sample_evaluation_result
+        mock_orchestrator.calculate_overall_score.return_value = 85
+        mock_orchestrator.generate_summary.return_value = sample_summary
+        mock_get_orch.return_value = mock_orchestrator
+
+        mock_db_service = AsyncMock()
+        mock_get_db.return_value = mock_db_service
+
+        # Make request
+        response = client.post("/api/v1/evaluate-call",
+                              json=no_talk_time_request,
+                              headers=auth_headers)
+
+        # Assertions
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify normal evaluation (not skipped when talk_time is None)
+        assert "evaluation" in data
+        assert "overall_score" in data
+
+        # Verify orchestrator WAS called
+        mock_orchestrator.evaluate_call.assert_called_once()
+
+    @patch.dict('os.environ', {'INTERNAL_API_KEY': 'test_api_key'})
+    @patch('app.api.routes.get_orchestrator')
+    @patch('app.api.routes.get_db_service')
+    def test_batch_with_mixed_talk_times(self, mock_get_db, mock_get_orch,
+                                        client, auth_headers,
+                                        sample_evaluation_result, sample_summary):
+        """Test batch evaluation with mix of short and sufficient talk times"""
+        batch_request = [
+            {  # Short talk_time - should be skipped
+                "call_id": "short_batch_1",
+                "agent_id": "agent_456",
+                "call_context": "First Call",
+                "transcript": {
+                    "transcript": "Short call",
+                    "metadata": {
+                        "duration": 40,
+                        "timestamp": "2024-01-15T10:30:00Z",
+                        "talk_time": 35,
+                        "disposition": "not_interested"
+                    }
+                },
+                "ideal_script": "Script",
+                "client_data": {
+                    "script_progress": {
+                        "sections_attempted": [1],
+                        "last_completed_section": 0,
+                        "termination_reason": "not_interested"
+                    }
+                }
+            },
+            {  # Sufficient talk_time - should be processed
+                "call_id": "good_batch_1",
+                "agent_id": "agent_456",
+                "call_context": "First Call",
+                "transcript": {
+                    "transcript": "Good call",
+                    "metadata": {
+                        "duration": 100,
+                        "timestamp": "2024-01-15T10:30:00Z",
+                        "talk_time": 95,
+                        "disposition": "completed"
+                    }
+                },
+                "ideal_script": "Script",
+                "client_data": {
+                    "script_progress": {
+                        "sections_attempted": [1, 2, 3],
+                        "last_completed_section": 3,
+                        "termination_reason": "completed"
+                    }
+                }
+            }
+        ]
+
+        # Setup mocks
+        mock_orchestrator = AsyncMock()
+        mock_orchestrator.evaluate_call.return_value = sample_evaluation_result
+        mock_orchestrator.calculate_overall_score.return_value = 85
+        mock_orchestrator.generate_summary.return_value = sample_summary
+        mock_get_orch.return_value = mock_orchestrator
+
+        mock_db_service = AsyncMock()
+        mock_get_db.return_value = mock_db_service
+
+        # Make request
+        response = client.post("/api/v1/evaluate-batch",
+                              json=batch_request,
+                              headers=auth_headers)
+
+        # Assertions
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["results"]) == 2
+        assert data["summary"]["total"] == 2
+        assert data["summary"]["successful"] == 2
+
+        # Check first result is skipped
+        result1 = next(r for r in data["results"] if r["call_id"] == "short_batch_1")
+        assert result1["success"] is True
+        assert result1.get("skipped") is True
+        assert result1["response"]["status"] == "skipped"
+
+        # Check second result is evaluated
+        result2 = next(r for r in data["results"] if r["call_id"] == "good_batch_1")
+        assert result2["success"] is True
+        assert result2.get("skipped") is None or result2.get("skipped") is False
+        assert "evaluation" in result2["response"]
+
+        # Verify orchestrator was called only once (for the good call)
+        assert mock_orchestrator.evaluate_call.call_count == 1
