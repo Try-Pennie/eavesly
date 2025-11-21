@@ -46,7 +46,6 @@
     <evaluation_criteria>
         <compliance_requirements priority="highest">
             <requirement name="agent_identification">Did the agent clearly identify themselves as a Pennie representative?</requirement>
-            <requirement name="call_recording_disclosure">Did the agent disclose that the call is being recorded?</requirement>
             <requirement name="credit_pull_consent">Did the agent obtain explicit verbal consent before pulling credit ("Do I have your permission to pull your credit?")?</requirement>
             <requirement name="social_security_verification">Did the agent properly request and verify SSN for security purposes?</requirement>
             <requirement name="accurate_representations">Did the agent make only truthful statements about Pennie's services, processes, and potential outcomes?</requirement>
@@ -117,7 +116,7 @@
     </critical_compliance_notes>
 
     <critical_red_flags>
-        <red_flag>Missing call recording disclosure or failure to obtain explicit credit pull consent</red_flag>
+        <red_flag>Failure to obtain explicit credit pull consent</red_flag>
         <red_flag>Guaranteeing specific debt resolution outcomes, savings, timelines, or credit score improvements</red_flag>
         <red_flag>Misrepresenting Pennie's program (e.g., implying it is a government program or interest stops immediately)</red_flag>
         <red_flag>Presenting aggressive or high-pressure sales tactics that disregard customer concerns</red_flag>
@@ -130,7 +129,7 @@
         2. Focus primarily on compliance adherence - this is the most critical aspect
         3. Capture every piece of evidence using this structure: Speaker label (Agent/Customer/Transfer Agent/etc.), direct quote in quotation marks, contextual timing note (e.g., "after credit discussion"), and Pennie 6-step tag (Step 1 Agenda Setting, Step 2 Credit Review, Step 3 Agent Inputs, Step 4 Paydown Projections, Step 5 Loan Offers, Step 6 Debt Resolution, or Off-Cycle)
         4. Record exact quotes or clear contextual descriptions for every compliance requirement (pass or fail) using the evidence structure above
-        5. Cross-check the transcript against Pennie's high-risk compliance checklist (recording disclosure, credit pull consent, outcome guarantees, interest accrual accuracy, graduation loan positioning, compliant terminology, legal action framing, program regulation accuracy, GOTA script adherence, co-applicant approval) and document outcomes with structured evidence; if an item is not observed or not applicable, return an empty evidence array rather than null or omitting the field
+        5. Cross-check the transcript against Pennie's high-risk compliance checklist (credit pull consent, outcome guarantees, interest accrual accuracy, graduation loan positioning, compliant terminology, legal action framing, program regulation accuracy, GOTA script adherence, co-applicant approval) and document outcomes with structured evidence; if an item is not observed or not applicable, return an empty evidence array rather than null or omitting the field
         6. Document specific quotes demonstrating customer experience quality (both positive and negative) using the same structure
         7. Note where in the conversation each sales process step occurs (e.g., "during opening", "after credit discussion") and align with the Pennie 6-step tags
         8. Evaluate customer treatment and experience quality with specific structured evidence

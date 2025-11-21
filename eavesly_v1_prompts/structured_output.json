@@ -210,7 +210,8 @@
             "title": "Call Recording Disclosure",
             "enum": [
               "pass",
-              "fail"
+              "fail",
+              "not_applicable"
             ]
           },
           "call_recording_disclosure_evidence": {
@@ -405,7 +406,6 @@
                   "description": "Category of the red flag triggered",
                   "title": "Red Flag Category",
                   "enum": [
-                    "Missing recording disclosure",
                     "No credit pull consent",
                     "Outcome guarantee",
                     "Program misrepresentation",

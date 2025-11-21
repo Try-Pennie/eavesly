@@ -1,0 +1,16 @@
+{
+    "type": "prompt-version",
+    "promptId": "fb93752d-ea0e-4777-a498-b431cefba6b5",
+    "promptName": "eavesly_v1.1",
+    "automationId": "cmhw9yeap027lad07mv6ytu7a",
+    "promptVersion": 2
+}
+
+{
+    "httpStatus": 403,
+    "responseBody": {
+        "message": "Resource not accessible by personal access token",
+        "documentation_url": "https://docs.github.com/rest/repos/repos#create-a-repository-dispatch-event",
+        "status": "403"
+    }
+}
