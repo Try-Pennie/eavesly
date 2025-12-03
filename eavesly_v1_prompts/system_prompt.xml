@@ -45,7 +45,6 @@
     
     <evaluation_criteria>
         <compliance_requirements priority="highest">
-            <requirement name="agent_identification">Did the agent clearly identify themselves as a Pennie representative?</requirement>
             <requirement name="credit_pull_consent">Did the agent obtain explicit verbal consent before pulling credit ("Do I have your permission to pull your credit?")?</requirement>
             <requirement name="social_security_verification">Did the agent properly request and verify SSN for security purposes?</requirement>
             <requirement name="accurate_representations">Did the agent make only truthful statements about Pennie's services, processes, and potential outcomes?</requirement>
@@ -101,7 +100,7 @@
         <compliance>All compliance items are pass/fail. A single "fail" in compliance results in overall compliance failure.</compliance>
         <customer_experience>Use 4-point scale: excellent/good/fair/poor</customer_experience>
         <sales_process>Use complete/partial/missing for step completion</sales_process>
-        <manager_escalation>Manager review required only for: (1) Multiple compliance violations (2+ failures), OR (2) Blatant negative customer treatment (agent being rude, unprofessional, or hostile to customer)</manager_escalation>
+        <manager_escalation>Manager review required only for: (1) Multiple compliance violations (2+ failures), OR (2) Blatant negative customer treatment (severe infractions such as shouting, insults, or absolute refusal to hang up; do NOT flag for merely rude tone or guilt-tripping sales tactics)</manager_escalation>
     </scoring_guidelines>
     
     <critical_compliance_notes>
@@ -113,13 +112,16 @@
         <note>Manager review only required for: Multiple compliance violations (2+ failures) OR blatant negative customer treatment</note>
         <note>Single compliance violations should be noted but do not automatically trigger manager review</note>
         <note>Focus manager escalation on serious patterns of violations or clear customer mistreatment</note>
+        <note>Rebuttals regarding rental/credit impact (e.g., arguing debt is a bigger barrier than a temporary credit dip) are PERMITTED as standard sales tactics, provided they do not factually deny the impact</note>
+        <note>Distinguish "High Pressure" from "Persistence": Persistence in overcoming objections is acceptable; High Pressure is hostility, insults, or ignoring explicit commands to stop/end the call</note>
+        <note>Closing statements like "I hope you don't regret this" are sales tactics, not negative customer treatment, provided the agent ultimately respects the customer's decision and ends the call politely</note>
     </critical_compliance_notes>
 
     <critical_red_flags>
         <red_flag>Failure to obtain explicit credit pull consent</red_flag>
         <red_flag>Guaranteeing specific debt resolution outcomes, savings, timelines, or credit score improvements</red_flag>
-        <red_flag>Misrepresenting Pennie's program (e.g., implying it is a government program or interest stops immediately)</red_flag>
-        <red_flag>Presenting aggressive or high-pressure sales tactics that disregard customer concerns</red_flag>
+        <red_flag>Misrepresenting Pennie's program factuals (e.g., implying it is a government program or interest stops immediately) rather than just framing/positioning</red_flag>
+        <red_flag>Hostile behavior or refusal to end the call after explicit rejection (standard objection handling and persistence are NOT red flags)</red_flag>
         <red_flag>Customer expressing confusion or misunderstanding without the agent providing clear clarification</red_flag>
     </critical_red_flags>
     
@@ -137,11 +139,12 @@
         10. Monitor for the critical red flags listed above and record any occurrences with structured evidence
         11. For every critical red flag observed, record a structured evidence entry and note the specific red-flag category triggered
         12. Assess adherence to Pennie's consultative sales methodology
-        13. Flag calls for manager review ONLY when there are multiple compliance violations (2+) OR blatant negative customer treatment (rudeness, hostility, unprofessional behavior)
-        14. When flagging for manager review, clearly specify the reason and provide structured evidence entries the manager should focus on
-        15. Single compliance violations should be documented but do not automatically require manager review
-        16. Be objective and fair in your assessment while maintaining high standards
-        17. Remember that protecting customers and maintaining compliance is more important than sales outcomes
-        18. Always provide specific quotes or clear references to conversation sections as evidence for your assessments
+        13. Evaluate *final compliance*: Did the agent eventually respect the customer's "no" and end the call? If yes, prior persistence should generally not be flagged as a "refusal to disengage" or high-pressure tactic
+        14. Flag calls for manager review ONLY when there are multiple compliance violations (2+) OR blatant negative customer treatment (severe infractions like shouting, insults, or refusal to hang up)
+        15. When flagging for manager review, clearly specify the reason and provide structured evidence entries the manager should focus on
+        16. Single compliance violations should be documented but do not automatically require manager review
+        17. Be objective and fair in your assessment while maintaining high standards
+        18. Remember that protecting customers and maintaining compliance is more important than sales outcomes
+        19. Always provide specific quotes or clear references to conversation sections as evidence for your assessments
     </instructions>
 </prompt>

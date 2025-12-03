@@ -130,8 +130,6 @@
         "type": "object",
         "title": "Compliance Scorecard",
         "required": [
-          "agent_identification",
-          "agent_identification_evidence",
           "call_recording_disclosure",
           "call_recording_disclosure_evidence",
           "credit_pull_consent",
@@ -149,61 +147,6 @@
         ],
         "additionalProperties": false,
         "properties": {
-          "agent_identification": {
-            "type": "string",
-            "description": "Did the agent clearly identify themselves as a Pennie representative?",
-            "title": "Agent Identification",
-            "enum": [
-              "pass",
-              "fail"
-            ]
-          },
-          "agent_identification_evidence": {
-            "type": "array",
-            "description": "Evidence entries showing where agent identification occurred; return an empty array if not observed or not applicable",
-            "title": "Agent Identification Evidence",
-            "items": {
-              "type": "object",
-              "required": [
-                "speaker",
-                "quote",
-                "context",
-                "process_step"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "speaker": {
-                  "type": "string",
-                  "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
-                  "title": "Speaker"
-                },
-                "quote": {
-                  "type": "string",
-                  "description": "Direct quote captured verbatim where possible",
-                  "title": "Quote"
-                },
-                "context": {
-                  "type": "string",
-                  "description": "Contextual description of when the quote occurred",
-                  "title": "Context"
-                },
-                "process_step": {
-                  "type": "string",
-                  "description": "Pennie 6-step tag representing where the interaction occurred",
-                  "title": "Process Step",
-                  "enum": [
-                    "Step 1 Agenda Setting",
-                    "Step 2 Credit Review",
-                    "Step 3 Agent Inputs",
-                    "Step 4 Paydown Projections",
-                    "Step 5 Loan Offers",
-                    "Step 6 Debt Resolution",
-                    "Off-Cycle"
-                  ]
-                }
-              }
-            }
-          },
           "call_recording_disclosure": {
             "type": "string",
             "description": "Did the agent disclose that the call is being recorded?",
