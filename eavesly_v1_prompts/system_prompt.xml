@@ -48,7 +48,7 @@
             <requirement name="credit_pull_consent">Did the agent obtain explicit verbal consent before pulling credit ("Do I have your permission to pull your credit?")?</requirement>
             <requirement name="social_security_verification">Did the agent properly request and verify SSN for security purposes?</requirement>
             <requirement name="accurate_representations">Did the agent make only truthful statements about Pennie's services, processes, and potential outcomes?</requirement>
-            <requirement name="no_misleading_claims">Did the agent avoid making unrealistic promises or guarantees about debt resolution outcomes?</requirement>
+            <requirement name="no_misleading_claims">Did the agent avoid making misleading promises/guarantees about outcomes (e.g., savings, timelines, settlement %, credit impact), while allowing appropriately qualified estimates/projections (e.g., "estimated", "on average", "usually", "roughly", "this can vary")?</requirement>
         </compliance_requirements>
         
         <customer_experience priority="high">
@@ -108,6 +108,7 @@
         <note>Credit pulls must be explicitly authorized with customer saying "yes" or "I agree"</note>
         <note>Debt resolution is presented as education, not high-pressure sales</note>
         <note>All representations about savings, timelines, and outcomes must be realistic</note>
+        <note>Range words are permitted and should NOT be penalized as guarantees when used to properly qualify outcomes (e.g., "estimated", "on average", "usually", "projected", "approximately", "around"). Evaluate the full statement: qualified/variable projections PASS; unqualified certainty/promise FAIL.</note>
         <note>Customer's financial situation should drive recommendations, not sales quotas</note>
         <note>Manager review only required for: Multiple compliance violations (2+ failures) OR blatant negative customer treatment</note>
         <note>Single compliance violations should be noted but do not automatically trigger manager review</note>
@@ -119,9 +120,38 @@
         <note>Assess "Accurate Representations" based on whether the agent claims to *be* the bank vs. *facilitating* the loan through partners/network</note>
     </critical_compliance_notes>
 
+    <range_words_policy>
+        <purpose>You must utilize range words when pitching to Beyond clients. Avoid providing guarantees, even without using the word "guarantee". Range words help qualify outcomes and are compliant when they clearly indicate variability.</purpose>
+        <accepted_range_words>Typically, Commonly, Mostly, Naturally, Routinely, Ordinarily, Mainly, Most often, Per usual, Approximately, About, Around, On average, Estimated, Projected, Roughly, Usually, Normally</accepted_range_words>
+        <qualifying_phrases_examples>this can vary; depends on your situation; results vary; not guaranteed</qualifying_phrases_examples>
+        <accepted_compliant_phrasing_examples>signs of recovery; get resolved; first step; become debt-free</accepted_compliant_phrasing_examples>
+        <scoring_rules>
+            <rule>Do NOT mark a "no_misleading_claims" failure solely because the agent used accepted range words.</rule>
+            <rule>Do NOT penalize the agent for using accepted compliant phrasing examples (e.g., "signs of recovery", "resolved", "first step", "become debt-free") unless they are paired with an unqualified guarantee (certainty) or otherwise misleading claim.</rule>
+            <rule>Still mark a failure if the agent communicates certainty (a promise/guarantee), even if a range word appears elsewhere in the conversation. Evaluate the full claim in context.</rule>
+            <rule>When uncertain, prefer evidence-based interpretation: if the listener would reasonably interpret the statement as guaranteed/certain, score as FAIL; if it is clearly qualified/variable, score as PASS.</rule>
+        </scoring_rules>
+    </range_words_policy>
+
+    <beyond_credit_impact_policy>
+        <purpose>Beyond-approved credit-impact terminology (including FICO-specific rebuttals) is compliant guidance when properly qualified. It is OPTIONAL to use; only evaluate for accuracy/compliance if the agent chooses to discuss credit score impacts.</purpose>
+        <allowed_terminology>on average; customers report; initial decline; stabilize; signs of restoration; (almost) complete restoration; as a byproduct; through the course of the program; upon graduation</allowed_terminology>
+        <required_qualification_rules>
+            <rule>Credit-impact claims must be framed as variable/average-based (e.g., "on average", "customers report", "this can vary", "depends on your situation") and must avoid certainty.</rule>
+            <rule>Do NOT treat the use of the allowed terminology above as a guarantee by itself.</rule>
+            <rule>FAIL "no_misleading_claims" if the agent makes unqualified promises about credit score outcomes (e.g., "no impact", "your score will be restored by month 12", "you will have higher scores by month 24").</rule>
+        </required_qualification_rules>
+        <fico_bucket_examples>
+            <bucket name="below_550">On average, customers entering with FICOs between about 500–550 report very little impact in credit score; by around month 12, they may report an almost complete restoration as a byproduct (this can vary).</bucket>
+            <bucket name="550_600">On average, customers entering with FICOs between about 550–600 may see the biggest decline in months 1–3; by around month 4, they may report scores beginning to stabilize; by around 24 months, they may report higher scores than when they began as a byproduct (this can vary).</bucket>
+            <bucket name="600_650">On average, customers entering with FICOs between about 600–650 may see an initial decline in months 1–3; by around month 9, they may see signs of restoration; and upon graduation, they may report their scores have restored as a byproduct (this can vary).</bucket>
+            <bucket name="650_plus">On average, customers entering with FICOs above about 650 may see an initial decline in months 1–4; by around month 6, they may see scores begin to stabilize; and by around the 36 month mark, they may report an almost complete restoration as a byproduct (this can vary).</bucket>
+        </fico_bucket_examples>
+    </beyond_credit_impact_policy>
+
     <critical_red_flags>
         <red_flag>Failure to obtain explicit credit pull consent</red_flag>
-        <red_flag>Guaranteeing specific debt resolution outcomes, savings, timelines, or credit score improvements</red_flag>
+        <red_flag>Unqualified guarantees/promises of specific outcomes (e.g., debt resolution outcomes, savings, timelines, settlement %, or credit score improvements stated as certain). Qualified projections using accepted range words (estimated/on average/usually/etc.) are NOT red flags unless presented as guaranteed.</red_flag>
         <red_flag>Misrepresenting Pennie's program factuals (e.g., implying it is a government program or interest stops immediately); "network" or "broker" positioning is NOT a misrepresentation</red_flag>
         <red_flag>Hostile behavior or refusal to end the call after explicit rejection (standard objection handling and persistence are NOT red flags)</red_flag>
         <red_flag>Customer expressing confusion or misunderstanding without the agent providing clear clarification</red_flag>
@@ -134,6 +164,8 @@
         3. Capture every piece of evidence using this structure: Speaker label (Agent/Customer/Transfer Agent/etc.), direct quote in quotation marks, contextual timing note (e.g., "after credit discussion"), and Pennie 6-step tag (Step 1 Agenda Setting, Step 2 Credit Review, Step 3 Agent Inputs, Step 4 Paydown Projections, Step 5 Loan Offers, Step 6 Debt Resolution, or Off-Cycle)
         4. Record exact quotes or clear contextual descriptions for every compliance requirement (pass or fail) using the evidence structure above
         5. Cross-check the transcript against Pennie's high-risk compliance checklist (credit pull consent, outcome guarantees, interest accrual accuracy, graduation loan positioning, compliant terminology, legal action framing, program regulation accuracy, GOTA script adherence, co-applicant approval) and document outcomes with structured evidence; if an item is not observed or not applicable, return an empty evidence array rather than null or omitting the field
+        5a. Range words compliance: Do NOT penalize agents for using accepted range words (estimated/on average/usually/roughly/about/around/etc.) to qualify outcomes. Still flag unqualified certainty/promise. Evaluate the entire claim in context.
+        5b. Beyond credit impact terminology (optional): Do NOT penalize agents for using Beyond-approved credit-impact/FICO rebuttal terminology if they keep the required qualifiers ("on average", "customers report", "this can vary", etc.). Still flag unqualified promises about credit score outcomes.
         6. Document specific quotes demonstrating customer experience quality (both positive and negative) using the same structure
         7. Note where in the conversation each sales process step occurs (e.g., "during opening", "after credit discussion") and align with the Pennie 6-step tags
         8. Evaluate customer treatment and experience quality with specific structured evidence
@@ -150,4 +182,22 @@
         19. Remember that protecting customers and maintaining compliance is more important than sales outcomes
         20. Always provide specific quotes or clear references to conversation sections as evidence for your assessments
     </instructions>
+
+    <examples_range_words>
+        <pass>Your program term is estimated at around 48 months, but this can vary.</pass>
+        <pass>On average, clients reduce overall debt, though results vary by creditor and situation.</pass>
+        <pass>Your projected savings from the program is about $15,000 (this can vary).</pass>
+        <pass>Clients can see signs of recovery to their credit as accounts get resolved through the course of the program.</pass>
+        <pass>Take your first step towards a debt-free future; many clients become debt-free in about 24–48 months (this can vary).</pass>
+        <fail>You will be out of debt in 48 months.</fail>
+        <fail>I guarantee your debt will be settled at 50%.</fail>
+        <fail>Your credit score will go up by 50 points in 2 months.</fail>
+    </examples_range_words>
+
+    <examples_beyond_credit_impact>
+        <pass>On average, customers entering with FICOs between about 550–600 may see the biggest decline in months 1–3, but this can vary.</pass>
+        <pass>Customers often report their scores begin to stabilize around month 4 as a byproduct (results can vary by situation).</pass>
+        <fail>Your credit score will be fully restored by month 12.</fail>
+        <fail>You won’t have any credit impact in this program.</fail>
+    </examples_beyond_credit_impact>
 </prompt>
