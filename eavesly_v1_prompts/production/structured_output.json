@@ -1,0 +1,1050 @@
+{
+  "type": "object",
+  "properties": {
+    "call_overview": {
+      "type": "object",
+      "title": "Call Overview",
+      "required": [
+        "pennie_agent_speaker",
+        "customer_speaker",
+        "other_speakers",
+        "call_topic",
+        "call_purpose",
+        "call_outcome",
+        "overall_tone",
+        "call_duration_assessment",
+        "manager_review_required",
+        "manager_review_reason",
+        "manager_focus_areas"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pennie_agent_speaker": {
+          "type": "string",
+          "description": "Speaker identifier for the Pennie sales representative",
+          "title": "Pennie Agent Speaker",
+          "required": []
+        },
+        "customer_speaker": {
+          "type": "string",
+          "description": "Speaker identifier for the customer/client",
+          "title": "Customer Speaker",
+          "required": []
+        },
+        "other_speakers": {
+          "type": "array",
+          "description": "",
+          "title": "Other Speakers",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "call_topic": {
+          "type": "string",
+          "description": "Main topic or subject of the call",
+          "title": "Call Topic",
+          "required": []
+        },
+        "call_purpose": {
+          "type": "string",
+          "description": "Primary purpose or objective of the call",
+          "title": "Call Purpose",
+          "required": []
+        },
+        "call_outcome": {
+          "type": "string",
+          "description": "Result or outcome of the call",
+          "title": "Call Outcome",
+          "required": []
+        },
+        "overall_tone": {
+          "type": "string",
+          "description": "General tone and atmosphere of the conversation",
+          "title": "Overall Tone",
+          "required": []
+        },
+        "call_duration_assessment": {
+          "type": "string",
+          "description": "Assessment of call length efficiency",
+          "title": "Call Duration Assessment",
+          "required": [],
+          "enum": [
+            "efficient",
+            "appropriate",
+            "too_long"
+          ]
+        },
+        "manager_review_required": {
+          "type": "boolean",
+          "description": "Boolean flag - only true for multiple compliance violations (2+) OR blatant negative customer treatment",
+          "title": "Manager Review Required",
+          "required": []
+        },
+        "manager_review_reason": {
+          "type": "string",
+          "description": "Specific reason why manager review is required - empty string if not required",
+          "title": "Manager Review Reason",
+          "required": []
+        },
+        "manager_focus_areas": {
+          "type": "array",
+          "description": "",
+          "title": "Manager Focus Areas",
+          "items": {
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
+                "title": "Speaker",
+                "required": []
+              },
+              "quote": {
+                "type": "string",
+                "description": "Direct quote captured verbatim where possible",
+                "title": "Quote",
+                "required": []
+              },
+              "context": {
+                "type": "string",
+                "description": "Contextual description of when the quote occurred",
+                "title": "Context",
+                "required": []
+              },
+              "process_step": {
+                "type": "string",
+                "description": "Pennie 6-step tag representing where the interaction occurred",
+                "title": "Process Step",
+                "required": [],
+                "enum": [
+                  "Step 1 Agenda Setting",
+                  "Step 2 Credit Review",
+                  "Step 3 Agent Inputs",
+                  "Step 4 Paydown Projections",
+                  "Step 5 Loan Offers",
+                  "Step 6 Debt Resolution",
+                  "Off-Cycle"
+                ]
+              }
+            },
+            "required": [
+              "speaker",
+              "quote",
+              "context",
+              "process_step"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "compliance_scorecard": {
+      "type": "object",
+      "title": "Compliance Scorecard",
+      "required": [
+        "call_recording_disclosure",
+        "call_recording_disclosure_evidence",
+        "credit_pull_consent",
+        "credit_pull_consent_evidence",
+        "social_security_verification",
+        "social_security_verification_evidence",
+        "accurate_representations",
+        "accurate_representations_violations",
+        "no_misleading_claims",
+        "misleading_claims_violations",
+        "overall_compliance_score",
+        "compliance_violations",
+        "critical_red_flag_hits",
+        "critical_moments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "call_recording_disclosure": {
+          "type": "string",
+          "description": "Did the agent disclose that the call is being recorded?",
+          "title": "Call Recording Disclosure",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail",
+            "not_applicable"
+          ]
+        },
+        "call_recording_disclosure_evidence": {
+          "type": "array",
+          "description": "",
+          "title": "Call Recording Disclosure Evidence",
+          "items": {
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
+                "title": "Speaker",
+                "required": []
+              },
+              "quote": {
+                "type": "string",
+                "description": "Direct quote captured verbatim where possible",
+                "title": "Quote",
+                "required": []
+              },
+              "context": {
+                "type": "string",
+                "description": "Contextual description of when the quote occurred",
+                "title": "Context",
+                "required": []
+              },
+              "process_step": {
+                "type": "string",
+                "description": "Pennie 6-step tag representing where the interaction occurred",
+                "title": "Process Step",
+                "required": [],
+                "enum": [
+                  "Step 1 Agenda Setting",
+                  "Step 2 Credit Review",
+                  "Step 3 Agent Inputs",
+                  "Step 4 Paydown Projections",
+                  "Step 5 Loan Offers",
+                  "Step 6 Debt Resolution",
+                  "Off-Cycle"
+                ]
+              }
+            },
+            "required": [
+              "speaker",
+              "quote",
+              "context",
+              "process_step"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "credit_pull_consent": {
+          "type": "string",
+          "description": "Did the agent obtain explicit verbal consent before pulling credit?",
+          "title": "Credit Pull Consent",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail",
+            "not_applicable"
+          ]
+        },
+        "credit_pull_consent_evidence": {
+          "type": "array",
+          "description": "",
+          "title": "Credit Pull Consent Evidence",
+          "items": {
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
+                "title": "Speaker",
+                "required": []
+              },
+              "quote": {
+                "type": "string",
+                "description": "Direct quote captured verbatim where possible",
+                "title": "Quote",
+                "required": []
+              },
+              "context": {
+                "type": "string",
+                "description": "Contextual description of when the quote occurred",
+                "title": "Context",
+                "required": []
+              },
+              "process_step": {
+                "type": "string",
+                "description": "Pennie 6-step tag representing where the interaction occurred",
+                "title": "Process Step",
+                "required": [],
+                "enum": [
+                  "Step 1 Agenda Setting",
+                  "Step 2 Credit Review",
+                  "Step 3 Agent Inputs",
+                  "Step 4 Paydown Projections",
+                  "Step 5 Loan Offers",
+                  "Step 6 Debt Resolution",
+                  "Off-Cycle"
+                ]
+              }
+            },
+            "required": [
+              "speaker",
+              "quote",
+              "context",
+              "process_step"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "social_security_verification": {
+          "type": "string",
+          "description": "Did the agent properly request and verify SSN for security purposes?",
+          "title": "Social Security Verification",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail",
+            "not_applicable"
+          ]
+        },
+        "social_security_verification_evidence": {
+          "type": "array",
+          "description": "",
+          "title": "Social Security Verification Evidence",
+          "items": {
+            "properties": {
+              "speaker": {
+                "type": "string",
+                "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
+                "title": "Speaker",
+                "required": []
+              },
+              "quote": {
+                "type": "string",
+                "description": "Direct quote captured verbatim where possible",
+                "title": "Quote",
+                "required": []
+              },
+              "context": {
+                "type": "string",
+                "description": "Contextual description of when the quote occurred",
+                "title": "Context",
+                "required": []
+              },
+              "process_step": {
+                "type": "string",
+                "description": "Pennie 6-step tag representing where the interaction occurred",
+                "title": "Process Step",
+                "required": [],
+                "enum": [
+                  "Step 1 Agenda Setting",
+                  "Step 2 Credit Review",
+                  "Step 3 Agent Inputs",
+                  "Step 4 Paydown Projections",
+                  "Step 5 Loan Offers",
+                  "Step 6 Debt Resolution",
+                  "Off-Cycle"
+                ]
+              }
+            },
+            "required": [
+              "speaker",
+              "quote",
+              "context",
+              "process_step"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "accurate_representations": {
+          "type": "string",
+          "description": "Did the agent make only truthful statements about Pennie's services?",
+          "title": "Accurate Representations",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "accurate_representations_violations": {
+          "type": "array",
+          "description": "",
+          "title": "Accurate Representations Violations",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_red_flag_hits": {
+          "type": "array",
+          "description": "",
+          "title": "Critical Red Flag Hits",
+          "items": {
+            "properties": {
+              "red_flag": {
+                "type": "string",
+                "description": "Category of the red flag triggered",
+                "title": "Red Flag Category",
+                "required": [],
+                "enum": [
+                  "No credit pull consent",
+                  "Outcome guarantee",
+                  "Program misrepresentation",
+                  "High-pressure tactics",
+                  "Unresolved customer confusion"
+                ]
+              },
+              "evidence": {
+                "type": "array",
+                "description": "",
+                "title": "Red Flag Evidence",
+                "items": {
+                  "properties": {
+                    "speaker": {
+                      "type": "string",
+                      "description": "Speaker label (e.g., Agent, Customer, Transfer Agent)",
+                      "title": "Speaker",
+                      "required": []
+                    },
+                    "quote": {
+                      "type": "string",
+                      "description": "Direct quote captured verbatim where possible",
+                      "title": "Quote",
+                      "required": []
+                    },
+                    "context": {
+                      "type": "string",
+                      "description": "Contextual description of when the quote occurred",
+                      "title": "Context",
+                      "required": []
+                    },
+                    "process_step": {
+                      "type": "string",
+                      "description": "Pennie 6-step tag representing where the interaction occurred",
+                      "title": "Process Step",
+                      "required": [],
+                      "enum": [
+                        "Step 1 Agenda Setting",
+                        "Step 2 Credit Review",
+                        "Step 3 Agent Inputs",
+                        "Step 4 Paydown Projections",
+                        "Step 5 Loan Offers",
+                        "Step 6 Debt Resolution",
+                        "Off-Cycle"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "speaker",
+                    "quote",
+                    "context",
+                    "process_step"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "red_flag",
+              "evidence"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "no_misleading_claims": {
+          "type": "string",
+          "description": "Did the agent avoid making unrealistic promises about outcomes?",
+          "title": "No Misleading Claims",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "misleading_claims_violations": {
+          "type": "array",
+          "description": "",
+          "title": "Misleading Claims Violations",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "overall_compliance_score": {
+          "type": "string",
+          "description": "Overall compliance assessment - fails if any individual item fails",
+          "title": "Overall Compliance Score",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "compliance_violations": {
+          "type": "array",
+          "description": "",
+          "title": "Compliance Violations",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_moments": {
+          "type": "array",
+          "description": "",
+          "title": "Critical Moments",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "customer_experience_scorecard": {
+      "type": "object",
+      "title": "Customer Experience Scorecard",
+      "required": [
+        "professional_tone",
+        "professional_tone_examples",
+        "active_listening",
+        "active_listening_examples",
+        "patience_empathy",
+        "patience_empathy_examples",
+        "clear_communication",
+        "clear_communication_examples",
+        "customer_focused",
+        "customer_focused_examples",
+        "overall_customer_experience",
+        "customer_experience_notes",
+        "notable_interactions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "professional_tone": {
+          "type": "string",
+          "description": "Was the agent respectful, courteous, and professional?",
+          "title": "Professional Tone",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "professional_tone_examples": {
+          "type": "array",
+          "description": "",
+          "title": "Professional Tone Examples",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "active_listening": {
+          "type": "string",
+          "description": "Did the agent demonstrate active listening and respond appropriately?",
+          "title": "Active Listening",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "active_listening_examples": {
+          "type": "array",
+          "description": "",
+          "title": "Active Listening Examples",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "patience_empathy": {
+          "type": "string",
+          "description": "Did the agent show patience and empathy with financial difficulties?",
+          "title": "Patience and Empathy",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "patience_empathy_examples": {
+          "type": "array",
+          "description": "",
+          "title": "Patience and Empathy Examples",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "clear_communication": {
+          "type": "string",
+          "description": "Did the agent explain concepts clearly without confusing jargon?",
+          "title": "Clear Communication",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "clear_communication_examples": {
+          "type": "array",
+          "description": "",
+          "title": "Clear Communication Examples",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "customer_focused": {
+          "type": "string",
+          "description": "Did the agent prioritize customer's best interests over sales pressure?",
+          "title": "Customer Focused",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "customer_focused_examples": {
+          "type": "array",
+          "description": "",
+          "title": "Customer Focused Examples",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "overall_customer_experience": {
+          "type": "string",
+          "description": "Overall assessment of customer experience quality",
+          "title": "Overall Customer Experience",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "customer_experience_notes": {
+          "type": "string",
+          "description": "Additional notes about customer experience and interaction quality",
+          "title": "Customer Experience Notes",
+          "required": []
+        },
+        "notable_interactions": {
+          "type": "array",
+          "description": "",
+          "title": "Notable Interactions",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sales_process_scorecard": {
+      "type": "object",
+      "title": "Sales Process Scorecard",
+      "required": [
+        "expected_sections",
+        "sections_attempted",
+        "sections_completed",
+        "step1_agenda_setting",
+        "step1_location",
+        "step2_credit_review",
+        "step2_location",
+        "step3_agent_inputs",
+        "step3_location",
+        "step4_paydown_projections",
+        "step4_location",
+        "step5_offers_review",
+        "step5_location",
+        "step6_debt_resolution",
+        "step6_location",
+        "overall_process_adherence",
+        "missed_opportunities",
+        "process_notes",
+        "section_gap_reasons",
+        "key_process_moments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "expected_sections": {
+          "type": "array",
+          "description": "",
+          "title": "Expected Sections",
+          "required": [],
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          }
+        },
+        "sections_attempted": {
+          "type": "array",
+          "description": "",
+          "title": "Sections Attempted",
+          "required": [],
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          }
+        },
+        "sections_completed": {
+          "type": "array",
+          "description": "",
+          "title": "Sections Completed",
+          "required": [],
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          }
+        },
+        "step1_agenda_setting": {
+          "type": "string",
+          "description": "Agenda setting and credit pull authorization step completion",
+          "title": "Step 1: Agenda Setting",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing"
+          ]
+        },
+        "step1_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 1 occurred, null if missing",
+          "title": "Step 1 Location",
+          "required": []
+        },
+        "step2_credit_review": {
+          "type": "string",
+          "description": "Credit report review and trend analysis step completion",
+          "title": "Step 2: Credit Review",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "step2_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 2 occurred, null if missing or not applicable",
+          "title": "Step 2 Location",
+          "required": []
+        },
+        "step3_agent_inputs": {
+          "type": "string",
+          "description": "Agent inputs and DTI calculation step completion",
+          "title": "Step 3: Agent Inputs",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing"
+          ]
+        },
+        "step3_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 3 occurred, null if missing",
+          "title": "Step 3 Location",
+          "required": []
+        },
+        "step4_paydown_projections": {
+          "type": "string",
+          "description": "Paydown projections and creditworthiness timeline step completion",
+          "title": "Step 4: Paydown Projections",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "step4_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 4 occurred, null if missing or not applicable",
+          "title": "Step 4 Location",
+          "required": []
+        },
+        "step5_offers_review": {
+          "type": "string",
+          "description": "Loan offers review step completion",
+          "title": "Step 5: Offers Review",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "step5_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 5 occurred, null if missing or not applicable",
+          "title": "Step 5 Location",
+          "required": []
+        },
+        "step6_debt_resolution": {
+          "type": "string",
+          "description": "Debt resolution presentation step completion",
+          "title": "Step 6: Debt Resolution",
+          "required": [],
+          "enum": [
+            "complete",
+            "partial",
+            "missing",
+            "not_applicable"
+          ]
+        },
+        "step6_location": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quote or context describing where Step 6 occurred, null if missing or not applicable",
+          "title": "Step 6 Location",
+          "required": []
+        },
+        "overall_process_adherence": {
+          "type": "string",
+          "description": "Overall adherence to Pennie's sales methodology",
+          "title": "Overall Process Adherence",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "missed_opportunities": {
+          "type": "array",
+          "description": "",
+          "title": "Missed Opportunities",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "process_notes": {
+          "type": "string",
+          "description": "Additional notes about sales process execution",
+          "title": "Process Notes",
+          "required": []
+        },
+        "section_gap_reasons": {
+          "type": "array",
+          "description": "",
+          "title": "Section Gap Reasons",
+          "items": {
+            "properties": {
+              "section": {
+                "type": "integer",
+                "description": "Pennie playbook section number that was not completed",
+                "title": "Section",
+                "required": [],
+                "minimum": 1,
+                "maximum": 6
+              },
+              "reason": {
+                "type": "string",
+                "description": "Reason the section was not completed (e.g., call ended early, customer declined, agent skipped)",
+                "title": "Reason",
+                "required": []
+              }
+            },
+            "required": [
+              "section",
+              "reason"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "key_process_moments": {
+          "type": "array",
+          "description": "",
+          "title": "Key Process Moments",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "transfer_agent_assessment": {
+      "type": "object",
+      "title": "Transfer Agent Assessment",
+      "required": [
+        "transfer_occurred",
+        "transfer_agent_tone",
+        "transfer_quality"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "transfer_occurred": {
+          "type": "boolean",
+          "description": "Boolean indicating if call was transferred to another agent",
+          "title": "Transfer Occurred",
+          "required": []
+        },
+        "transfer_agent_tone": {
+          "type": "string",
+          "description": "Assessment of transfer agent's tone and professionalism",
+          "title": "Transfer Agent Tone",
+          "required": [],
+          "enum": [
+            "professional",
+            "unprofessional",
+            "not_applicable"
+          ]
+        },
+        "transfer_quality": {
+          "type": "string",
+          "description": "Overall assessment of transfer agent quality or 'not_applicable'",
+          "title": "Transfer Quality",
+          "required": []
+        }
+      }
+    },
+    "coaching_recommendations": {
+      "type": "object",
+      "title": "Coaching Recommendations",
+      "required": [
+        "strengths",
+        "areas_for_improvement",
+        "specific_coaching_points",
+        "training_recommendations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "strengths": {
+          "type": "array",
+          "description": "",
+          "title": "Strengths",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "areas_for_improvement": {
+          "type": "array",
+          "description": "",
+          "title": "Areas for Improvement",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "specific_coaching_points": {
+          "type": "array",
+          "description": "",
+          "title": "Specific Coaching Points",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "training_recommendations": {
+          "type": "array",
+          "description": "",
+          "title": "Training Recommendations",
+          "required": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "overall_call_rating": {
+      "type": "object",
+      "title": "Overall Call Rating",
+      "required": [
+        "compliance_rating",
+        "sales_effectiveness",
+        "customer_satisfaction_likely",
+        "overall_score"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "compliance_rating": {
+          "type": "string",
+          "description": "Overall compliance pass/fail rating",
+          "title": "Compliance Rating",
+          "required": [],
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "sales_effectiveness": {
+          "type": "string",
+          "description": "Assessment of sales effectiveness and methodology execution",
+          "title": "Sales Effectiveness",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "fair",
+            "poor"
+          ]
+        },
+        "customer_satisfaction_likely": {
+          "type": "string",
+          "description": "Predicted customer satisfaction level based on interaction",
+          "title": "Customer Satisfaction Likely",
+          "required": [],
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "overall_score": {
+          "type": "string",
+          "description": "Overall call score combining all assessment areas",
+          "title": "Overall Score",
+          "required": [],
+          "enum": [
+            "excellent",
+            "good",
+            "needs_improvement",
+            "poor"
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "call_overview",
+    "compliance_scorecard",
+    "customer_experience_scorecard",
+    "sales_process_scorecard",
+    "transfer_agent_assessment",
+    "coaching_recommendations",
+    "overall_call_rating"
+  ],
+  "additionalProperties": false
+}

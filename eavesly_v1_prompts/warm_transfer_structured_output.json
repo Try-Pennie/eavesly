@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "description": "Minimal structured output for warm transfer compliance screening. The warm_transfer_violation boolean is the primary alert field for manager notifications.",
+  "properties": {
+    "enrollment_completed": {
+      "type": "boolean",
+      "description": "Was the client successfully enrolled during this call? Look for: payment collected, account setup confirmed, program start date set. If false, skip remaining analysis.",
+      "title": "Enrollment Completed"
+    },
+    "warm_transfer_completed": {
+      "type": "boolean",
+      "description": "Was the client warm transferred (connected LIVE) to the welcome call team before the call ended? True = compliant behavior.",
+      "title": "Warm Transfer Completed"
+    },
+    "welcome_call_scheduled": {
+      "type": "boolean",
+      "description": "Was a future welcome call scheduled instead of completing a live warm transfer?",
+      "title": "Welcome Call Scheduled"
+    },
+    "client_proactively_requested_scheduling": {
+      "type": "boolean",
+      "description": "Did the CLIENT initiate/request scheduling BEFORE the agent suggested or offered it? Passive agreement ('okay', 'sure') to agent's suggestion does NOT count - must be proactive client request.",
+      "title": "Client Proactively Requested Scheduling"
+    },
+    "warm_transfer_violation": {
+      "type": "boolean",
+      "description": "ALERT FIELD: Set to TRUE when enrollment occurred but agent failed to warm transfer AND client did not proactively request scheduling. This triggers manager alerts.",
+      "title": "Warm Transfer Violation"
+    },
+    "violation_reason": {
+      "type": "string",
+      "description": "Brief explanation of why the violation occurred. Empty string if no violation. Example: 'Agent suggested scheduling instead of warm transfer. Client only passively agreed.'",
+      "title": "Violation Reason"
+    },
+    "key_evidence_quote": {
+      "type": "string",
+      "description": "The most relevant direct quote from the transcript supporting the compliance determination. For violations, capture the agent's scheduling suggestion and client's passive response. For compliant calls, capture the transfer initiation or client's proactive scheduling request.",
+      "title": "Key Evidence Quote"
+    }
+  },
+  "required": [
+    "enrollment_completed",
+    "warm_transfer_completed",
+    "welcome_call_scheduled",
+    "client_proactively_requested_scheduling",
+    "warm_transfer_violation",
+    "violation_reason",
+    "key_evidence_quote"
+  ],
+  "additionalProperties": false
+}

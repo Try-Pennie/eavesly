@@ -1,0 +1,23 @@
+⚠️ *Warm Transfer Violation*
+
+Agent scheduled a welcome call instead of completing a mandated warm transfer.
+
+*Call Details*
+• *Agent:* {{steps.trigger.event.body.agent_email}}
+• *Regal Call ID:* {{steps.trigger.event.body.regal_call_id}}
+• *Lead ID:* {{steps.trigger.event.body.sfdc_lead_id}}
+• *Lead Name:* {{steps.trigger.event.body.client_name}}
+• *Call Length (Seconds):* {{steps.trigger.event.body.recording_length}}
+
+*Violation Details*
+• *Reason:* {{steps.clean_json.$return_value.cleanedJson.warm_transfer_compliance.violation_reason}}
+
+*Key Evidence*
+> "{{steps.clean_json.$return_value.cleanedJson.warm_transfer_compliance.key_evidence_quote}}"
+
+*Call Outcome*
+{{steps.clean_json.$return_value.cleanedJson.call_overview.call_outcome}}
+
+---
+<{{steps.trigger.event.body.regal_call_url}}|🔗 View Transcript & Recording on Regal>
+<{{steps.trigger.event.body.regal_recording_link}}|🗣️ Listen to Call Recording>
