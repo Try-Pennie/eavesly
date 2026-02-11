@@ -1,0 +1,24 @@
+⚠️ *Budget Collection Violation*
+
+Agent skipped required budget items during enrollment call.
+
+*Call Details*
+• *Agent:* {{steps.trigger.event.body.agent_email}}
+• *Regal Call ID:* {{steps.trigger.event.body.regal_call_id}}
+• *Lead ID:* {{steps.trigger.event.body.sfdc_lead_id}}
+• *Lead Name:* {{steps.trigger.event.body.client_name}}
+• *Call Length (Seconds):* {{steps.trigger.event.body.recording_length}}
+
+*Budget Collection*
+• *Items Collected:* {{steps.clean_json.$return_value.cleanedJson.budget_collection_overview.items_collected}} of 4
+• *Items Skipped:* {{steps.clean_json.$return_value.cleanedJson.budget_collection_overview.items_skipped}}
+
+*Violation Details*
+• *Reason:* {{steps.clean_json.$return_value.cleanedJson.violation_reason}}
+
+*Key Evidence*
+> "{{steps.clean_json.$return_value.cleanedJson.key_evidence_quote}}"
+
+---
+<{{steps.trigger.event.body.regal_call_url}}|🔗 View Transcript & Recording on Regal>
+<{{steps.trigger.event.body.regal_recording_link}}|🗣️ Listen to Call Recording>
