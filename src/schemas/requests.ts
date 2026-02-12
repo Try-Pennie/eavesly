@@ -9,7 +9,7 @@ export const TranscriptMetadataSchema = z.object({
 })
 
 export const TranscriptDataSchema = z.object({
-  transcript: z.string().min(1),
+  transcript: z.string().min(1).max(200000),
   metadata: TranscriptMetadataSchema,
 })
 
@@ -22,7 +22,7 @@ export const EvaluateRequestSchema = z.object({
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>
 
 export const BatchEvaluateRequestSchema = z.object({
-  calls: z.array(EvaluateRequestSchema).min(1).max(20),
+  calls: z.array(EvaluateRequestSchema).min(1).max(10),
 })
 
 export type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>

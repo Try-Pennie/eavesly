@@ -4,8 +4,31 @@ import type { EvalModule, ModuleResult } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { LLMClient } from "../services/llm-client"
 import type { DatabaseService } from "../services/database"
+import { MODULE_NAMES } from "../modules/constants"
 import { dispatchAlerts } from "../services/alerts"
 import { log } from "../utils/logger"
+
+function createSemaphore(limit: number) {
+  let active = 0
+  const queue: (() => void)[] = []
+
+  return {
+    async acquire<T>(fn: () => Promise<T>): Promise<T> {
+      if (active >= limit) {
+        await new Promise<void>((resolve) => queue.push(resolve))
+      }
+      active++
+      try {
+        return await fn()
+      } finally {
+        active--
+        queue.shift()?.()
+      }
+    },
+  }
+}
+
+const LLM_CONCURRENCY = 5
 
 export async function evaluateAndRespond(
   c: Context<AppEnv>,
@@ -34,7 +57,7 @@ export async function evaluateAndRespond(
 
   await db.storeModuleResult(callData.call_id, result, alertDispatched)
 
-  if (module.name === "full_qa") {
+  if (module.name === MODULE_NAMES.FULL_QA) {
     await db.storeQAResult(
       callData.call_id,
       result.result,
@@ -76,41 +99,45 @@ export async function batchEvaluateAndRespond(
     batchSize: calls.length,
   })
 
+  const semaphore = createSemaphore(LLM_CONCURRENCY)
+
   const settled = await Promise.allSettled(
-    calls.map(async (callData) => {
-      const result = await module.evaluate(
-        callData.transcript.transcript,
-        callData,
-        llm,
-      )
-
-      const alerts = module.extractAlerts(result, callData.call_id)
-      const alertDispatched = alerts.length > 0
-
-      await db.storeModuleResult(callData.call_id, result, alertDispatched)
-
-      if (module.name === "full_qa") {
-        await db.storeQAResult(
-          callData.call_id,
-          result.result,
-          result.processing_time_ms,
+    calls.map((callData) =>
+      semaphore.acquire(async () => {
+        const result = await module.evaluate(
+          callData.transcript.transcript,
+          callData,
+          llm,
         )
-      }
 
-      if (alertDispatched) {
-        dispatchAlerts(alerts, c.executionCtx)
-      }
+        const alerts = module.extractAlerts(result, callData.call_id)
+        const alertDispatched = alerts.length > 0
 
-      return {
-        call_id: callData.call_id,
-        module: module.name,
-        result: result.result,
-        has_violation: result.has_violation,
-        violation_type: result.violation_type,
-        alert_dispatched: alertDispatched,
-        processing_time_ms: result.processing_time_ms,
-      }
-    }),
+        await db.storeModuleResult(callData.call_id, result, alertDispatched)
+
+        if (module.name === MODULE_NAMES.FULL_QA) {
+          await db.storeQAResult(
+            callData.call_id,
+            result.result,
+            result.processing_time_ms,
+          )
+        }
+
+        if (alertDispatched) {
+          dispatchAlerts(alerts, c.executionCtx)
+        }
+
+        return {
+          call_id: callData.call_id,
+          module: module.name,
+          result: result.result,
+          has_violation: result.has_violation,
+          violation_type: result.violation_type,
+          alert_dispatched: alertDispatched,
+          processing_time_ms: result.processing_time_ms,
+        }
+      }),
+    ),
   )
 
   const results = settled.map((outcome, i) => {

@@ -5,10 +5,11 @@ import {
   BudgetInputsSchema,
   type BudgetInputsResult,
 } from "../../schemas/budget-inputs"
+import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/budget-inputs.txt"
 
 export const budgetInputsModule: EvalModule = {
-  name: "budget_inputs",
+  name: MODULE_NAMES.BUDGET_INPUTS,
 
   async evaluate(
     transcript: string,
@@ -28,10 +29,10 @@ export const budgetInputsModule: EvalModule = {
     const hasViolation = result.budget_collection_overview.budget_compliance_violation
 
     return {
-      module_name: "budget_inputs",
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
       result,
       has_violation: hasViolation,
-      violation_type: hasViolation ? "budget_compliance" : null,
+      violation_type: hasViolation ? VIOLATION_TYPES.BUDGET_COMPLIANCE : null,
       processing_time_ms: Date.now() - start,
     }
   },
@@ -41,8 +42,8 @@ export const budgetInputsModule: EvalModule = {
 
     return [
       {
-        module_name: "budget_inputs",
-        violation_type: "budget_compliance",
+        module_name: MODULE_NAMES.BUDGET_INPUTS,
+        violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
         call_id: callId,
         result: result.result,
       },

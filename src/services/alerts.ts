@@ -6,7 +6,15 @@ export async function dispatchAlerts(
   ctx: ExecutionContext,
 ): Promise<void> {
   for (const alert of alerts) {
-    ctx.waitUntil(processAlert(alert))
+    ctx.waitUntil(
+      processAlert(alert).catch((error) => {
+        log("error", "Alert dispatch failed", {
+          module: alert.module_name,
+          callId: alert.call_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }),
+    )
   }
 }
 

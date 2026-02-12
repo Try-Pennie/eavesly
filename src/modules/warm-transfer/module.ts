@@ -5,10 +5,11 @@ import {
   WarmTransferSchema,
   type WarmTransferResult,
 } from "../../schemas/warm-transfer"
+import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/warm-transfer.txt"
 
 export const warmTransferModule: EvalModule = {
-  name: "warm_transfer",
+  name: MODULE_NAMES.WARM_TRANSFER,
 
   async evaluate(
     transcript: string,
@@ -28,10 +29,10 @@ export const warmTransferModule: EvalModule = {
     const hasViolation = result.warm_transfer_compliance.warm_transfer_violation
 
     return {
-      module_name: "warm_transfer",
+      module_name: MODULE_NAMES.WARM_TRANSFER,
       result,
       has_violation: hasViolation,
-      violation_type: hasViolation ? "warm_transfer" : null,
+      violation_type: hasViolation ? VIOLATION_TYPES.WARM_TRANSFER : null,
       processing_time_ms: Date.now() - start,
     }
   },
@@ -41,8 +42,8 @@ export const warmTransferModule: EvalModule = {
 
     return [
       {
-        module_name: "warm_transfer",
-        violation_type: "warm_transfer",
+        module_name: MODULE_NAMES.WARM_TRANSFER,
+        violation_type: VIOLATION_TYPES.WARM_TRANSFER,
         call_id: callId,
         result: result.result,
       },

@@ -3,6 +3,7 @@ import type { Bindings } from "../types/env"
 
 export function corsMiddleware() {
   return honoCors({
+    // TODO: Restrict to specific origins before production launch
     origin: "*",
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

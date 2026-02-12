@@ -11,11 +11,11 @@ import { fullQAModule } from "../modules/full-qa/module"
 import { auth } from "../middleware/auth"
 import { evaluateAndRespond, batchEvaluateAndRespond } from "./shared"
 
-const app = new Hono<AppEnv>()
+const fullQARoutes = new Hono<AppEnv>()
 
-app.use("*", auth)
+fullQARoutes.use("*", auth)
 
-app.post(
+fullQARoutes.post(
   "/evaluate/full-qa",
   zValidator("json", EvaluateRequestSchema),
   async (c) => {
@@ -26,7 +26,7 @@ app.post(
   },
 )
 
-app.post(
+fullQARoutes.post(
   "/evaluate/full-qa/batch",
   zValidator("json", BatchEvaluateRequestSchema),
   async (c) => {
@@ -37,4 +37,4 @@ app.post(
   },
 )
 
-export { app as fullQARoutes }
+export { fullQARoutes }

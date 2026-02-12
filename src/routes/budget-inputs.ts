@@ -11,11 +11,11 @@ import { budgetInputsModule } from "../modules/budget-inputs/module"
 import { auth } from "../middleware/auth"
 import { evaluateAndRespond, batchEvaluateAndRespond } from "./shared"
 
-const app = new Hono<AppEnv>()
+const budgetInputsRoutes = new Hono<AppEnv>()
 
-app.use("*", auth)
+budgetInputsRoutes.use("*", auth)
 
-app.post(
+budgetInputsRoutes.post(
   "/evaluate/budget-inputs",
   zValidator("json", EvaluateRequestSchema),
   async (c) => {
@@ -26,7 +26,7 @@ app.post(
   },
 )
 
-app.post(
+budgetInputsRoutes.post(
   "/evaluate/budget-inputs/batch",
   zValidator("json", BatchEvaluateRequestSchema),
   async (c) => {
@@ -37,4 +37,4 @@ app.post(
   },
 )
 
-export { app as budgetInputsRoutes }
+export { budgetInputsRoutes }

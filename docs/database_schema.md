@@ -2,192 +2,68 @@
 
 ## Overview
 
-The Eavesly Call QA system uses Supabase (PostgreSQL) for data persistence. This document describes the database schema with emphasis on the **new dedicated tables** created to avoid any disruption to existing production systems.
+The Eavesly Call QA system uses Supabase (PostgreSQL) for data persistence. This document describes the database schema used by the API.
 
 ## Design Philosophy
 
 ### Zero-Downtime Approach
-To ensure **zero production impact**, all new API implementation uses dedicated tables with the `eavesly_` prefix, completely separate from existing production tables. This approach:
+All tables use the `eavesly_` prefix to ensure clear separation from other production tables. This approach:
 
-- ✅ Eliminates risk of production data corruption
-- ✅ Allows parallel operation of old and new systems
-- ✅ Enables safe rollback if needed
-- ✅ Provides clear separation of concerns
+- Eliminates risk of production data corruption
+- Allows parallel operation of old and new systems
+- Enables safe rollback if needed
+- Provides clear separation of concerns
 
-### Table Naming Convention
-- **Production tables**: `eavesly_calls`, `eavesly_transcriptions`, `eavesly_transcription_qa`
-- **New API tables**: `eavesly_evaluation_results`, `eavesly_api_logs`
+## Tables
 
-## Schema Definition
+### eavesly_module_results
 
-### eavesly_evaluation_results
+**Purpose**: Store evaluation results from all QA modules (full_qa, budget_inputs, warm_transfer).
 
-**Purpose**: Store complete evaluation results from the new Call QA API
+**Columns**:
+- `call_id` (TEXT, NOT NULL) - Unique identifier for the call
+- `module_name` (TEXT, NOT NULL) - Which evaluation module produced this result
+- `result_json` (JSONB, NOT NULL) - Complete structured evaluation result
+- `has_violation` (BOOLEAN, NOT NULL) - Whether a violation was detected
+- `violation_type` (TEXT) - Type of violation if applicable
+- `alert_sent` (BOOLEAN) - Whether an alert was dispatched
+- `alert_sent_at` (TIMESTAMPTZ) - When the alert was sent
+- `processing_time_ms` (INTEGER) - Time taken for evaluation
 
-```sql
-CREATE TABLE eavesly_evaluation_results (
-    id BIGSERIAL PRIMARY KEY,
-    call_id TEXT NOT NULL UNIQUE,
-    agent_id TEXT NOT NULL,
-    correlation_id TEXT NOT NULL,
-    processing_time_ms INTEGER NOT NULL,
-    api_overall_score INTEGER NOT NULL,
-    api_evaluation_timestamp TIMESTAMPTZ NOT NULL,
-    evaluation_version TEXT NOT NULL DEFAULT 'v1',
-    
-    -- Evaluation components stored as JSONB
-    classification_result JSONB NOT NULL,
-    script_deviation_result JSONB NOT NULL,
-    compliance_result JSONB NOT NULL,
-    communication_result JSONB NOT NULL,
-    deep_dive_result JSONB,
-    
-    -- Metadata
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**Unique constraint**: `(call_id, module_name)` - prevents duplicate evaluations per call per module. Upsert operations use this constraint.
 
-**Key Features**:
-- **UNIQUE constraint** on `call_id` prevents duplicates
-- **JSONB columns** store structured evaluation results
-- **Correlation tracking** for request tracing
-- **Performance metrics** with processing time
-- **Version tracking** for evaluation schema evolution
+**Used by**: `DatabaseService.storeModuleResult()` in `src/services/database.ts`
 
-**Indexes**:
-```sql
-CREATE INDEX idx_eavesly_eval_call_id ON eavesly_evaluation_results(call_id);
-CREATE INDEX idx_eavesly_eval_agent_id ON eavesly_evaluation_results(agent_id);
-CREATE INDEX idx_eavesly_eval_correlation_id ON eavesly_evaluation_results(correlation_id);
-CREATE INDEX idx_eavesly_eval_timestamp ON eavesly_evaluation_results(api_evaluation_timestamp);
-```
+### eavesly_transcription_qa
 
-### eavesly_api_logs
+**Purpose**: Store full QA results in a format compatible with the existing transcription QA system.
 
-**Purpose**: Track API request metadata for monitoring and debugging
+**Columns**:
+- `call_id` (TEXT, NOT NULL, UNIQUE) - Unique identifier for the call
+- `qa_result` (JSONB) - Complete QA evaluation result
+- `processing_time_ms` (INTEGER) - Time taken for evaluation
+- `created_at` (TIMESTAMPTZ) - When the record was created
 
-```sql
-CREATE TABLE eavesly_api_logs (
-    id BIGSERIAL PRIMARY KEY,
-    correlation_id TEXT NOT NULL,
-    endpoint TEXT NOT NULL,
-    http_method TEXT NOT NULL DEFAULT 'POST',
-    http_status_code INTEGER NOT NULL,
-    processing_time_ms INTEGER NOT NULL,
-    error_message TEXT,
-    request_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**Unique constraint**: `call_id` - one QA result per call. Upsert operations use this constraint.
 
-**Key Features**:
-- **Non-blocking logging** - failures don't break main API flow
-- **Correlation tracking** for request tracing
-- **Performance monitoring** with processing times
-- **Error tracking** with optional error messages
-- **HTTP metadata** for request analysis
-
-**Indexes**:
-```sql
-CREATE INDEX idx_eavesly_api_logs_correlation_id ON eavesly_api_logs(correlation_id);
-CREATE INDEX idx_eavesly_api_logs_timestamp ON eavesly_api_logs(request_timestamp);
-```
+**Used by**: `DatabaseService.storeQAResult()` in `src/services/database.ts` (only for `full_qa` module)
 
 ## Data Flow
 
-### Evaluation Result Storage
 ```
-API Request → Evaluation Processing → store_evaluation_result() → eavesly_evaluation_results
-     ↓
-log_api_request() → eavesly_api_logs
+API Request -> Module Evaluation -> storeModuleResult() -> eavesly_module_results
+                                 -> storeQAResult()     -> eavesly_transcription_qa (full_qa only)
 ```
-
-### Query Patterns
-- **By Call ID**: `SELECT * FROM eavesly_evaluation_results WHERE call_id = ?`
-- **By Agent**: `SELECT * FROM eavesly_evaluation_results WHERE agent_id = ?`
-- **By Date Range**: `SELECT * FROM eavesly_evaluation_results WHERE api_evaluation_timestamp BETWEEN ? AND ?`
-- **Performance Analysis**: `SELECT AVG(processing_time_ms) FROM eavesly_api_logs WHERE endpoint = ?`
 
 ## Security
 
 ### Row Level Security (RLS)
-Both tables have RLS enabled:
-```sql
-ALTER TABLE eavesly_evaluation_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE eavesly_api_logs ENABLE ROW LEVEL SECURITY;
-```
+Both tables have RLS enabled. Access is mediated through the service role key only.
 
 ### Access Patterns
 - **Service Role Key**: Full read/write access for API operations
 - **Anonymous Key**: No direct access (API-mediated only)
 
-## Migration Strategy
+## Health Checks
 
-### Current State
-- ✅ New tables created with migration `create_eavesly_api_tables`
-- ✅ Indexes and RLS configured
-- ✅ Production tables remain unchanged
-
-### Deployment Process
-1. **Deploy new API** with updated table references
-2. **Test functionality** with new tables
-3. **Monitor performance** and data integrity
-4. **Gradual migration** if needed (future phase)
-
-### Rollback Plan
-If issues arise:
-1. **Revert API deployment** to previous version
-2. **New tables remain** for future use
-3. **Zero impact** on existing production systems
-
-## Performance Considerations
-
-### Query Performance
-- **Indexes** on all major query columns
-- **JSONB** for flexible schema evolution
-- **Correlation IDs** for efficient request tracing
-
-### Storage
-- **JSONB compression** reduces storage overhead
-- **Timestamp indexing** for time-series analysis
-- **Proper normalization** while maintaining query performance
-
-## Monitoring
-
-### Health Checks
-The `DatabaseService.health_check()` method tests:
-- **Database connectivity**
-- **Basic query functionality**
-- **Table accessibility**
-
-### Metrics to Monitor
-- **Query performance** (processing_time_ms)
-- **Error rates** (via api_logs)
-- **Storage growth** (table sizes)
-- **Index usage** (query plans)
-
-## Future Considerations
-
-### Schema Evolution
-- **evaluation_version** field allows for schema migrations
-- **JSONB** provides flexibility for new evaluation criteria
-- **Separate tables** enable independent evolution
-
-### Data Retention
-Consider implementing:
-- **Automated archiving** for old records
-- **Partitioning** by date for large datasets
-- **Backup strategies** for compliance
-
----
-
-## Summary
-
-The new database schema provides:
-- ✅ **Zero production impact** through table separation
-- ✅ **Comprehensive evaluation storage** with JSONB flexibility
-- ✅ **Performance monitoring** through API logs
-- ✅ **Scalability** through proper indexing
-- ✅ **Security** through RLS
-- ✅ **Flexibility** for future requirements
+The `DatabaseService.healthCheck()` method tests database connectivity by running a simple query against `eavesly_module_results`.

@@ -2,10 +2,11 @@ import type { EvalModule, ModuleResult, Alert } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { FullQASchema, type FullQAResult } from "../../schemas/full-qa"
+import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/full-qa.txt"
 
 export const fullQAModule: EvalModule = {
-  name: "full_qa",
+  name: MODULE_NAMES.FULL_QA,
 
   async evaluate(
     transcript: string,
@@ -25,10 +26,10 @@ export const fullQAModule: EvalModule = {
     const hasViolation = result.call_overview.manager_review_required
 
     return {
-      module_name: "full_qa",
+      module_name: MODULE_NAMES.FULL_QA,
       result,
       has_violation: hasViolation,
-      violation_type: hasViolation ? "manager_escalation" : null,
+      violation_type: hasViolation ? VIOLATION_TYPES.MANAGER_ESCALATION : null,
       processing_time_ms: Date.now() - start,
     }
   },
@@ -38,8 +39,8 @@ export const fullQAModule: EvalModule = {
 
     return [
       {
-        module_name: "full_qa",
-        violation_type: "manager_escalation",
+        module_name: MODULE_NAMES.FULL_QA,
+        violation_type: VIOLATION_TYPES.MANAGER_ESCALATION,
         call_id: callId,
         result: result.result,
       },

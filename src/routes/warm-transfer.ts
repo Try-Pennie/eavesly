@@ -11,11 +11,11 @@ import { warmTransferModule } from "../modules/warm-transfer/module"
 import { auth } from "../middleware/auth"
 import { evaluateAndRespond, batchEvaluateAndRespond } from "./shared"
 
-const app = new Hono<AppEnv>()
+const warmTransferRoutes = new Hono<AppEnv>()
 
-app.use("*", auth)
+warmTransferRoutes.use("*", auth)
 
-app.post(
+warmTransferRoutes.post(
   "/evaluate/warm-transfer",
   zValidator("json", EvaluateRequestSchema),
   async (c) => {
@@ -26,7 +26,7 @@ app.post(
   },
 )
 
-app.post(
+warmTransferRoutes.post(
   "/evaluate/warm-transfer/batch",
   zValidator("json", BatchEvaluateRequestSchema),
   async (c) => {
@@ -37,4 +37,4 @@ app.post(
   },
 )
 
-export { app as warmTransferRoutes }
+export { warmTransferRoutes }

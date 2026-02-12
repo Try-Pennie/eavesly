@@ -36,20 +36,37 @@ export function createLLMClient(env: Bindings) {
         max_tokens: maxTokens,
       })
 
+      log("info", "LLM call completed", {
+        model: env.OPENROUTER_MODEL,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens,
+      })
+
       const content = response.choices[0]?.message?.content
       if (!content) {
         throw new Error("Empty response from LLM")
       }
 
-      const parsed = JSON.parse(content)
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(content)
+      } catch (parseError) {
+        log("error", "LLM returned invalid JSON", {
+          contentPreview: content.substring(0, 500),
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+        })
+        throw new Error(`LLM returned invalid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`)
+      }
+
       const result = schema.safeParse(parsed)
 
       if (!result.success) {
-        const topKeys = Object.keys(parsed)
+        const topKeys = Object.keys(parsed as object)
         log("warn", "Zod validation failed, retrying", {
           errors: result.error.issues.slice(0, 5),
           responseKeys: topKeys,
-          firstKey: topKeys[0] ? Object.keys(parsed[topKeys[0]] ?? {}).slice(0, 5) : [],
+          firstKey: topKeys[0] ? Object.keys((parsed as Record<string, unknown>)[topKeys[0]] ?? {}).slice(0, 5) : [],
         })
         throw new Error(
           `Schema validation failed (keys: ${topKeys.join(",")}): ${result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ")}`,
