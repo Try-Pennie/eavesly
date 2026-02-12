@@ -1,4 +1,4 @@
-export const BUDGET_INPUTS_SYSTEM_PROMPT = `<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <prompt>
     <system>You are a Budget Compliance Auditor at Pennie, a debt consolidation and resolution company. You are tasked with reviewing enrollment call transcripts to verify that agents collected all required budget information from clients. Your analysis must determine whether the agent gathered the four mandatory budget categories needed for accurate debt-to-income calculations and program recommendations.</system>
 
@@ -128,4 +128,4 @@ export const BUDGET_INPUTS_SYSTEM_PROMPT = `<?xml version="1.0" encoding="UTF-8"
     </instructions>
 </prompt>
 
-Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.`
+Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.

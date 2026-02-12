@@ -1,4 +1,4 @@
-export const FULL_QA_SYSTEM_PROMPT = `<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <prompt>
     <system>You are a Sales Quality Assurance Manager at Pennie, a debt consolidation and resolution company. You are tasked with carefully reviewing call transcripts and providing a structured scorecard in JSON format for the sales rep's performance. Your analysis must focus heavily on compliance adherence and customer experience quality.</system>
 
@@ -149,4 +149,4 @@ export const FULL_QA_SYSTEM_PROMPT = `<?xml version="1.0" encoding="UTF-8"?>
     </instructions>
 </prompt>
 
-Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.`
+Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.

@@ -2,7 +2,7 @@ import type { EvalModule, ModuleResult, Alert } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { FullQASchema, type FullQAResult } from "../../schemas/full-qa"
-import { FULL_QA_SYSTEM_PROMPT } from "./prompt"
+import systemPrompt from "../../../prompts/full-qa.txt"
 
 export const fullQAModule: EvalModule = {
   name: "full_qa",
@@ -17,7 +17,7 @@ export const fullQAModule: EvalModule = {
     const userPrompt = `Please evaluate the following call transcript:\n\n${transcript}`
 
     const result = await llm.getStructuredResponse(
-      FULL_QA_SYSTEM_PROMPT,
+      systemPrompt,
       userPrompt,
       FullQASchema,
     )

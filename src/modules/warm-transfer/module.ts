@@ -5,7 +5,7 @@ import {
   WarmTransferSchema,
   type WarmTransferResult,
 } from "../../schemas/warm-transfer"
-import { WARM_TRANSFER_SYSTEM_PROMPT } from "./prompt"
+import systemPrompt from "../../../prompts/warm-transfer.txt"
 
 export const warmTransferModule: EvalModule = {
   name: "warm_transfer",
@@ -20,7 +20,7 @@ export const warmTransferModule: EvalModule = {
     const userPrompt = `Please evaluate the following enrollment call transcript for warm transfer compliance and full QA:\n\n${transcript}`
 
     const result = await llm.getStructuredResponse(
-      WARM_TRANSFER_SYSTEM_PROMPT,
+      systemPrompt,
       userPrompt,
       WarmTransferSchema,
     )

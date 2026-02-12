@@ -15,6 +15,11 @@ OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06"
 # CF_GATEWAY_ID
 # CF_AIG_TOKEN
 
+[[rules]]
+type = "Text"
+globs = ["prompts/**/*.txt"]
+fallthrough = true
+
 [env.staging]
 name = "eavesly-staging"
 vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06" }

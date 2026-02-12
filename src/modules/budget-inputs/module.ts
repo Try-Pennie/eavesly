@@ -5,7 +5,7 @@ import {
   BudgetInputsSchema,
   type BudgetInputsResult,
 } from "../../schemas/budget-inputs"
-import { BUDGET_INPUTS_SYSTEM_PROMPT } from "./prompt"
+import systemPrompt from "../../../prompts/budget-inputs.txt"
 
 export const budgetInputsModule: EvalModule = {
   name: "budget_inputs",
@@ -20,7 +20,7 @@ export const budgetInputsModule: EvalModule = {
     const userPrompt = `Please evaluate the following enrollment call transcript for budget input compliance:\n\n${transcript}`
 
     const result = await llm.getStructuredResponse(
-      BUDGET_INPUTS_SYSTEM_PROMPT,
+      systemPrompt,
       userPrompt,
       BudgetInputsSchema,
     )
