@@ -14,6 +14,7 @@ OPENROUTER_MODEL = "openai/gpt-4.1"
 # CF_ACCOUNT_ID
 # CF_GATEWAY_ID
 # CF_AIG_TOKEN
+# SLACK_WEBHOOK_URL
 
 [[rules]]
 type = "Text"

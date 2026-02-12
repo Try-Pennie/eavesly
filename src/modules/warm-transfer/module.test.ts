@@ -111,7 +111,7 @@ describe("warmTransferModule", () => {
         violation_type: null,
         processing_time_ms: 75,
       }
-      expect(warmTransferModule.extractAlerts(result, "call-1")).toEqual([])
+      expect(warmTransferModule.extractAlerts(result, "call-1", "agent-1")).toEqual([])
     })
 
     it("returns alert with warm_transfer violation type", () => {
@@ -122,10 +122,11 @@ describe("warmTransferModule", () => {
         violation_type: VIOLATION_TYPES.WARM_TRANSFER,
         processing_time_ms: 75,
       }
-      const alerts = warmTransferModule.extractAlerts(result, "call-2")
+      const alerts = warmTransferModule.extractAlerts(result, "call-2", "agent-2")
       expect(alerts).toHaveLength(1)
       expect(alerts[0].violation_type).toBe(VIOLATION_TYPES.WARM_TRANSFER)
       expect(alerts[0].call_id).toBe("call-2")
+      expect(alerts[0].agent_id).toBe("agent-2")
       expect(alerts[0].module_name).toBe(MODULE_NAMES.WARM_TRANSFER)
     })
   })

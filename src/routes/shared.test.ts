@@ -30,6 +30,7 @@ function createMockModule(overrides: Partial<ModuleResult> = {}): EvalModule {
             module_name: defaultResult.module_name,
             violation_type: defaultResult.violation_type,
             call_id: "test",
+            agent_id: "test-agent-456",
             result: defaultResult.result,
           }]
         : [],

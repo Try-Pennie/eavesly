@@ -100,7 +100,7 @@ describe("budgetInputsModule", () => {
         violation_type: null,
         processing_time_ms: 50,
       }
-      expect(budgetInputsModule.extractAlerts(result, "call-1")).toEqual([])
+      expect(budgetInputsModule.extractAlerts(result, "call-1", "agent-1")).toEqual([])
     })
 
     it("returns alert with budget_compliance violation type", () => {
@@ -111,10 +111,11 @@ describe("budgetInputsModule", () => {
         violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
         processing_time_ms: 50,
       }
-      const alerts = budgetInputsModule.extractAlerts(result, "call-2")
+      const alerts = budgetInputsModule.extractAlerts(result, "call-2", "agent-2")
       expect(alerts).toHaveLength(1)
       expect(alerts[0].violation_type).toBe(VIOLATION_TYPES.BUDGET_COMPLIANCE)
       expect(alerts[0].call_id).toBe("call-2")
+      expect(alerts[0].agent_id).toBe("agent-2")
     })
   })
 })

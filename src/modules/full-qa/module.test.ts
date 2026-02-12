@@ -103,7 +103,7 @@ describe("fullQAModule", () => {
         violation_type: null,
         processing_time_ms: 100,
       }
-      expect(fullQAModule.extractAlerts(result, "call-123")).toEqual([])
+      expect(fullQAModule.extractAlerts(result, "call-123", "agent-1")).toEqual([])
     })
 
     it("returns alert with correct fields when violation", () => {
@@ -114,12 +114,13 @@ describe("fullQAModule", () => {
         violation_type: VIOLATION_TYPES.MANAGER_ESCALATION,
         processing_time_ms: 100,
       }
-      const alerts = fullQAModule.extractAlerts(result, "call-456")
+      const alerts = fullQAModule.extractAlerts(result, "call-456", "agent-789")
       expect(alerts).toHaveLength(1)
       expect(alerts[0]).toEqual({
         module_name: MODULE_NAMES.FULL_QA,
         violation_type: VIOLATION_TYPES.MANAGER_ESCALATION,
         call_id: "call-456",
+        agent_id: "agent-789",
         result: violationFixture,
       })
     })

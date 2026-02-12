@@ -38,7 +38,7 @@ export const budgetInputsModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string): Alert[] {
+  extractAlerts(result: ModuleResult, callId: string, agentId: string): Alert[] {
     if (!result.has_violation) return []
 
     return [
@@ -46,6 +46,7 @@ export const budgetInputsModule: EvalModule = {
         module_name: MODULE_NAMES.BUDGET_INPUTS,
         violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
         call_id: callId,
+        agent_id: agentId,
         result: result.result,
       },
     ]

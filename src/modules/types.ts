@@ -14,6 +14,7 @@ export interface Alert {
   module_name: string
   violation_type: string
   call_id: string
+  agent_id: string
   result: unknown
 }
 
@@ -24,5 +25,5 @@ export interface EvalModule {
     callData: EvaluateRequest,
     llm: LLMClient,
   ): Promise<ModuleResult>
-  extractAlerts(result: ModuleResult, callId: string): Alert[]
+  extractAlerts(result: ModuleResult, callId: string, agentId: string): Alert[]
 }

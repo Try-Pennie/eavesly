@@ -52,7 +52,7 @@ export async function evaluateAndRespond(
     llm,
   )
 
-  const alerts = module.extractAlerts(result, callData.call_id)
+  const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id)
   const alertDispatched = alerts.length > 0
 
   await db.storeModuleResult(callData.call_id, result, alertDispatched)
@@ -66,7 +66,7 @@ export async function evaluateAndRespond(
   }
 
   if (alertDispatched) {
-    dispatchAlerts(alerts, c.executionCtx)
+    dispatchAlerts(alerts, c.executionCtx, c.env)
   }
 
   const processingTimeMs = Date.now() - start
@@ -110,7 +110,7 @@ export async function batchEvaluateAndRespond(
           llm,
         )
 
-        const alerts = module.extractAlerts(result, callData.call_id)
+        const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id)
         const alertDispatched = alerts.length > 0
 
         await db.storeModuleResult(callData.call_id, result, alertDispatched)
@@ -124,7 +124,7 @@ export async function batchEvaluateAndRespond(
         }
 
         if (alertDispatched) {
-          dispatchAlerts(alerts, c.executionCtx)
+          dispatchAlerts(alerts, c.executionCtx, c.env)
         }
 
         return {

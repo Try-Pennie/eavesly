@@ -1,13 +1,19 @@
 import type { Alert } from "../modules/types"
+import type { Bindings } from "../types/env"
+import type { FullQAResult } from "../schemas/full-qa"
+import type { BudgetInputsResult } from "../schemas/budget-inputs"
+import type { WarmTransferResult } from "../schemas/warm-transfer"
+import { VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 
 export async function dispatchAlerts(
   alerts: Alert[],
   ctx: ExecutionContext,
+  env: Bindings,
 ): Promise<void> {
   for (const alert of alerts) {
     ctx.waitUntil(
-      processAlert(alert).catch((error) => {
+      processAlert(alert, env).catch((error) => {
         log("error", "Alert dispatch failed", {
           module: alert.module_name,
           callId: alert.call_id,
@@ -18,11 +24,99 @@ export async function dispatchAlerts(
   }
 }
 
-async function processAlert(alert: Alert): Promise<void> {
+async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   log("info", "Alert dispatched", {
     module: alert.module_name,
     violationType: alert.violation_type,
     callId: alert.call_id,
   })
-  // Future: Slack webhook, Supabase edge function trigger, email, etc.
+
+  if (!env.SLACK_WEBHOOK_URL) {
+    log("warn", "SLACK_WEBHOOK_URL not set, skipping Slack notification", {
+      callId: alert.call_id,
+    })
+    return
+  }
+
+  const payload = buildSlackPayload(alert)
+  await sendSlackWebhook(env.SLACK_WEBHOOK_URL, payload)
+}
+
+export interface SlackPayload {
+  call_id: string
+  agent_id: string
+  module_name: string
+  violation_type: string
+  summary: string
+  timestamp: string
+}
+
+export function buildSlackPayload(alert: Alert): SlackPayload {
+  return {
+    call_id: alert.call_id,
+    agent_id: alert.agent_id,
+    module_name: alert.module_name,
+    violation_type: alert.violation_type,
+    summary: buildSummary(alert),
+    timestamp: new Date().toISOString(),
+  }
+}
+
+export function buildSummary(alert: Alert): string {
+  const prefix = `${formatViolationType(alert.violation_type)} violation on call ${alert.call_id} (agent ${alert.agent_id})`
+  const detail = extractDetail(alert)
+  return detail ? `${prefix}: ${detail}` : prefix
+}
+
+function formatViolationType(type: string): string {
+  switch (type) {
+    case VIOLATION_TYPES.MANAGER_ESCALATION:
+      return "Manager escalation"
+    case VIOLATION_TYPES.BUDGET_COMPLIANCE:
+      return "Budget compliance"
+    case VIOLATION_TYPES.WARM_TRANSFER:
+      return "Warm transfer"
+    default:
+      return type
+  }
+}
+
+function extractDetail(alert: Alert): string {
+  const result = alert.result as Record<string, any>
+
+  switch (alert.violation_type) {
+    case VIOLATION_TYPES.MANAGER_ESCALATION: {
+      const reason = (result as FullQAResult)?.call_overview?.manager_review_reason
+      return reason || "Manager review required"
+    }
+    case VIOLATION_TYPES.BUDGET_COMPLIANCE: {
+      const skipped = (result as BudgetInputsResult)?.budget_collection_overview?.items_skipped
+      return skipped != null
+        ? `${skipped} budget item(s) skipped`
+        : "Budget compliance issue"
+    }
+    case VIOLATION_TYPES.WARM_TRANSFER: {
+      const reason = (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason
+      return reason || "No transfer attempted"
+    }
+    default:
+      return ""
+  }
+}
+
+async function sendSlackWebhook(
+  url: string,
+  payload: SlackPayload,
+): Promise<void> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(
+      `Slack webhook failed: ${response.status} ${response.statusText}`,
+    )
+  }
 }

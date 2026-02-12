@@ -7,6 +7,7 @@ export interface Bindings {
   CF_ACCOUNT_ID: string
   CF_GATEWAY_ID: string
   CF_AIG_TOKEN: string
+  SLACK_WEBHOOK_URL?: string
 }
 
 export interface Variables {

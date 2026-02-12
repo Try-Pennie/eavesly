@@ -12,6 +12,7 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     CF_ACCOUNT_ID: "test-account",
     CF_GATEWAY_ID: "test-gateway",
     CF_AIG_TOKEN: "test-token",
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/workflows/test",
     ...overrides,
   }
 }

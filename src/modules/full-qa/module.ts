@@ -35,7 +35,7 @@ export const fullQAModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string): Alert[] {
+  extractAlerts(result: ModuleResult, callId: string, agentId: string): Alert[] {
     if (!result.has_violation) return []
 
     return [
@@ -43,6 +43,7 @@ export const fullQAModule: EvalModule = {
         module_name: MODULE_NAMES.FULL_QA,
         violation_type: VIOLATION_TYPES.MANAGER_ESCALATION,
         call_id: callId,
+        agent_id: agentId,
         result: result.result,
       },
     ]

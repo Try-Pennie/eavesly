@@ -38,7 +38,7 @@ export const warmTransferModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string): Alert[] {
+  extractAlerts(result: ModuleResult, callId: string, agentId: string): Alert[] {
     if (!result.has_violation) return []
 
     return [
@@ -46,6 +46,7 @@ export const warmTransferModule: EvalModule = {
         module_name: MODULE_NAMES.WARM_TRANSFER,
         violation_type: VIOLATION_TYPES.WARM_TRANSFER,
         call_id: callId,
+        agent_id: agentId,
         result: result.result,
       },
     ]
