@@ -1,0 +1,24 @@
+{
+  "call_id": "test-001",
+  "agent_id": "agent-123",
+  "call_context": "First Call",
+  "transcript": {
+    "transcript": "Agent: Hello, thank you for calling Pennie. My name is John Smith, how can I help you today?\nCustomer: Hi, I am looking for health insurance.\nAgent: I would be happy to help you with that. Can I get your full name please?\nCustomer: Sure, my name is Jane Doe.\nAgent: Thank you Jane. And can I get your date of birth?\nCustomer: January 15, 1960.\nAgent: Great. Let me pull up some plans for you. Based on your information, I have a few options. The first plan is a Silver plan at $150 per month with a $2000 deductible.\nCustomer: That sounds good. What about dental?\nAgent: Dental is included in this plan. Let me go over the details with you. The plan covers preventive care at 100%, and major services at 50%.\nCustomer: Ok, I would like to enroll in that plan.\nAgent: Wonderful! Let me get you enrolled. I will need to verify a few things. Can you confirm your address?\nCustomer: 123 Main Street, Philadelphia PA 19101.\nAgent: Perfect. And your monthly household income?\nCustomer: About $3,500 per month.\nAgent: Thank you. Based on your income, you qualify for a subsidy that brings your premium down to $50 per month.\nCustomer: That is great!\nAgent: Excellent. I have submitted your application. You should receive a confirmation within 24 hours. Is there anything else I can help you with?\nCustomer: No, that is all. Thank you so much for your help.\nAgent: You are welcome Jane. Thank you for choosing Pennie and have a great day!",
+    "metadata": {
+      "duration": 120,
+      "timestamp": "2024-12-01T10:00:00Z",
+      "talk_time": 120,
+      "disposition": "Enrolled",
+      "campaign_name": "Medicare AEP 2024"
+    }
+  },
+  "ideal_script": "Standard enrollment script for Medicare AEP campaign.",
+  "client_data": {
+    "script_progress": {
+      "sections_attempted": [1, 2, 3, 4, 5],
+      "last_completed_section": 5,
+      "termination_reason": "Completed enrollment",
+      "pitch_outcome": "Enrolled"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+name = "eavesly"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+account_id = "3e7f907a9c19e51417873e2cce4fbc5c"
+
+[vars]
+ENVIRONMENT = "development"
+OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06"
+
+# Secrets (set via `wrangler secret put`):
+# INTERNAL_API_KEY
+# SUPABASE_URL
+# SUPABASE_SERVICE_ROLE_KEY
+# CF_ACCOUNT_ID
+# CF_GATEWAY_ID
+# CF_AIG_TOKEN
+
+[env.staging]
+name = "eavesly-staging"
+vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06" }
+
+[env.production]
+name = "eavesly-production"
+vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06" }
