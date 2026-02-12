@@ -3,9 +3,14 @@ import { createEnv, TEST_API_KEY } from "../test/helpers/mock-env"
 import excellentFixture from "../test/fixtures/responses/full-qa-excellent.json"
 import violationFixture from "../test/fixtures/responses/full-qa-violation.json"
 import budgetPassFixture from "../test/fixtures/responses/budget-inputs-pass.json"
+import budgetViolationFixture from "../test/fixtures/responses/budget-inputs-violation.json"
 import warmTransferFixture from "../test/fixtures/responses/warm-transfer-no-violation.json"
 
-const mockGetStructuredResponse = vi.fn()
+const { mockGetStructuredResponse, mockDispatchAlerts, mockStoreModuleResult } = vi.hoisted(() => ({
+  mockGetStructuredResponse: vi.fn(),
+  mockDispatchAlerts: vi.fn(),
+  mockStoreModuleResult: vi.fn().mockResolvedValue(undefined),
+}))
 
 vi.mock("./services/llm-client", () => ({
   createLLMClient: () => ({
@@ -15,14 +20,14 @@ vi.mock("./services/llm-client", () => ({
 
 vi.mock("./services/database", () => ({
   DatabaseService: class {
-    storeModuleResult = vi.fn().mockResolvedValue(undefined)
+    storeModuleResult = mockStoreModuleResult
     storeQAResult = vi.fn().mockResolvedValue(undefined)
     healthCheck = vi.fn().mockResolvedValue(true)
   },
 }))
 
 vi.mock("./services/alerts", () => ({
-  dispatchAlerts: vi.fn(),
+  dispatchAlerts: mockDispatchAlerts,
 }))
 
 import app from "./index"
@@ -178,6 +183,51 @@ describe("E2E app tests", () => {
       const body = (await res.json()) as any
       expect(body.module).toBe("warm_transfer")
       expect(body.has_violation).toBe(false)
+    })
+  })
+
+  describe("budget-inputs violation triggers alert", () => {
+    it("returns violation with alert_dispatched and dispatches Slack alert", async () => {
+      mockGetStructuredResponse.mockResolvedValue(budgetViolationFixture)
+      mockDispatchAlerts.mockClear()
+      const mockExecCtx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() }
+
+      const res = await app.request("/api/v1/evaluate/budget-inputs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify(validBody),
+      }, createEnv(), mockExecCtx)
+
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as any
+
+      // Verify response shape matches production expectations
+      expect(body.call_id).toBe("e2e-call-123")
+      expect(body.module).toBe("budget_inputs")
+      expect(body.has_violation).toBe(true)
+      expect(body.violation_type).toBe("budget_compliance")
+      expect(body.alert_dispatched).toBe(true)
+      expect(body.correlation_id).toBeTruthy()
+      expect(body.timestamp).toBeTruthy()
+      expect(body.processing_time_ms).toBeGreaterThanOrEqual(0)
+
+      // Verify result contains the violation details
+      expect(body.result.budget_collection_overview.budget_compliance_violation).toBe(true)
+      expect(body.result.budget_collection_overview.items_skipped).toBe(2)
+
+      // Verify dispatchAlerts was called with correct alert payload
+      expect(mockDispatchAlerts).toHaveBeenCalledOnce()
+      const [alerts, ctx, env] = mockDispatchAlerts.mock.calls[0]
+      expect(alerts).toHaveLength(1)
+      expect(alerts[0]).toMatchObject({
+        module_name: "budget_inputs",
+        violation_type: "budget_compliance",
+        call_id: "e2e-call-123",
+        agent_id: "agent-456",
+      })
     })
   })
 })
