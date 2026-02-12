@@ -128,4 +128,14 @@
     </instructions>
 </prompt>
 
-Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.
+Respond with a valid JSON object using exactly these top-level keys:
+
+- "budget_collection_overview": Items collected/skipped counts and budget_compliance_violation flag
+- "housing_payment": { collected, how_collected, evidence } for mortgage/rent
+- "auto_payment": { collected, how_collected, evidence } for car loan/lease
+- "utilities": { collected, how_collected, evidence } for utility bills
+- "other_debts_expenses": { collected, how_collected, evidence } for additional debts/obligations
+- "violation_reason": Summary explanation of which items were missed
+- "key_evidence_quote": Most impactful quote a manager should see
+
+Do not include any text outside the JSON.

@@ -1,0 +1,134 @@
+{
+  "call_overview": {
+    "pennie_agent_speaker": "handling agent",
+    "customer_speaker": "contact",
+    "other_speakers": [],
+    "call_topic": "Debt resolution consultation and follow-up regarding program details, updated quote, payment structure, and next steps.",
+    "call_purpose": "To address client's outstanding questions about the Pennie program, update quoted figures, verify eligibility, and potentially move client toward enrollment.",
+    "call_outcome": "No enrollment completed. Client requested to discuss with spouse and scheduled a follow-up call for next week.",
+    "overall_tone": "Friendly, professional, informative, low sales pressure.",
+    "call_duration_assessment": "appropriate",
+    "manager_review_required": false,
+    "manager_review_reason": "",
+    "manager_focus_areas": []
+  },
+  "compliance_scorecard": {
+    "call_recording_disclosure": "pass",
+    "call_recording_disclosure_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "This is Jonathan with Penny on a recorded line.",
+        "context": "Opening of the call, very first agent statement.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "credit_pull_consent": "pass",
+    "credit_pull_consent_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "If we do, like, a soft check, we can kinda, like, re relook at it. Is it okay if we do that?",
+        "context": "After verifying client identity, before running a new soft credit check.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "social_security_verification": "pass",
+    "social_security_verification_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "just for security, can you please verify date of birth and last 4 of the social?",
+        "context": "Early in call before updating financial quote.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "accurate_representations": "pass",
+    "accurate_representations_violations": [],
+    "critical_red_flag_hits": [],
+    "no_misleading_claims": "pass",
+    "misleading_claims_violations": [],
+    "overall_compliance_score": "pass",
+    "compliance_violations": [],
+    "critical_moments": [
+      "Agent properly states credit impact will occur short term but describes the longer-term recovery and benefits without making guarantees.",
+      "Agent repeatedly clarifies payment schedules and explicitly states program payment will not increase barring customer-initiated change."
+    ]
+  },
+  "customer_experience_scorecard": {
+    "professional_tone": "excellent",
+    "professional_tone_examples": [
+      "Oh, very well. Always a fine day. Very busy, of course, as usual. But glad to reconnect with you."
+    ],
+    "active_listening": "excellent",
+    "active_listening_examples": [
+      "Agent responds directly to client concerns about account closures."
+    ],
+    "patience_empathy": "excellent",
+    "patience_empathy_examples": [
+      "I know that can make you feel a little anxious...But the goal of this is just to free up the cash flow."
+    ],
+    "clear_communication": "excellent",
+    "clear_communication_examples": [
+      "Agent frequently confirms understanding: Does that make sense?"
+    ],
+    "customer_focused": "excellent",
+    "customer_focused_examples": [
+      "Agent volunteers to send documentation for spouse review rather than pressure client to enroll on the call."
+    ],
+    "overall_customer_experience": "excellent",
+    "customer_experience_notes": "The agent is consistently supportive and educational.",
+    "notable_interactions": [
+      "Agent reassures with BBB/reviews link for trust-building.",
+      "Agent sets follow-up for client's preferred time and method."
+    ]
+  },
+  "sales_process_scorecard": {
+    "expected_sections": [1, 2, 3, 4, 5, 6],
+    "sections_attempted": [1, 2, 3, 4, 5, 6],
+    "sections_completed": [1, 2, 3, 4, 5, 6],
+    "step1_agenda_setting": "complete",
+    "step1_location": "Opening of call: greeting, recording disclosure, reconnection.",
+    "step2_credit_review": "complete",
+    "step2_location": "Immediately after credit check consent.",
+    "step3_agent_inputs": "complete",
+    "step3_location": "Agent reviews new balance figures.",
+    "step4_paydown_projections": "complete",
+    "step4_location": "Agent sends new proposal, breaks down cash flow savings.",
+    "step5_offers_review": "complete",
+    "step5_location": "Agent discusses preapproval loan offers.",
+    "step6_debt_resolution": "complete",
+    "step6_location": "Agent describes actual Pennie program benefits.",
+    "overall_process_adherence": "excellent",
+    "missed_opportunities": [],
+    "process_notes": "Process was well-paced. All six steps were distinctly covered.",
+    "section_gap_reasons": [],
+    "key_process_moments": [
+      "Agent clearly transitions from initial concern into identity/consent.",
+      "Agent leverages prior conversation history for relationship continuity."
+    ]
+  },
+  "transfer_agent_assessment": {
+    "transfer_occurred": false,
+    "transfer_agent_tone": "not_applicable",
+    "transfer_quality": "not_applicable"
+  },
+  "coaching_recommendations": {
+    "strengths": [
+      "Excellent compliance on all critical regulatory points.",
+      "Empathetic, supportive, and attentive communication style."
+    ],
+    "areas_for_improvement": [
+      "Continue to guard against any phrasing that could be interpreted as a guarantee."
+    ],
+    "specific_coaching_points": [
+      "When describing long-term credit improvements, add a short disclaimer about variability."
+    ],
+    "training_recommendations": [
+      "Use this call as a model for training on compliance and customer experience."
+    ]
+  },
+  "overall_call_rating": {
+    "compliance_rating": "pass",
+    "sales_effectiveness": "excellent",
+    "customer_satisfaction_likely": "high",
+    "overall_score": "excellent"
+  }
+}

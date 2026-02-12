@@ -182,4 +182,15 @@
     </instructions>
 </prompt>
 
-Respond with a valid JSON object matching the required structured output schema. Do not include any text outside the JSON.
+Respond with a valid JSON object using exactly these top-level keys:
+
+- "call_overview": Call metadata — speakers, topic, purpose, outcome, tone, enrollment_completed, manager review flags
+- "compliance_scorecard": Pass/fail compliance checks with evidence arrays
+- "customer_experience_scorecard": 4-point scale ratings (excellent/good/fair/poor) for each CX criterion
+- "sales_process_scorecard": 6-step sales process adherence — step completion, locations, gaps
+- "transfer_agent_assessment": Transfer agent evaluation (occurred, tone, quality)
+- "warm_transfer_compliance": Warm transfer violation tracking — enrollment, transfer, scheduling, client-initiated flag, violation flag
+- "coaching_recommendations": Strengths, areas for improvement, coaching points, training recommendations
+- "overall_call_rating": Final summary ratings — compliance, sales effectiveness, customer satisfaction, overall score
+
+Do not include any text outside the JSON.

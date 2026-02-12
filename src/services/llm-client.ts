@@ -1,4 +1,5 @@
 import OpenAI from "openai"
+import { zodResponseFormat } from "openai/helpers/zod"
 import type { z } from "zod"
 import type { Bindings } from "../types/env"
 import { withRetry } from "../utils/retry"
@@ -19,7 +20,8 @@ export function createLLMClient(env: Bindings) {
   async function getStructuredResponse<T>(
     systemPrompt: string,
     userPrompt: string,
-    schema: z.ZodSchema<T>,
+    schema: z.ZodType<T>,
+    schemaName: string,
     options: { temperature?: number; maxTokens?: number } = {},
   ): Promise<T> {
     const { temperature = 0.3, maxTokens = 16000 } = options
@@ -31,7 +33,7 @@ export function createLLMClient(env: Bindings) {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_object" },
+        response_format: zodResponseFormat(schema, schemaName),
         temperature,
         max_tokens: maxTokens,
       })

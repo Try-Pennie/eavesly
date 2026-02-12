@@ -1,0 +1,125 @@
+{
+  "call_overview": {
+    "pennie_agent_speaker": "handling agent",
+    "customer_speaker": "contact",
+    "other_speakers": ["transfer agent"],
+    "call_topic": "Debt consolidation and enrollment",
+    "call_purpose": "To review financials and complete enrollment",
+    "call_outcome": "Customer enrolled but no warm transfer completed",
+    "overall_tone": "Professional but rushed",
+    "call_duration_assessment": "too_long",
+    "enrollment_completed": true,
+    "manager_review_required": true,
+    "manager_review_reason": "Warm transfer violation: enrollment completed without proper warm transfer.",
+    "manager_focus_areas": [
+      {
+        "speaker": "handling agent",
+        "quote": "Alright, you're all set. We'll have someone call you to schedule your welcome call.",
+        "context": "Agent ends call without completing warm transfer",
+        "process_step": "Step 6 Debt Resolution"
+      }
+    ]
+  },
+  "compliance_scorecard": {
+    "call_recording_disclosure": "pass",
+    "call_recording_disclosure_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "This is Lamel with Penny on a recorded line.",
+        "context": "Opening of call",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "credit_pull_consent": "pass",
+    "credit_pull_consent_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "Do I have your permission to pull your credit?",
+        "context": "Before credit pull",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "social_security_verification": "pass",
+    "social_security_verification_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "Can you confirm the last 4 of your social?",
+        "context": "Identity verification",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "accurate_representations": "pass",
+    "accurate_representations_violations": [],
+    "critical_red_flag_hits": [],
+    "no_misleading_claims": "pass",
+    "misleading_claims_violations": [],
+    "overall_compliance_score": "pass",
+    "compliance_violations": [],
+    "critical_moments": [
+      "Enrollment completed without warm transfer to law group."
+    ]
+  },
+  "customer_experience_scorecard": {
+    "professional_tone": "good",
+    "professional_tone_examples": ["Professional greeting and pace."],
+    "active_listening": "good",
+    "active_listening_examples": ["Acknowledged customer concerns."],
+    "patience_empathy": "good",
+    "patience_empathy_examples": ["Patient with questions."],
+    "clear_communication": "fair",
+    "clear_communication_examples": ["Explained program basics."],
+    "customer_focused": "fair",
+    "customer_focused_examples": ["Did not ensure warm transfer."],
+    "overall_customer_experience": "fair",
+    "customer_experience_notes": "Good rapport but failed on transfer follow-through.",
+    "notable_interactions": ["Customer was not transferred to partner."]
+  },
+  "sales_process_scorecard": {
+    "expected_sections": [1, 2, 3, 4, 5, 6],
+    "sections_attempted": [1, 2, 3, 4, 5, 6],
+    "sections_completed": [1, 2, 3, 4, 5, 6],
+    "step1_agenda_setting": "complete",
+    "step1_location": "Opening of call.",
+    "step2_credit_review": "complete",
+    "step2_location": "Credit report review.",
+    "step3_agent_inputs": "complete",
+    "step3_location": "Income and expense collection.",
+    "step4_paydown_projections": "complete",
+    "step4_location": "Payment projections.",
+    "step5_offers_review": "complete",
+    "step5_location": "Loan offer review.",
+    "step6_debt_resolution": "complete",
+    "step6_location": "Program enrollment.",
+    "overall_process_adherence": "fair",
+    "missed_opportunities": ["Failed to complete warm transfer after enrollment."],
+    "process_notes": "All steps completed but warm transfer omitted.",
+    "section_gap_reasons": [],
+    "key_process_moments": ["Enrollment completed.", "Warm transfer skipped."]
+  },
+  "transfer_agent_assessment": {
+    "transfer_occurred": false,
+    "transfer_agent_tone": "not_applicable",
+    "transfer_quality": "not_applicable"
+  },
+  "warm_transfer_compliance": {
+    "enrollment_completed": true,
+    "warm_transfer_completed": false,
+    "welcome_call_scheduled": false,
+    "client_proactively_requested_scheduling": false,
+    "warm_transfer_violation": true,
+    "violation_reason": "Customer enrolled in program but agent did not complete required warm transfer to law group partner.",
+    "key_evidence_quote": "Alright, you're all set. We'll have someone call you to schedule your welcome call."
+  },
+  "coaching_recommendations": {
+    "strengths": ["Good rapport building.", "Thorough data collection."],
+    "areas_for_improvement": ["Must complete warm transfer after every enrollment."],
+    "specific_coaching_points": ["Never end call after enrollment without live transfer."],
+    "training_recommendations": ["Review warm transfer requirements."]
+  },
+  "overall_call_rating": {
+    "compliance_rating": "pass",
+    "sales_effectiveness": "good",
+    "customer_satisfaction_likely": "medium",
+    "overall_score": "needs_improvement"
+  }
+}

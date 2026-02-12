@@ -1,0 +1,174 @@
+{
+  "call_overview": {
+    "pennie_agent_speaker": "handling agent",
+    "customer_speaker": "contact",
+    "other_speakers": ["transfer agent"],
+    "call_topic": "Debt consolidation and enrollment in debt resolution program",
+    "call_purpose": "To review customer financials, discuss loan/debt consolidation options, and complete enrollment",
+    "call_outcome": "Customer was enrolled but significant compliance issues were identified",
+    "overall_tone": "Courteous but with significant compliance issue regarding accurate representation",
+    "call_duration_assessment": "too_long",
+    "manager_review_required": true,
+    "manager_review_reason": "Multiple compliance violations: failure to accurately represent program impact on credit reporting.",
+    "manager_focus_areas": [
+      {
+        "speaker": "handling agent",
+        "quote": "whenever we pull up the credit report, we pull it up as a soft pull so you don't have any inquiries on your profile. Do we have your appointment to proceed?",
+        "context": "During early agenda, prior to financial data collection",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ]
+  },
+  "compliance_scorecard": {
+    "call_recording_disclosure": "pass",
+    "call_recording_disclosure_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "This is Lamel with Penny on a recorded line. How are you doing?",
+        "context": "Opening of call",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "credit_pull_consent": "fail",
+    "credit_pull_consent_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "whenever we pull up the credit report, we pull it up as a soft pull. Do we have your appointment to proceed?",
+        "context": "Early in call before pulling credit",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "social_security_verification": "pass",
+    "social_security_verification_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "So if you click in the screen, you should be able to put the last 4 of your social.",
+        "context": "At end of credit review",
+        "process_step": "Step 3 Agent Inputs"
+      }
+    ],
+    "accurate_representations": "fail",
+    "accurate_representations_violations": [
+      "Agent incorrectly stated that enrolled debts appear as closed and settled without months of missed payment reporting."
+    ],
+    "critical_red_flag_hits": [
+      {
+        "red_flag": "Program misrepresentation",
+        "evidence": [
+          {
+            "speaker": "handling agent",
+            "quote": "So when it shows closed, that's why clients are able to get that settlement. After you get the settlement within your term, it shows settled and paid.",
+            "context": "Agent implies accounts will NOT show missed payments",
+            "process_step": "Step 6 Debt Resolution"
+          }
+        ]
+      },
+      {
+        "red_flag": "Unresolved customer confusion",
+        "evidence": [
+          {
+            "speaker": "contact",
+            "quote": "that's not what he told me. He told me something completely different.",
+            "context": "Customer realization at transfer",
+            "process_step": "Step 6 Debt Resolution"
+          }
+        ]
+      }
+    ],
+    "no_misleading_claims": "fail",
+    "misleading_claims_violations": [
+      "Agent presented debt resolution credit reporting impact as much less severe than reality."
+    ],
+    "overall_compliance_score": "fail",
+    "compliance_violations": [
+      "Failure to obtain explicit verbal consent for credit pull.",
+      "Misrepresentation of credit reporting impact."
+    ],
+    "critical_moments": [
+      "Agent's inaccurate summary of resolution program's credit reporting process directly resulted in customer confusion."
+    ]
+  },
+  "customer_experience_scorecard": {
+    "professional_tone": "good",
+    "professional_tone_examples": [
+      "No. Take your time. I wanna make sure you get your numbers right anyway so I could help you."
+    ],
+    "active_listening": "good",
+    "active_listening_examples": [
+      "Agent paused to clarify income and double-checked numbers."
+    ],
+    "patience_empathy": "excellent",
+    "patience_empathy_examples": [
+      "No. Take your time. and patiently continued the process."
+    ],
+    "clear_communication": "fair",
+    "clear_communication_examples": [
+      "Agent gave step-by-step instruction with DocuSign and bank account setup."
+    ],
+    "customer_focused": "good",
+    "customer_focused_examples": [
+      "You do what works for you."
+    ],
+    "overall_customer_experience": "fair",
+    "customer_experience_notes": "Agent was courteous but key misrepresentation caused confusion.",
+    "notable_interactions": [
+      "Customer explicitly sought reassurance about credit reporting; agent provided inaccurate info."
+    ]
+  },
+  "sales_process_scorecard": {
+    "expected_sections": [1, 2, 3, 4, 5, 6],
+    "sections_attempted": [1, 2, 3, 4, 5, 6],
+    "sections_completed": [1, 2, 3, 4, 5, 6],
+    "step1_agenda_setting": "complete",
+    "step1_location": "Opening: agent introduces self, gives call recording disclosure.",
+    "step2_credit_review": "complete",
+    "step2_location": "Detailed review of debts, credit utilization.",
+    "step3_agent_inputs": "complete",
+    "step3_location": "Full collection of income, expenses.",
+    "step4_paydown_projections": "complete",
+    "step4_location": "Discussed interest savings, timeline projections.",
+    "step5_offers_review": "complete",
+    "step5_location": "Reviewed available loan offers.",
+    "step6_debt_resolution": "complete",
+    "step6_location": "Presented the resolution program.",
+    "overall_process_adherence": "fair",
+    "missed_opportunities": [
+      "Failed to clarify honestly about negative short-term credit reporting impact."
+    ],
+    "process_notes": "Agent followed step structure but undermined educational element.",
+    "section_gap_reasons": [],
+    "key_process_moments": [
+      "Agent walked through projections and minimum payment math.",
+      "Warm transfer was executed as required."
+    ]
+  },
+  "transfer_agent_assessment": {
+    "transfer_occurred": true,
+    "transfer_agent_tone": "professional",
+    "transfer_quality": "professional"
+  },
+  "coaching_recommendations": {
+    "strengths": [
+      "High patience and empathy; agent built strong rapport.",
+      "Thorough data collection and adaptive pacing."
+    ],
+    "areas_for_improvement": [
+      "Must obtain explicit, standalone verbal consent for credit pull.",
+      "Must provide full, honest disclosure regarding negative short-term credit impacts."
+    ],
+    "specific_coaching_points": [
+      "Always use required credit pull consent language.",
+      "Provide balanced explanation of resolution program."
+    ],
+    "training_recommendations": [
+      "Refresher on compliance scripting for credit pulls.",
+      "Role-play scenarios explaining credit reporting consequences."
+    ]
+  },
+  "overall_call_rating": {
+    "compliance_rating": "fail",
+    "sales_effectiveness": "good",
+    "customer_satisfaction_likely": "medium",
+    "overall_score": "needs_improvement"
+  }
+}

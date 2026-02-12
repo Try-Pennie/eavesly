@@ -24,6 +24,7 @@ export const budgetInputsModule: EvalModule = {
       systemPrompt,
       userPrompt,
       BudgetInputsSchema,
+      "budget_inputs_evaluation",
     )
 
     const hasViolation = result.budget_collection_overview.budget_compliance_violation

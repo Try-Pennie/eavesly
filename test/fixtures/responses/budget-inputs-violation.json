@@ -1,0 +1,29 @@
+{
+  "budget_collection_overview": {
+    "items_collected": 2,
+    "items_skipped": 2,
+    "budget_compliance_violation": true
+  },
+  "housing_payment": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about rent/mortgage and customer provided $1,800/month."
+  },
+  "auto_payment": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about vehicle payments. Customer said none."
+  },
+  "utilities": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent did not ask about utilities or household expenses."
+  },
+  "other_debts_expenses": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent skipped asking about other debts or monthly obligations."
+  },
+  "violation_reason": "Agent skipped 2 of 4 required budget input categories (utilities and other debts/expenses), failing to collect a complete financial picture.",
+  "key_evidence_quote": "Agent moved directly from auto payment to program presentation without collecting utilities or other expenses."
+}

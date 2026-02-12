@@ -1,0 +1,118 @@
+{
+  "call_overview": {
+    "pennie_agent_speaker": "handling agent",
+    "customer_speaker": "contact",
+    "other_speakers": [],
+    "call_topic": "Debt resolution consultation and follow-up regarding program details.",
+    "call_purpose": "To address client's outstanding questions about the Pennie program.",
+    "call_outcome": "No enrollment completed. Client requested to discuss with spouse.",
+    "overall_tone": "Friendly, professional, informative.",
+    "call_duration_assessment": "appropriate",
+    "enrollment_completed": false,
+    "manager_review_required": false,
+    "manager_review_reason": "",
+    "manager_focus_areas": []
+  },
+  "compliance_scorecard": {
+    "call_recording_disclosure": "pass",
+    "call_recording_disclosure_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "This is Jonathan with Penny on a recorded line.",
+        "context": "Opening of the call.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "credit_pull_consent": "pass",
+    "credit_pull_consent_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "If we do, like, a soft check, is it okay if we do that?",
+        "context": "Before running credit check.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "social_security_verification": "pass",
+    "social_security_verification_evidence": [
+      {
+        "speaker": "handling agent",
+        "quote": "can you please verify date of birth and last 4 of the social?",
+        "context": "Early in call for identity verification.",
+        "process_step": "Step 1 Agenda Setting"
+      }
+    ],
+    "accurate_representations": "pass",
+    "accurate_representations_violations": [],
+    "critical_red_flag_hits": [],
+    "no_misleading_claims": "pass",
+    "misleading_claims_violations": [],
+    "overall_compliance_score": "pass",
+    "compliance_violations": [],
+    "critical_moments": [
+      "Agent properly states credit impact without making guarantees."
+    ]
+  },
+  "customer_experience_scorecard": {
+    "professional_tone": "excellent",
+    "professional_tone_examples": ["Friendly and warm greeting."],
+    "active_listening": "excellent",
+    "active_listening_examples": ["Responds directly to concerns."],
+    "patience_empathy": "excellent",
+    "patience_empathy_examples": ["Shows understanding of client anxiety."],
+    "clear_communication": "excellent",
+    "clear_communication_examples": ["Confirms understanding frequently."],
+    "customer_focused": "excellent",
+    "customer_focused_examples": ["Offers documentation for spouse review."],
+    "overall_customer_experience": "excellent",
+    "customer_experience_notes": "Consistently supportive and educational.",
+    "notable_interactions": ["Trust-building with BBB link."]
+  },
+  "sales_process_scorecard": {
+    "expected_sections": [1, 2, 3, 4, 5, 6],
+    "sections_attempted": [1, 2, 3, 4, 5, 6],
+    "sections_completed": [1, 2, 3, 4, 5, 6],
+    "step1_agenda_setting": "complete",
+    "step1_location": "Opening of call.",
+    "step2_credit_review": "complete",
+    "step2_location": "After credit check consent.",
+    "step3_agent_inputs": "complete",
+    "step3_location": "Balance review.",
+    "step4_paydown_projections": "complete",
+    "step4_location": "Proposal breakdown.",
+    "step5_offers_review": "complete",
+    "step5_location": "Loan offers discussion.",
+    "step6_debt_resolution": "complete",
+    "step6_location": "Program benefits.",
+    "overall_process_adherence": "excellent",
+    "missed_opportunities": [],
+    "process_notes": "All six steps completed.",
+    "section_gap_reasons": [],
+    "key_process_moments": ["Clear transitions between steps."]
+  },
+  "transfer_agent_assessment": {
+    "transfer_occurred": false,
+    "transfer_agent_tone": "not_applicable",
+    "transfer_quality": "not_applicable"
+  },
+  "warm_transfer_compliance": {
+    "enrollment_completed": false,
+    "warm_transfer_completed": false,
+    "welcome_call_scheduled": false,
+    "client_proactively_requested_scheduling": false,
+    "warm_transfer_violation": false,
+    "violation_reason": "",
+    "key_evidence_quote": "No enrollment occurred so warm transfer not applicable."
+  },
+  "coaching_recommendations": {
+    "strengths": ["Excellent compliance.", "Empathetic communication."],
+    "areas_for_improvement": ["Guard against implied guarantees."],
+    "specific_coaching_points": ["Add disclaimers about credit variability."],
+    "training_recommendations": ["Use as training model."]
+  },
+  "overall_call_rating": {
+    "compliance_rating": "pass",
+    "sales_effectiveness": "excellent",
+    "customer_satisfaction_likely": "high",
+    "overall_score": "excellent"
+  }
+}

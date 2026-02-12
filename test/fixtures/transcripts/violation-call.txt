@@ -1,0 +1,45 @@
+[contact]: Hello? Oh, hold on. I gotta exit out something. Hello?
+[handling agent]: Yes. Is this Erica? Hi,
+[contact]: Yes.
+[contact]: It is. I'm
+[handling agent]: Erica. This is Lamel with Penny on a recorded line. How are you doing?
+[contact]: good. Thank you.
+[handling agent]: Good. I know you had an appointment set up, so we wanted to just, we saw your message where you was like you're ready, so we wanted to make sure we give you a call.
+[contact]: Yeah. Because the the appointment was for 5 to
+[handling agent]: Yep. It looks
+[contact]: go over everything.
+[contact]: Yep.
+[handling agent]: it looks like you were looking for 35,000 for the loan. So for the
+[contact]: Yes.
+[handling agent]: income loans for clients, there's a couple of income numbers that we have to gather, we'll so get be able to get those directly from you. And then from there, we're able to see the different terms, percentages, and lenders, what they're offering for the loans. Okay? And then for clients,
+[contact]: Okay.
+[handling agent]: whenever we pull up the, credit report, we pull it up as a soft pull so you don't have any inquiries on your profile. Do we have your appointment to proceed?
+[contact]: Okay.
+[handling agent]: And while that's loading up,
+[contact]: Yes. I
+[handling agent]: what is it that you do for work?
+[contact]: work for public
+[handling agent]: Got it. And how
+[contact]: school system. I'm a building
+[handling agent]: long have you been doing this since? Gotcha. And do you guys normally
+[contact]: secretary.
+[contact]: 9 years.
+[handling agent]: get paid weekly or biweekly? So 1 of the questions that I don't have on the application
+[contact]: Biweekly.
+[handling agent]: is how much does the client bring in for the month in total after taxes and deductions? So how much would you say that is?
+[contact]: 2,000
+[handling agent]: 2400.
+[contact]: 4 100?
+[handling agent]: Got it. Are you able to, like, maybe check, like, bank statements to
+[contact]: I think so. Yeah.
+[handling agent]: see what you bring in? Sometimes that makes it easier.
+[contact]: Hold on.
+[handling agent]: No. Take your time. I wanna make sure you get your numbers right anyway so I could help you.
+[contact]: Hang on. I'm looking. Hold on.
+[handling agent]: So when it shows closed, that's why clients are able to get that settlement. After you get the settlement within your term, it shows settled and paid. So it's the same thing like if you paid off your old account on your credit report. Like, a good 1 would be you had a Best Buy account. That account on your credit report shows paid and closed. Anytime someone pays off a debt, whether they do it themselves or in a program, it'll always reflect how you paid it, and that's what helps the creditworthiness go up.
+[contact]: He said he said that they were gonna say that it's it's closed and that there wasn't gonna be, not gonna be showing that I haven't paid on them each month.
+[transfer agent]: No. What happens is you have to stop paying the creditors now because the creditors require a period of 3 to 6 months of nonpayments on the account consecutively. So you will show missed payments at least for that long, if not longer. And that's what affects the credit.
+[contact]: that's not what he told me. He told me something completely different.
+[handling agent]: I have the representative on the phone. He's gonna make sure you have your phone number. I'll leave you in in good hands, and you take care.
+[contact]: Bye.
+END OF TRANSCRIPT

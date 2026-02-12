@@ -1,0 +1,4 @@
+[handling agent]: This is Alex with Penny on a recorded line. How are you today?
+[contact]: Good, thanks.
+[handling agent]: Great. I'm calling to follow up on your inquiry. Do you have a few minutes?
+[contact]: Sure, go ahead.

@@ -21,6 +21,7 @@ export const fullQAModule: EvalModule = {
       systemPrompt,
       userPrompt,
       FullQASchema,
+      "full_qa_evaluation",
     )
 
     const hasViolation = result.call_overview.manager_review_required

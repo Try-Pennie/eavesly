@@ -24,6 +24,7 @@ export const warmTransferModule: EvalModule = {
       systemPrompt,
       userPrompt,
       WarmTransferSchema,
+      "warm_transfer_evaluation",
     )
 
     const hasViolation = result.warm_transfer_compliance.warm_transfer_violation

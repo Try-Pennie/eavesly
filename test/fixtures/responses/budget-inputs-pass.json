@@ -1,0 +1,29 @@
+{
+  "budget_collection_overview": {
+    "items_collected": 4,
+    "items_skipped": 0,
+    "budget_compliance_violation": false
+  },
+  "housing_payment": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'And then are you renting or paying a mortgage? How much is rent every month?'"
+  },
+  "auto_payment": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'And then any vehicle payments?' Customer confirmed amount."
+  },
+  "utilities": {
+    "collected": true,
+    "how_collected": "customer_volunteered",
+    "evidence": "Customer volunteered utility expenses during budget discussion."
+  },
+  "other_debts_expenses": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about other monthly obligations and debts."
+  },
+  "violation_reason": "",
+  "key_evidence_quote": "Agent thoroughly collected all four budget categories through direct questioning."
+}
