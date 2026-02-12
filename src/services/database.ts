@@ -1,37 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
-import type { ModuleConfig, ModuleResult } from "../modules/types"
+import type { ModuleResult } from "../modules/types"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
   private client: SupabaseClient
-  private configCache: ModuleConfig[] | null = null
-  private configCacheTime = 0
-  private readonly CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
   constructor(env: Bindings) {
     this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-  }
-
-  async getModuleConfigs(): Promise<ModuleConfig[]> {
-    const now = Date.now()
-    if (this.configCache && now - this.configCacheTime < this.CACHE_TTL_MS) {
-      return this.configCache
-    }
-
-    const { data, error } = await this.client
-      .from("eavesly_module_config")
-      .select("module_name, enabled, trigger_dispositions, trigger_campaigns, min_talk_time, config_json")
-
-    if (error) {
-      log("error", "Failed to fetch module configs", { error: error.message })
-      if (this.configCache) return this.configCache
-      throw error
-    }
-
-    this.configCache = data as ModuleConfig[]
-    this.configCacheTime = now
-    return this.configCache
   }
 
   async storeModuleResult(
@@ -90,8 +66,8 @@ export class DatabaseService {
 
   async healthCheck(): Promise<boolean> {
     const { error } = await this.client
-      .from("eavesly_module_config")
-      .select("module_name")
+      .from("eavesly_module_results")
+      .select("call_id")
       .limit(1)
 
     return !error

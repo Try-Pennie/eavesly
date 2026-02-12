@@ -17,15 +17,6 @@ export interface Alert {
   result: unknown
 }
 
-export interface ModuleConfig {
-  module_name: string
-  enabled: boolean
-  trigger_dispositions: string[] | null
-  trigger_campaigns: string[] | null
-  min_talk_time: number
-  config_json: Record<string, unknown>
-}
-
 export interface EvalModule {
   name: string
   evaluate(

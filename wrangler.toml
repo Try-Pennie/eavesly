@@ -5,7 +5,7 @@ account_id = "3e7f907a9c19e51417873e2cce4fbc5c"
 
 [vars]
 ENVIRONMENT = "development"
-OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06"
+OPENROUTER_MODEL = "openai/gpt-4.1"
 
 # Secrets (set via `wrangler secret put`):
 # INTERNAL_API_KEY
@@ -22,8 +22,8 @@ fallthrough = true
 
 [env.staging]
 name = "eavesly-staging"
-vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06" }
+vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1" }
 
 [env.production]
 name = "eavesly-production"
-vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4o-2024-08-06" }
+vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1" }

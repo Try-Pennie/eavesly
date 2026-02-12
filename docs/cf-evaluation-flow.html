@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eavesly — Cloudflare Evaluation Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --bg-surface: #11141b;
+    --bg-elevated: #181c26;
+    --border: #1e2330;
+    --border-accent: #2a3040;
+    --text: #c8cdd8;
+    --text-muted: #6b7280;
+    --text-dim: #3d4555;
+
+    --amber: #f59e0b;
+    --amber-dim: #78500622;
+    --amber-glow: #f59e0b18;
+
+    --cyan: #22d3ee;
+    --cyan-dim: #22d3ee10;
+    --cyan-glow: #22d3ee18;
+
+    --green: #34d399;
+    --green-dim: #34d39910;
+
+    --rose: #fb7185;
+    --rose-dim: #fb718510;
+
+    --violet: #a78bfa;
+    --violet-dim: #a78bfa10;
+
+    --blue: #60a5fa;
+    --blue-dim: #60a5fa10;
+
+    --orange: #fb923c;
+    --orange-dim: #fb923c10;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 800px 600px at 20% 10%, #22d3ee06, transparent),
+      radial-gradient(ellipse 600px 800px at 80% 90%, #f59e0b04, transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .header-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #eef0f4;
+    margin-bottom: 8px;
+  }
+
+  .header p {
+    font-size: 14px;
+    color: var(--text-muted);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Flow connector lines */
+  .flow-connector {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  .flow-line {
+    width: 1px;
+    height: 32px;
+    background: linear-gradient(to bottom, var(--border-accent), var(--border));
+    position: relative;
+  }
+
+  .flow-line::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-accent);
+  }
+
+  .flow-line.animated {
+    overflow: hidden;
+  }
+
+  .flow-line.animated::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -1px;
+    width: 3px;
+    height: 8px;
+    background: var(--cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 6px var(--cyan);
+    animation: flow-down 2s ease-in-out infinite;
+  }
+
+  @keyframes flow-down {
+    0% { top: -8px; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: calc(100% + 8px); opacity: 0; }
+  }
+
+  /* Phase label */
+  .phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .phase-label span {
+    padding: 4px 12px;
+    border-radius: 4px;
+  }
+
+  .phase-label.middleware span { color: var(--cyan); }
+  .phase-label.execution span { color: var(--amber); }
+  .phase-label.storage span { color: var(--green); }
+  .phase-label.response span { color: var(--violet); }
+
+  /* Step number */
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+  }
+
+  .card:hover {
+    border-color: var(--border-accent);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-header h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e5eb;
+    flex: 1;
+  }
+
+  .card-header .file-ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 2px 8px;
+    background: var(--bg);
+    border-radius: 4px;
+  }
+
+  .card-body {
+    padding: 16px 18px;
+  }
+
+  /* Section-specific */
+  .incoming .step-num { background: var(--blue-dim); color: var(--blue); }
+  .incoming .card { border-color: #60a5fa18; }
+  .incoming .card:hover { border-color: #60a5fa30; }
+
+  .middleware-section .step-num { background: var(--cyan-dim); color: var(--cyan); }
+  .middleware-section .card { border-color: #22d3ee12; }
+  .middleware-section .card:hover { border-color: #22d3ee28; }
+
+  .execution .step-num { background: var(--amber-dim); color: var(--amber); }
+  .execution .card { border-color: #f59e0b12; }
+  .execution .card:hover { border-color: #f59e0b28; }
+
+  .storage-section .step-num { background: var(--green-dim); color: var(--green); }
+  .storage-section .card { border-color: #34d39912; }
+  .storage-section .card:hover { border-color: #34d39928; }
+
+  .alert-section .step-num { background: var(--rose-dim); color: var(--rose); }
+  .alert-section .card { border-color: #fb718512; }
+  .alert-section .card:hover { border-color: #fb718528; }
+
+  .response-section .step-num { background: var(--violet-dim); color: var(--violet); }
+  .response-section .card { border-color: #a78bfa12; }
+  .response-section .card:hover { border-color: #a78bfa28; }
+
+  /* Request block */
+  .request-block {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .method-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--blue-dim);
+    color: var(--blue);
+    border: 1px solid #60a5fa20;
+    flex-shrink: 0;
+  }
+
+  .endpoint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #e2e5eb;
+    margin-bottom: 8px;
+  }
+
+  .payload-fields {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .field-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  /* Middleware pipeline */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    position: relative;
+  }
+
+  .pipeline-track {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 20px;
+    flex-shrink: 0;
+  }
+
+  .pipeline-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 14px;
+  }
+
+  .pipeline-line {
+    width: 1px;
+    flex: 1;
+    min-height: 8px;
+  }
+
+  .pipeline-step.cyan .pipeline-dot { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  .pipeline-step.cyan .pipeline-line { background: linear-gradient(to bottom, #22d3ee40, #22d3ee10); }
+
+  .pipeline-content {
+    flex: 1;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pipeline-step:last-child .pipeline-content {
+    border-bottom: none;
+  }
+
+  .pipeline-step:last-child .pipeline-line {
+    display: none;
+  }
+
+  .pipeline-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: #dde0e7;
+    margin-bottom: 3px;
+  }
+
+  .pipeline-desc {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .pipeline-desc code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--cyan);
+    background: var(--cyan-dim);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .reject-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--rose-dim);
+    color: var(--rose);
+    border: 1px solid #fb718515;
+    margin-left: 6px;
+  }
+
+  /* Route handler */
+  .handler-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .handler-step {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .handler-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+
+  .handler-step-text {
+    padding-top: 4px;
+  }
+
+  .handler-step-text .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #dde0e7;
+  }
+
+  .handler-step-text .detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .handler-step-text .detail code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .handler-step.amber .handler-icon { background: var(--amber-dim); color: var(--amber); border: 1px solid #f59e0b15; }
+  .handler-step.amber .detail code { background: var(--amber-dim); color: var(--amber); }
+  .handler-step.green .handler-icon { background: var(--green-dim); color: var(--green); border: 1px solid #34d39915; }
+  .handler-step.green .detail code { background: var(--green-dim); color: var(--green); }
+  .handler-step.blue .handler-icon { background: var(--blue-dim); color: var(--blue); border: 1px solid #60a5fa15; }
+  .handler-step.blue .detail code { background: var(--blue-dim); color: var(--blue); }
+
+  /* Module resolution */
+  .resolution-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .config-source {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .config-source .icon {
+    font-size: 14px;
+  }
+
+  .config-source .text {
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .config-source .text strong {
+    color: #dde0e7;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+
+  .config-source .cache-tag {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid #34d39915;
+  }
+
+  .filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .filter-check {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .filter-check .check {
+    color: var(--amber);
+    font-size: 10px;
+  }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .module-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--amber-dim);
+    border: 1px solid #f59e0b15;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  .module-chip .mod-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+
+  .skip-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  /* Parallel execution */
+  .parallel-container {
+    position: relative;
+  }
+
+  .parallel-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    margin-bottom: 14px;
+    letter-spacing: 0.06em;
+  }
+
+  .parallel-badge .line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #f59e0b25, transparent);
+  }
+
+  .parallel-lanes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .lane {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .lane-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e5eb;
+    text-align: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .lane-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .lane-step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .lane-step-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .lane-step-text code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .lane-step-text code.file { background: var(--bg-surface); color: var(--text-muted); }
+  .lane-step-text code.amber { background: var(--amber-dim); color: var(--amber); }
+  .lane-step-text code.cyan { background: var(--cyan-dim); color: var(--cyan); }
+
+  /* LLM call chain */
+  .llm-chain {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 12px 0 6px;
+    flex-wrap: wrap;
+  }
+
+  .chain-node {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .chain-node.highlight {
+    border-color: #f59e0b25;
+    color: var(--amber);
+    background: var(--amber-dim);
+  }
+
+  .chain-arrow {
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 0 4px;
+  }
+
+  /* Retry loop */
+  .retry-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border-radius: 6px;
+    border: 1px dashed #fb718525;
+    margin-top: 4px;
+  }
+
+  .retry-icon {
+    font-size: 12px;
+    color: var(--rose);
+    animation: spin-retry 3s linear infinite;
+  }
+
+  @keyframes spin-retry {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .retry-text {
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+
+  .retry-text strong {
+    color: var(--rose);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* Module result schema */
+  .result-schema {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--bg-surface);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  .result-schema .key { color: var(--cyan); }
+  .result-schema .type { color: var(--text-dim); }
+  .result-schema .brace { color: var(--text-dim); }
+
+  /* Storage */
+  .storage-targets {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .storage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .storage-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .storage-row.primary .storage-icon {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid #34d39915;
+  }
+
+  .storage-row.legacy .storage-icon {
+    background: var(--orange-dim);
+    color: var(--orange);
+    border: 1px solid #fb923c15;
+  }
+
+  .storage-info { flex: 1; }
+
+  .storage-info .table-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: #dde0e7;
+    font-weight: 500;
+  }
+
+  .storage-info .table-detail {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .storage-info .table-detail code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .storage-method {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid #34d39912;
+  }
+
+  .condition-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--orange-dim);
+    color: var(--orange);
+    border: 1px solid #fb923c12;
+  }
+
+  /* Alert dispatch */
+  .alert-flow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .alert-method {
+    padding: 8px 14px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--rose);
+  }
+
+  .alert-method .sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-weight: 400;
+    display: block;
+    margin-top: 2px;
+  }
+
+  .async-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--rose-dim);
+    color: var(--rose);
+    border: 1px solid #fb718515;
+    white-space: nowrap;
+  }
+
+  .future-note {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* Response */
+  .response-fields {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .resp-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+  }
+
+  .resp-field .fname { color: var(--violet); }
+  .resp-field .ftype { color: var(--text-dim); font-size: 9.5px; margin-left: auto; }
+
+  /* External services sidebar */
+  .ext-services {
+    display: flex;
+    gap: 10px;
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+
+  .ext-service {
+    flex: 1;
+    padding: 14px;
+    background: var(--bg-surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .ext-service .ext-icon {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .ext-service .ext-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #dde0e7;
+    margin-bottom: 2px;
+  }
+
+  .ext-service .ext-role {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* Two-col layout for steps 6 + 7 */
+  .side-by-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .side-by-side .flow-connector {
+    grid-column: 1 / -1;
+  }
+
+  /* Animations */
+  .card, .lane, .ext-service {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: fade-up 0.5s ease forwards;
+  }
+
+  .card:nth-child(1) { animation-delay: 0.1s; }
+  .card:nth-child(2) { animation-delay: 0.2s; }
+
+  @keyframes fade-up {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .lane:nth-child(1) { animation-delay: 0.15s; }
+  .lane:nth-child(2) { animation-delay: 0.25s; }
+  .lane:nth-child(3) { animation-delay: 0.35s; }
+
+  .ext-service:nth-child(1) { animation-delay: 0.1s; }
+  .ext-service:nth-child(2) { animation-delay: 0.2s; }
+  .ext-service:nth-child(3) { animation-delay: 0.3s; }
+  .ext-service:nth-child(4) { animation-delay: 0.4s; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .page { padding: 32px 18px 60px; }
+    .parallel-lanes { grid-template-columns: 1fr; }
+    .modules-grid { grid-template-columns: 1fr; }
+    .side-by-side { grid-template-columns: 1fr; }
+    .response-fields { grid-template-columns: 1fr; }
+    .ext-services { flex-direction: column; }
+    .llm-chain { gap: 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-badge">
+      <span class="dot"></span>
+      Cloudflare Workers
+    </div>
+    <h1>Eavesly Evaluation Flow</h1>
+    <p>Request lifecycle when a call evaluation is triggered via the Cloudflare Workers build</p>
+  </header>
+
+  <!-- Step 1: Incoming Request -->
+  <div class="incoming">
+    <div class="phase-label"><span>Ingress</span></div>
+    <div class="card" style="animation-delay:0.05s">
+      <div class="card-header">
+        <div class="step-num">1</div>
+        <h3>Incoming Request</h3>
+        <span class="file-ref">src/index.ts</span>
+      </div>
+      <div class="card-body">
+        <div class="request-block">
+          <span class="method-badge">POST</span>
+          <div>
+            <div class="endpoint">/api/v1/evaluate</div>
+            <div class="payload-fields">
+              <span class="field-tag">call_id</span>
+              <span class="field-tag">transcript</span>
+              <span class="field-tag">metadata.talk_time</span>
+              <span class="field-tag">metadata.disposition</span>
+              <span class="field-tag">metadata.campaign_name</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated"></div></div>
+
+  <!-- Step 2: Middleware Pipeline -->
+  <div class="middleware-section">
+    <div class="phase-label middleware"><span>Phase 1 &mdash; Middleware Pipeline</span></div>
+    <div class="card" style="animation-delay:0.1s">
+      <div class="card-header">
+        <div class="step-num">2</div>
+        <h3>Middleware Stack</h3>
+        <span class="file-ref">sequential</span>
+      </div>
+      <div class="card-body">
+        <div class="pipeline">
+          <div class="pipeline-step cyan">
+            <div class="pipeline-track">
+              <div class="pipeline-dot"></div>
+              <div class="pipeline-line"></div>
+            </div>
+            <div class="pipeline-content">
+              <div class="pipeline-title">CORS Middleware</div>
+              <div class="pipeline-desc">
+                <code>hono/cors</code> &mdash; allows all origins, methods <code>GET POST OPTIONS</code>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step cyan">
+            <div class="pipeline-track">
+              <div class="pipeline-dot"></div>
+              <div class="pipeline-line"></div>
+            </div>
+            <div class="pipeline-content">
+              <div class="pipeline-title">Request Logger</div>
+              <div class="pipeline-desc">
+                Generates <code>correlationId</code> via <code>crypto.randomUUID()</code>, sets <code>X-Correlation-ID</code> header, times the full request
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step cyan">
+            <div class="pipeline-track">
+              <div class="pipeline-dot"></div>
+              <div class="pipeline-line"></div>
+            </div>
+            <div class="pipeline-content">
+              <div class="pipeline-title">Auth Middleware</div>
+              <div class="pipeline-desc">
+                Validates <code>Bearer</code> token against <code>INTERNAL_API_KEY</code> env var
+                <span class="reject-badge">401 if invalid</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step cyan">
+            <div class="pipeline-track">
+              <div class="pipeline-dot"></div>
+            </div>
+            <div class="pipeline-content">
+              <div class="pipeline-title">Zod Validator</div>
+              <div class="pipeline-desc">
+                Validates request body against <code>EvaluateRequestSchema</code> via <code>zValidator</code>
+                <span class="reject-badge">400 if invalid</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated" style="animation-delay:0.3s"></div></div>
+
+  <!-- Step 3: Route Handler -->
+  <div class="execution">
+    <div class="phase-label execution"><span>Phase 2 &mdash; Initialization</span></div>
+    <div class="card" style="animation-delay:0.15s">
+      <div class="card-header">
+        <div class="step-num">3</div>
+        <h3>Route Handler</h3>
+        <span class="file-ref">src/routes/evaluate.ts</span>
+      </div>
+      <div class="card-body">
+        <div class="handler-steps">
+          <div class="handler-step blue">
+            <div class="handler-icon">D</div>
+            <div class="handler-step-text">
+              <div class="label">Extract validated callData</div>
+              <div class="detail"><code>c.req.valid("json")</code> &mdash; typed request data</div>
+            </div>
+          </div>
+          <div class="handler-step amber">
+            <div class="handler-icon">L</div>
+            <div class="handler-step-text">
+              <div class="label">Create LLM Client</div>
+              <div class="detail">OpenAI SDK &rarr; <code>CF AI Gateway</code> &rarr; OpenRouter</div>
+            </div>
+          </div>
+          <div class="handler-step green">
+            <div class="handler-icon">S</div>
+            <div class="handler-step-text">
+              <div class="label">Create DatabaseService</div>
+              <div class="detail">Supabase client via <code>SUPABASE_SERVICE_ROLE_KEY</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated" style="animation-delay:0.5s"></div></div>
+
+  <!-- Step 4: Module Resolution -->
+  <div class="execution">
+    <div class="phase-label execution"><span>Phase 3 &mdash; Module Resolution</span></div>
+    <div class="card" style="animation-delay:0.2s">
+      <div class="card-header">
+        <div class="step-num">4</div>
+        <h3>resolveModules()</h3>
+        <span class="file-ref">src/modules/router.ts</span>
+      </div>
+      <div class="card-body">
+        <div class="resolution-flow">
+          <div class="config-source">
+            <span class="icon">&#9881;</span>
+            <div class="text">Fetch configs from <strong>eavesly_module_config</strong> table</div>
+            <span class="cache-tag">5 min cache</span>
+          </div>
+
+          <div style="font-size:11px;color:var(--text-muted);margin:2px 0 0;">Filter each module against call metadata:</div>
+          <div class="filter-list">
+            <div class="filter-check"><span class="check">?</span> enabled</div>
+            <div class="filter-check"><span class="check">?</span> min_talk_time met</div>
+            <div class="filter-check"><span class="check">?</span> disposition matches</div>
+            <div class="filter-check"><span class="check">?</span> campaign matches</div>
+          </div>
+
+          <div class="modules-grid">
+            <div class="module-chip"><span class="mod-dot"></span>full_qa</div>
+            <div class="module-chip"><span class="mod-dot"></span>budget_inputs</div>
+            <div class="module-chip"><span class="mod-dot"></span>warm_transfer</div>
+          </div>
+          <div class="skip-note">Modules that fail filters &rarr; skippedModules[]</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated" style="animation-delay:0.7s"></div></div>
+
+  <!-- Step 5: Parallel Execution -->
+  <div class="execution">
+    <div class="phase-label execution"><span>Phase 4 &mdash; Parallel Evaluation</span></div>
+    <div class="card parallel-container" style="animation-delay:0.25s">
+      <div class="card-header">
+        <div class="step-num">5</div>
+        <h3>Module Execution</h3>
+        <span class="file-ref">Promise.allSettled()</span>
+      </div>
+      <div class="card-body">
+        <div class="parallel-badge">
+          <span class="line"></span>
+          PARALLEL EXECUTION
+          <span class="line"></span>
+        </div>
+
+        <div class="parallel-lanes">
+          <div class="lane">
+            <div class="lane-header">full_qa</div>
+            <div class="lane-step">
+              <span class="lane-step-num">a.</span>
+              <span class="lane-step-text">Load <code class="file">prompts/full-qa.txt</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">b.</span>
+              <span class="lane-step-text">Build user prompt with transcript</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">c.</span>
+              <span class="lane-step-text">Call LLM &rarr; JSON response</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">d.</span>
+              <span class="lane-step-text">Validate with <code class="amber">FullQASchema</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">e.</span>
+              <span class="lane-step-text">Check <code class="cyan">manager_review_required</code></span>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-header">budget_inputs</div>
+            <div class="lane-step">
+              <span class="lane-step-num">a.</span>
+              <span class="lane-step-text">Load <code class="file">prompts/budget-inputs.txt</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">b.</span>
+              <span class="lane-step-text">Build user prompt with transcript</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">c.</span>
+              <span class="lane-step-text">Call LLM &rarr; JSON response</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">d.</span>
+              <span class="lane-step-text">Validate with <code class="amber">BudgetInputsSchema</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">e.</span>
+              <span class="lane-step-text">Check <code class="cyan">budget violations</code></span>
+            </div>
+          </div>
+
+          <div class="lane">
+            <div class="lane-header">warm_transfer</div>
+            <div class="lane-step">
+              <span class="lane-step-num">a.</span>
+              <span class="lane-step-text">Load <code class="file">prompts/warm-transfer.txt</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">b.</span>
+              <span class="lane-step-text">Build user prompt with transcript</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">c.</span>
+              <span class="lane-step-text">Call LLM &rarr; JSON response</span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">d.</span>
+              <span class="lane-step-text">Validate with <code class="amber">WarmTransferSchema</code></span>
+            </div>
+            <div class="lane-step">
+              <span class="lane-step-num">e.</span>
+              <span class="lane-step-text">Check <code class="cyan">transfer compliance</code></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LLM Call Chain -->
+        <div style="margin-top:16px;font-size:11px;color:var(--text-muted);margin-bottom:6px;">LLM request path (each module):</div>
+        <div class="llm-chain">
+          <span class="chain-node">CF Worker</span>
+          <span class="chain-arrow">&rarr;</span>
+          <span class="chain-node highlight">Cloudflare AI Gateway</span>
+          <span class="chain-arrow">&rarr;</span>
+          <span class="chain-node">OpenRouter</span>
+          <span class="chain-arrow">&rarr;</span>
+          <span class="chain-node highlight">GPT-4o</span>
+        </div>
+
+        <!-- Retry -->
+        <div class="retry-box">
+          <span class="retry-icon">&#8634;</span>
+          <span class="retry-text">
+            If Zod validation fails: <strong>retry with exponential backoff</strong> &mdash; 1s&ndash;10s delay, max 3 retries
+          </span>
+        </div>
+
+        <!-- Result schema -->
+        <div class="result-schema">
+          <span class="brace">{</span><br>
+          &nbsp;&nbsp;<span class="key">module_name</span>: <span class="type">string</span>,<br>
+          &nbsp;&nbsp;<span class="key">result</span>: <span class="type">object</span>,<br>
+          &nbsp;&nbsp;<span class="key">has_violation</span>: <span class="type">boolean</span>,<br>
+          &nbsp;&nbsp;<span class="key">violation_type</span>: <span class="type">string | null</span>,<br>
+          &nbsp;&nbsp;<span class="key">processing_time_ms</span>: <span class="type">number</span><br>
+          <span class="brace">}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated" style="animation-delay:0.9s"></div></div>
+
+  <!-- Steps 6 & 7: Storage + Alerts side by side -->
+  <div class="side-by-side">
+    <div class="storage-section">
+      <div class="phase-label storage"><span>Phase 5 &mdash; Persistence</span></div>
+      <div class="card" style="animation-delay:0.3s">
+        <div class="card-header">
+          <div class="step-num">6</div>
+          <h3>Results Storage</h3>
+          <span class="file-ref">sequential per result</span>
+        </div>
+        <div class="card-body">
+          <div class="storage-targets">
+            <div class="storage-row primary">
+              <div class="storage-icon">&#9638;</div>
+              <div class="storage-info">
+                <div class="table-name">eavesly_module_results</div>
+                <div class="table-detail">All module results &mdash; <code>upsert</code> on <code>call_id, module_name</code></div>
+              </div>
+              <span class="storage-method">UPSERT</span>
+            </div>
+            <div class="storage-row legacy">
+              <div class="storage-icon">&#9671;</div>
+              <div class="storage-info">
+                <div class="table-name">eavesly_transcription_qa</div>
+                <div class="table-detail">Legacy compat table &mdash; <code>upsert</code> on <code>call_id</code></div>
+              </div>
+              <span class="condition-tag">full_qa only</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-section">
+      <div class="phase-label" style="visibility:hidden"><span>&nbsp;</span></div>
+      <div class="card" style="animation-delay:0.35s">
+        <div class="card-header">
+          <div class="step-num">7</div>
+          <h3>Alert Dispatch</h3>
+          <span class="file-ref">src/services/alerts.ts</span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="alert-flow">
+              <div class="alert-method">
+                ctx.waitUntil()
+                <span class="sub">non-blocking</span>
+              </div>
+              <span class="async-badge">ASYNC</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);">
+              If any module flagged <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--rose);background:var(--rose-dim);padding:1px 5px;border-radius:3px;">has_violation: true</code>, alerts are dispatched after response is sent
+            </div>
+            <div class="future-note">Currently: logging only. Future: Slack, email webhooks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-connector"><div class="flow-line animated" style="animation-delay:1.1s"></div></div>
+
+  <!-- Step 8: Response -->
+  <div class="response-section">
+    <div class="phase-label response"><span>Response</span></div>
+    <div class="card" style="animation-delay:0.4s">
+      <div class="card-header">
+        <div class="step-num">8</div>
+        <h3>JSON Response</h3>
+        <span class="file-ref">200 OK</span>
+      </div>
+      <div class="card-body">
+        <div class="response-fields">
+          <div class="resp-field"><span class="fname">call_id</span><span class="ftype">string</span></div>
+          <div class="resp-field"><span class="fname">correlation_id</span><span class="ftype">string</span></div>
+          <div class="resp-field"><span class="fname">timestamp</span><span class="ftype">ISO 8601</span></div>
+          <div class="resp-field"><span class="fname">processing_time_ms</span><span class="ftype">number</span></div>
+          <div class="resp-field"><span class="fname">modules_run</span><span class="ftype">string[]</span></div>
+          <div class="resp-field"><span class="fname">modules_skipped</span><span class="ftype">string[]</span></div>
+          <div class="resp-field"><span class="fname">results</span><span class="ftype">Record&lt;module, result&gt;</span></div>
+          <div class="resp-field"><span class="fname">alerts</span><span class="ftype">{ module, type }[]</span></div>
+          <div class="resp-field"><span class="fname">modules_failed</span><span class="ftype">ModuleError[]</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External Services -->
+  <div class="ext-services">
+    <div class="ext-service" style="animation-delay:0.5s">
+      <div class="ext-icon">&#9729;</div>
+      <div class="ext-name">Cloudflare AI Gateway</div>
+      <div class="ext-role">LLM proxy &amp; rate limiting</div>
+    </div>
+    <div class="ext-service" style="animation-delay:0.6s">
+      <div class="ext-icon">&#9889;</div>
+      <div class="ext-name">OpenRouter</div>
+      <div class="ext-role">Model routing layer</div>
+    </div>
+    <div class="ext-service" style="animation-delay:0.7s">
+      <div class="ext-icon">&#9670;</div>
+      <div class="ext-name">GPT-4o</div>
+      <div class="ext-role">Evaluation inference</div>
+    </div>
+    <div class="ext-service" style="animation-delay:0.8s">
+      <div class="ext-icon">&#9683;</div>
+      <div class="ext-name">Supabase</div>
+      <div class="ext-role">Config, results, legacy storage</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

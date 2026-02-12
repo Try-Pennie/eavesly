@@ -1,0 +1,6 @@
+INTERNAL_API_KEY=your_secure_api_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+CF_ACCOUNT_ID=your_cloudflare_account_id
+CF_GATEWAY_ID=your_gateway_id
+CF_AIG_TOKEN=your_aig_token
