@@ -21,6 +21,11 @@ type = "Text"
 globs = ["prompts/**/*.txt"]
 fallthrough = true
 
+[observability]
+[observability.logs]
+enabled = false
+invocation_logs = true
+
 [env.staging]
 name = "eavesly-staging"
 vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1" }
