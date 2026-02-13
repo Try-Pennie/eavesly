@@ -73,6 +73,32 @@ export class DatabaseService {
     }
   }
 
+  async logRequest(entry: {
+    endpoint: string
+    callId?: string
+    status: string
+    statusCode?: number
+    errorMessage?: string
+    errorDetails?: unknown
+    rawBody?: string
+    correlationId?: string
+  }): Promise<void> {
+    try {
+      await this.client.from("eavesly_request_log").insert({
+        endpoint: entry.endpoint,
+        call_id: entry.callId ?? null,
+        status: entry.status,
+        status_code: entry.statusCode ?? null,
+        error_message: entry.errorMessage ?? null,
+        error_details: entry.errorDetails ?? null,
+        raw_body: entry.rawBody?.slice(0, 10000) ?? null,
+        correlation_id: entry.correlationId ?? null,
+      })
+    } catch {
+      // Never let logging break the main flow
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     const { error } = await this.client
       .from("eavesly_module_results")
