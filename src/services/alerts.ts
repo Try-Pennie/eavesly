@@ -53,6 +53,7 @@ export interface SlackPayload {
   detail: string
   contact_name: string
   recording_link: string
+  transcript_url: string
 }
 
 export function buildSlackPayload(alert: Alert): SlackPayload {
@@ -67,6 +68,7 @@ export function buildSlackPayload(alert: Alert): SlackPayload {
     detail: extractDetail(alert),
     contact_name: alert.contact_name ?? "",
     recording_link: alert.recording_link ?? "",
+    transcript_url: alert.transcript_url ?? "",
   }
 }
 

@@ -19,6 +19,7 @@ export interface Alert {
   agent_email?: string
   contact_name?: string
   recording_link?: string
+  transcript_url?: string
 }
 
 export interface EvalModule {

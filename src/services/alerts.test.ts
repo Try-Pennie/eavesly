@@ -159,12 +159,14 @@ describe("buildSlackPayload", () => {
       agent_email: "agent@example.com",
       contact_name: "John Doe",
       recording_link: "https://recordings.example.com/call-123",
+      transcript_url: "https://transcripts.example.com/call-123",
     })
     const payload = buildSlackPayload(alert)
 
     expect(payload.agent_email).toBe("agent@example.com")
     expect(payload.contact_name).toBe("John Doe")
     expect(payload.recording_link).toBe("https://recordings.example.com/call-123")
+    expect(payload.transcript_url).toBe("https://transcripts.example.com/call-123")
   })
 
   it("defaults Regal context fields to empty string when not present", () => {
@@ -178,6 +180,7 @@ describe("buildSlackPayload", () => {
     expect(payload.agent_email).toBe("")
     expect(payload.contact_name).toBe("")
     expect(payload.recording_link).toBe("")
+    expect(payload.transcript_url).toBe("")
   })
 
   it("populates evidence and detail for budget compliance", () => {

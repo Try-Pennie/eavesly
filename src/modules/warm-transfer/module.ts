@@ -51,6 +51,7 @@ export const warmTransferModule: EvalModule = {
         agent_email: callData?.agent_email,
         contact_name: callData?.contact_name,
         recording_link: callData?.recording_link,
+        transcript_url: callData?.transcript_url,
       },
     ]
   },
