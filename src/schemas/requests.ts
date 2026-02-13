@@ -1,9 +1,9 @@
 import { z } from "zod"
 
 export const TranscriptMetadataSchema = z.object({
-  duration: z.number().int().positive(),
+  duration: z.coerce.number().int().positive(),
   timestamp: z.string(),
-  talk_time: z.number().int().positive().optional(),
+  talk_time: z.coerce.number().int().positive().optional(),
   disposition: z.string().min(1).optional(),
   campaign_name: z.string().optional(),
 })
