@@ -29,6 +29,13 @@ All tables use the `eavesly_` prefix to ensure clear separation from other produ
 - `alert_sent` (BOOLEAN) - Whether an alert was dispatched
 - `alert_sent_at` (TIMESTAMPTZ) - When the alert was sent
 - `processing_time_ms` (INTEGER) - Time taken for evaluation
+- `agent_email` (TEXT) - Agent's email address from Regal
+- `contact_name` (TEXT) - Contact name from Regal
+- `contact_phone` (TEXT) - Contact phone from Regal
+- `recording_link` (TEXT) - Call recording URL from Regal
+- `call_summary` (TEXT) - Call summary from Regal
+- `transcript_url` (TEXT) - Transcript URL from Regal
+- `sfdc_lead_id` (TEXT) - Salesforce Lead ID from Regal
 
 **Unique constraint**: `(call_id, module_name)` - prevents duplicate evaluations per call per module. Upsert operations use this constraint.
 

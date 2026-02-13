@@ -100,6 +100,7 @@ describe("EvaluateRequestSchema optional Regal fields", () => {
       recording_link: "https://recordings.example.com/call-123",
       call_summary: "Test call summary",
       transcript_url: "https://transcripts.example.com/call-123",
+      sfdc_lead_id: "00Q1234567890AB",
     })
     expect(result.success).toBe(true)
     if (result.success) {
@@ -109,6 +110,7 @@ describe("EvaluateRequestSchema optional Regal fields", () => {
       expect(result.data.recording_link).toBe("https://recordings.example.com/call-123")
       expect(result.data.call_summary).toBe("Test call summary")
       expect(result.data.transcript_url).toBe("https://transcripts.example.com/call-123")
+      expect(result.data.sfdc_lead_id).toBe("00Q1234567890AB")
     }
   })
 

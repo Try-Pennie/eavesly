@@ -84,6 +84,7 @@ describe("DatabaseService", () => {
         recording_link: "https://recordings.example.com/call-1",
         call_summary: "Test summary",
         transcript_url: "https://transcripts.example.com/call-1",
+        sfdc_lead_id: "00Q1234567890AB",
       })
 
       const call = mockUpsert.mock.calls[0][0]
@@ -93,6 +94,7 @@ describe("DatabaseService", () => {
       expect(call.recording_link).toBe("https://recordings.example.com/call-1")
       expect(call.call_summary).toBe("Test summary")
       expect(call.transcript_url).toBe("https://transcripts.example.com/call-1")
+      expect(call.sfdc_lead_id).toBe("00Q1234567890AB")
     })
 
     it("stores null for Regal fields when callData not provided", async () => {
@@ -112,6 +114,7 @@ describe("DatabaseService", () => {
       expect(call.recording_link).toBeNull()
       expect(call.call_summary).toBeNull()
       expect(call.transcript_url).toBeNull()
+      expect(call.sfdc_lead_id).toBeNull()
     })
 
     it("sets alert_sent_at when alert sent", async () => {

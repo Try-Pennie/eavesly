@@ -33,6 +33,7 @@ export class DatabaseService {
         recording_link: callData?.recording_link ?? null,
         call_summary: callData?.call_summary ?? null,
         transcript_url: callData?.transcript_url ?? null,
+        sfdc_lead_id: callData?.sfdc_lead_id ?? null,
       },
       { onConflict: "call_id,module_name" },
     )

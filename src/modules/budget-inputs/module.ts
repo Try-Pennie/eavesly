@@ -52,6 +52,7 @@ export const budgetInputsModule: EvalModule = {
         contact_name: callData?.contact_name,
         recording_link: callData?.recording_link,
         transcript_url: callData?.transcript_url,
+        sfdc_lead_id: callData?.sfdc_lead_id,
       },
     ]
   },

@@ -20,6 +20,7 @@ export interface Alert {
   contact_name?: string
   recording_link?: string
   transcript_url?: string
+  sfdc_lead_id?: string
 }
 
 export interface EvalModule {

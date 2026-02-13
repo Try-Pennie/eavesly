@@ -143,6 +143,7 @@ describe("fullQAModule", () => {
       expect(alerts[0].agent_email).toBe("agent@test.com")
       expect(alerts[0].contact_name).toBe("Jane Smith")
       expect(alerts[0].recording_link).toBe("https://recordings.example.com/call-456")
+      expect(alerts[0].sfdc_lead_id).toBe("00Q1234567890AB")
     })
   })
 })

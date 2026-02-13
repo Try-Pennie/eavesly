@@ -23,6 +23,7 @@ export const EvaluateRequestSchema = z.object({
   recording_link: z.string().optional(),
   call_summary: z.string().optional(),
   transcript_url: z.string().optional(),
+  sfdc_lead_id: z.string().optional(),
 })
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>

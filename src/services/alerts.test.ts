@@ -160,6 +160,7 @@ describe("buildSlackPayload", () => {
       contact_name: "John Doe",
       recording_link: "https://recordings.example.com/call-123",
       transcript_url: "https://transcripts.example.com/call-123",
+      sfdc_lead_id: "00Q1234567890AB",
     })
     const payload = buildSlackPayload(alert)
 
@@ -167,6 +168,7 @@ describe("buildSlackPayload", () => {
     expect(payload.contact_name).toBe("John Doe")
     expect(payload.recording_link).toBe("https://recordings.example.com/call-123")
     expect(payload.transcript_url).toBe("https://transcripts.example.com/call-123")
+    expect(payload.sfdc_lead_id).toBe("00Q1234567890AB")
   })
 
   it("defaults Regal context fields to empty string when not present", () => {
@@ -181,6 +183,7 @@ describe("buildSlackPayload", () => {
     expect(payload.contact_name).toBe("")
     expect(payload.recording_link).toBe("")
     expect(payload.transcript_url).toBe("")
+    expect(payload.sfdc_lead_id).toBe("")
   })
 
   it("populates evidence and detail for budget compliance", () => {

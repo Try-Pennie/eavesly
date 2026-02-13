@@ -20,6 +20,7 @@ export function createEvaluateRequest(
     recording_link: "https://recordings.example.com/call-123",
     call_summary: "Test call summary",
     transcript_url: "https://transcripts.example.com/call-123",
+    sfdc_lead_id: "00Q1234567890AB",
     ...overrides,
   }
 }

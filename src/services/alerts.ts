@@ -54,6 +54,7 @@ export interface SlackPayload {
   contact_name: string
   recording_link: string
   transcript_url: string
+  sfdc_lead_id: string
 }
 
 export function buildSlackPayload(alert: Alert): SlackPayload {
@@ -69,6 +70,7 @@ export function buildSlackPayload(alert: Alert): SlackPayload {
     contact_name: alert.contact_name ?? "",
     recording_link: alert.recording_link ?? "",
     transcript_url: alert.transcript_url ?? "",
+    sfdc_lead_id: alert.sfdc_lead_id ?? "",
   }
 }
 
