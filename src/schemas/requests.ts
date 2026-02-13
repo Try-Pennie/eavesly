@@ -1,21 +1,21 @@
 import { z } from "zod"
 
 export const TranscriptMetadataSchema = z.object({
-  duration: z.coerce.number().int().positive(),
+  duration: z.coerce.number().int().nonnegative(),
   timestamp: z.string(),
-  talk_time: z.coerce.number().int().positive().optional(),
-  disposition: z.string().min(1).optional(),
+  talk_time: z.coerce.number().int().nonnegative().optional(),
+  disposition: z.string().optional(),
   campaign_name: z.string().optional(),
 })
 
 export const TranscriptDataSchema = z.object({
-  transcript: z.string().min(1).max(200000),
+  transcript: z.string().max(200000),
   metadata: TranscriptMetadataSchema,
 })
 
 export const EvaluateRequestSchema = z.object({
   call_id: z.string().min(1),
-  agent_id: z.string().min(1),
+  agent_id: z.string(),
   transcript: TranscriptDataSchema,
   agent_email: z.string().optional(),
   contact_name: z.string().optional(),
