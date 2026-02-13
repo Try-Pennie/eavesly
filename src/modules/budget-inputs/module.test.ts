@@ -117,5 +117,25 @@ describe("budgetInputsModule", () => {
       expect(alerts[0].call_id).toBe("call-2")
       expect(alerts[0].agent_id).toBe("agent-2")
     })
+
+    it("includes Regal context fields when callData provided", () => {
+      const result = {
+        module_name: MODULE_NAMES.BUDGET_INPUTS,
+        result: violationFixture,
+        has_violation: true,
+        violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+        processing_time_ms: 50,
+      }
+      const callData = createEvaluateRequest({
+        agent_email: "agent@test.com",
+        contact_name: "Jane Smith",
+        recording_link: "https://recordings.example.com/call-2",
+      })
+      const alerts = budgetInputsModule.extractAlerts(result, "call-2", "agent-2", callData)
+      expect(alerts).toHaveLength(1)
+      expect(alerts[0].agent_email).toBe("agent@test.com")
+      expect(alerts[0].contact_name).toBe("Jane Smith")
+      expect(alerts[0].recording_link).toBe("https://recordings.example.com/call-2")
+    })
   })
 })

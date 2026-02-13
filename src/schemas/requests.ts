@@ -17,6 +17,12 @@ export const EvaluateRequestSchema = z.object({
   call_id: z.string().min(1),
   agent_id: z.string().min(1),
   transcript: TranscriptDataSchema,
+  agent_email: z.string().optional(),
+  contact_name: z.string().optional(),
+  contact_phone: z.string().optional(),
+  recording_link: z.string().optional(),
+  call_summary: z.string().optional(),
+  transcript_url: z.string().optional(),
 })
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>

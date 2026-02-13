@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult } from "../modules/types"
+import type { EvaluateRequest } from "../schemas/requests"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -14,6 +15,7 @@ export class DatabaseService {
     callId: string,
     result: ModuleResult,
     alertSent: boolean,
+    callData?: EvaluateRequest,
   ): Promise<void> {
     const { error } = await this.client.from("eavesly_module_results").upsert(
       {
@@ -25,6 +27,12 @@ export class DatabaseService {
         alert_sent: alertSent,
         alert_sent_at: alertSent ? new Date().toISOString() : null,
         processing_time_ms: result.processing_time_ms,
+        agent_email: callData?.agent_email ?? null,
+        contact_name: callData?.contact_name ?? null,
+        contact_phone: callData?.contact_phone ?? null,
+        recording_link: callData?.recording_link ?? null,
+        call_summary: callData?.call_summary ?? null,
+        transcript_url: callData?.transcript_url ?? null,
       },
       { onConflict: "call_id,module_name" },
     )

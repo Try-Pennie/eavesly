@@ -35,7 +35,7 @@ export const fullQAModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string, agentId: string): Alert[] {
+  extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[] {
     if (!result.has_violation) return []
 
     return [
@@ -45,6 +45,9 @@ export const fullQAModule: EvalModule = {
         call_id: callId,
         agent_id: agentId,
         result: result.result,
+        agent_email: callData?.agent_email,
+        contact_name: callData?.contact_name,
+        recording_link: callData?.recording_link,
       },
     ]
   },

@@ -52,10 +52,10 @@ export async function evaluateAndRespond(
     llm,
   )
 
-  const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id)
+  const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id, callData)
   const alertDispatched = alerts.length > 0
 
-  await db.storeModuleResult(callData.call_id, result, alertDispatched)
+  await db.storeModuleResult(callData.call_id, result, alertDispatched, callData)
 
   if (module.name === MODULE_NAMES.FULL_QA) {
     await db.storeQAResult(
@@ -110,10 +110,10 @@ export async function batchEvaluateAndRespond(
           llm,
         )
 
-        const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id)
+        const alerts = module.extractAlerts(result, callData.call_id, callData.agent_id, callData)
         const alertDispatched = alerts.length > 0
 
-        await db.storeModuleResult(callData.call_id, result, alertDispatched)
+        await db.storeModuleResult(callData.call_id, result, alertDispatched, callData)
 
         if (module.name === MODULE_NAMES.FULL_QA) {
           await db.storeQAResult(

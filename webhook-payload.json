@@ -1,0 +1,17 @@
+{
+  "call_id": "{{call_id}}",
+  "agent_id": "{{agent_id}}",
+  "agent_email": "{{agent_email}}",
+  "contact_name": "{{contact_name}}",
+  "contact_phone": "{{contact_phone}}",
+  "recording_link": "{{recording_link}}",
+  "call_summary": "{{call_summary}}",
+  "transcript_url": "{{transcript_url}}",
+  "transcript": {
+    "transcript": "{{transcript}}",
+    "metadata": {
+      "duration": {{duration}},
+      "timestamp": "{{timestamp}}"
+    }
+  }
+}

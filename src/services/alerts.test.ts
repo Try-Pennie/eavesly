@@ -148,6 +148,35 @@ describe("buildSlackPayload", () => {
     expect(payload.summary).toBeTruthy()
     expect(payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
+
+  it("includes enriched Regal context fields when present", () => {
+    const alert = createAlert({
+      call_id: "call-123",
+      agent_id: "agent-456",
+      result: violationFixture,
+      agent_email: "agent@example.com",
+      contact_name: "John Doe",
+      recording_link: "https://recordings.example.com/call-123",
+    })
+    const payload = buildSlackPayload(alert)
+
+    expect(payload.agent_email).toBe("agent@example.com")
+    expect(payload.contact_name).toBe("John Doe")
+    expect(payload.recording_link).toBe("https://recordings.example.com/call-123")
+  })
+
+  it("omits Regal context fields when not present", () => {
+    const alert = createAlert({
+      call_id: "call-123",
+      agent_id: "agent-456",
+      result: violationFixture,
+    })
+    const payload = buildSlackPayload(alert)
+
+    expect(payload.agent_email).toBeUndefined()
+    expect(payload.contact_name).toBeUndefined()
+    expect(payload.recording_link).toBeUndefined()
+  })
 })
 
 describe("buildSummary", () => {

@@ -84,3 +84,44 @@ describe("BatchEvaluateRequestSchema", () => {
     expect(result.success).toBe(true)
   })
 })
+
+describe("EvaluateRequestSchema optional Regal fields", () => {
+  it("passes without optional fields", () => {
+    const result = EvaluateRequestSchema.safeParse(validRequest)
+    expect(result.success).toBe(true)
+  })
+
+  it("passes with all optional fields", () => {
+    const result = EvaluateRequestSchema.safeParse({
+      ...validRequest,
+      agent_email: "agent@example.com",
+      contact_name: "John Doe",
+      contact_phone: "+15551234567",
+      recording_link: "https://recordings.example.com/call-123",
+      call_summary: "Test call summary",
+      transcript_url: "https://transcripts.example.com/call-123",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agent_email).toBe("agent@example.com")
+      expect(result.data.contact_name).toBe("John Doe")
+      expect(result.data.contact_phone).toBe("+15551234567")
+      expect(result.data.recording_link).toBe("https://recordings.example.com/call-123")
+      expect(result.data.call_summary).toBe("Test call summary")
+      expect(result.data.transcript_url).toBe("https://transcripts.example.com/call-123")
+    }
+  })
+
+  it("passes with a subset of optional fields", () => {
+    const result = EvaluateRequestSchema.safeParse({
+      ...validRequest,
+      agent_email: "agent@example.com",
+      recording_link: "https://recordings.example.com/call-123",
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agent_email).toBe("agent@example.com")
+      expect(result.data.contact_name).toBeUndefined()
+    }
+  })
+})

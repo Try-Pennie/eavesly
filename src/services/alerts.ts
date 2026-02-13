@@ -49,6 +49,9 @@ export interface SlackPayload {
   violation_type: string
   summary: string
   timestamp: string
+  agent_email?: string
+  contact_name?: string
+  recording_link?: string
 }
 
 export function buildSlackPayload(alert: Alert): SlackPayload {
@@ -59,6 +62,9 @@ export function buildSlackPayload(alert: Alert): SlackPayload {
     violation_type: alert.violation_type,
     summary: buildSummary(alert),
     timestamp: new Date().toISOString(),
+    agent_email: alert.agent_email,
+    contact_name: alert.contact_name,
+    recording_link: alert.recording_link,
   }
 }
 

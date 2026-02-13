@@ -66,6 +66,54 @@ describe("DatabaseService", () => {
       )
     })
 
+    it("stores Regal context fields when callData provided", async () => {
+      const db = new DatabaseService(createEnv())
+      await db.storeModuleResult("call-1", {
+        module_name: "full_qa",
+        result: {},
+        has_violation: false,
+        violation_type: null,
+        processing_time_ms: 50,
+      }, false, {
+        call_id: "call-1",
+        agent_id: "agent-1",
+        transcript: { transcript: "test", metadata: { duration: 100, timestamp: "2025-01-01T00:00:00Z" } },
+        agent_email: "agent@example.com",
+        contact_name: "John Doe",
+        contact_phone: "+15551234567",
+        recording_link: "https://recordings.example.com/call-1",
+        call_summary: "Test summary",
+        transcript_url: "https://transcripts.example.com/call-1",
+      })
+
+      const call = mockUpsert.mock.calls[0][0]
+      expect(call.agent_email).toBe("agent@example.com")
+      expect(call.contact_name).toBe("John Doe")
+      expect(call.contact_phone).toBe("+15551234567")
+      expect(call.recording_link).toBe("https://recordings.example.com/call-1")
+      expect(call.call_summary).toBe("Test summary")
+      expect(call.transcript_url).toBe("https://transcripts.example.com/call-1")
+    })
+
+    it("stores null for Regal fields when callData not provided", async () => {
+      const db = new DatabaseService(createEnv())
+      await db.storeModuleResult("call-1", {
+        module_name: "full_qa",
+        result: {},
+        has_violation: false,
+        violation_type: null,
+        processing_time_ms: 50,
+      }, false)
+
+      const call = mockUpsert.mock.calls[0][0]
+      expect(call.agent_email).toBeNull()
+      expect(call.contact_name).toBeNull()
+      expect(call.contact_phone).toBeNull()
+      expect(call.recording_link).toBeNull()
+      expect(call.call_summary).toBeNull()
+      expect(call.transcript_url).toBeNull()
+    })
+
     it("sets alert_sent_at when alert sent", async () => {
       const db = new DatabaseService(createEnv())
       await db.storeModuleResult("call-1", {

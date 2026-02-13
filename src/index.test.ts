@@ -35,6 +35,12 @@ import app from "./index"
 const validBody = {
   call_id: "e2e-call-123",
   agent_id: "agent-456",
+  agent_email: "agent@example.com",
+  contact_name: "John Doe",
+  contact_phone: "+15551234567",
+  recording_link: "https://recordings.example.com/e2e-call-123",
+  call_summary: "Test call summary",
+  transcript_url: "https://transcripts.example.com/e2e-call-123",
   transcript: {
     transcript: "Hello, this is a test transcript for E2E.",
     metadata: { duration: 300, timestamp: "2025-01-01T00:00:00Z" },
@@ -227,7 +233,25 @@ describe("E2E app tests", () => {
         violation_type: "budget_compliance",
         call_id: "e2e-call-123",
         agent_id: "agent-456",
+        agent_email: "agent@example.com",
+        contact_name: "John Doe",
+        recording_link: "https://recordings.example.com/e2e-call-123",
       })
+
+      // Verify storeModuleResult was called with callData including new fields
+      expect(mockStoreModuleResult).toHaveBeenCalledWith(
+        "e2e-call-123",
+        expect.any(Object),
+        true,
+        expect.objectContaining({
+          agent_email: "agent@example.com",
+          contact_name: "John Doe",
+          contact_phone: "+15551234567",
+          recording_link: "https://recordings.example.com/e2e-call-123",
+          call_summary: "Test call summary",
+          transcript_url: "https://transcripts.example.com/e2e-call-123",
+        }),
+      )
     })
   })
 })

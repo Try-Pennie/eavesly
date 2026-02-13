@@ -80,6 +80,7 @@ describe("evaluateAndRespond", () => {
       callData.call_id,
       expect.anything(),
       false,
+      callData,
     )
   })
 
