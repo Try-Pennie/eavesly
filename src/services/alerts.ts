@@ -44,34 +44,36 @@ async function processAlert(alert: Alert, env: Bindings): Promise<void> {
 
 export interface SlackPayload {
   call_id: string
-  agent_id: string
-  module_name: string
   violation_type: string
+  module_name: string
+  agent_email: string
   summary: string
   timestamp: string
-  agent_email?: string
-  contact_name?: string
-  recording_link?: string
+  evidence: string
+  detail: string
+  contact_name: string
+  recording_link: string
 }
 
 export function buildSlackPayload(alert: Alert): SlackPayload {
   return {
     call_id: alert.call_id,
-    agent_id: alert.agent_id,
-    module_name: alert.module_name,
     violation_type: alert.violation_type,
+    module_name: alert.module_name,
+    agent_email: alert.agent_email ?? "",
     summary: buildSummary(alert),
     timestamp: new Date().toISOString(),
-    agent_email: alert.agent_email,
-    contact_name: alert.contact_name,
-    recording_link: alert.recording_link,
+    evidence: extractEvidence(alert),
+    detail: extractDetail(alert),
+    contact_name: alert.contact_name ?? "",
+    recording_link: alert.recording_link ?? "",
   }
 }
 
 export function buildSummary(alert: Alert): string {
-  const prefix = `${formatViolationType(alert.violation_type)} violation on call ${alert.call_id} (agent ${alert.agent_id})`
-  const detail = extractDetail(alert)
-  return detail ? `${prefix}: ${detail}` : prefix
+  const prefix = `${formatViolationType(alert.violation_type)} violation on call ${alert.call_id}`
+  const reason = extractViolationReason(alert)
+  return reason ? `${prefix}: ${reason}` : prefix
 }
 
 function formatViolationType(type: string): string {
@@ -87,6 +89,43 @@ function formatViolationType(type: string): string {
   }
 }
 
+function extractViolationReason(alert: Alert): string {
+  const result = alert.result as Record<string, any>
+
+  switch (alert.violation_type) {
+    case VIOLATION_TYPES.MANAGER_ESCALATION: {
+      return (result as FullQAResult)?.call_overview?.manager_review_reason || "Manager review required"
+    }
+    case VIOLATION_TYPES.BUDGET_COMPLIANCE: {
+      return (result as BudgetInputsResult)?.violation_reason || "Budget compliance issue"
+    }
+    case VIOLATION_TYPES.WARM_TRANSFER: {
+      return (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason || "No transfer attempted"
+    }
+    default:
+      return ""
+  }
+}
+
+function extractEvidence(alert: Alert): string {
+  const result = alert.result as Record<string, any>
+
+  switch (alert.violation_type) {
+    case VIOLATION_TYPES.MANAGER_ESCALATION: {
+      const areas = (result as FullQAResult)?.call_overview?.manager_focus_areas
+      return areas?.map((a: { quote: string }) => a.quote).join("; ") || ""
+    }
+    case VIOLATION_TYPES.BUDGET_COMPLIANCE: {
+      return (result as BudgetInputsResult)?.key_evidence_quote || ""
+    }
+    case VIOLATION_TYPES.WARM_TRANSFER: {
+      return (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason || ""
+    }
+    default:
+      return ""
+  }
+}
+
 function extractDetail(alert: Alert): string {
   const result = alert.result as Record<string, any>
 
@@ -96,10 +135,16 @@ function extractDetail(alert: Alert): string {
       return reason || "Manager review required"
     }
     case VIOLATION_TYPES.BUDGET_COMPLIANCE: {
-      const skipped = (result as BudgetInputsResult)?.budget_collection_overview?.items_skipped
-      return skipped != null
-        ? `${skipped} budget item(s) skipped`
-        : "Budget compliance issue"
+      const r = result as BudgetInputsResult
+      const categories = [
+        { name: "Housing", ...r?.housing_payment },
+        { name: "Auto", ...r?.auto_payment },
+        { name: "Utilities", ...r?.utilities },
+        { name: "Other", ...r?.other_debts_expenses },
+      ]
+      return categories
+        .map((c) => `${c.name}: ${c.collected ? "collected" : "skipped"}`)
+        .join(", ")
     }
     case VIOLATION_TYPES.WARM_TRANSFER: {
       const reason = (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason

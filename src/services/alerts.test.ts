@@ -100,11 +100,12 @@ describe("dispatchAlerts", () => {
 
     const body = JSON.parse((fetch as any).mock.calls[0][1].body)
     expect(body.call_id).toBe("call-abc")
-    expect(body.agent_id).toBe("agent-xyz")
     expect(body.module_name).toBe(MODULE_NAMES.FULL_QA)
     expect(body.violation_type).toBe(VIOLATION_TYPES.MANAGER_ESCALATION)
     expect(body.summary).toContain("call-abc")
     expect(body.timestamp).toBeTruthy()
+    expect(body).toHaveProperty("evidence")
+    expect(body).toHaveProperty("detail")
   })
 
   it("skips webhook when SLACK_WEBHOOK_URL is not set", async () => {
@@ -142,11 +143,12 @@ describe("buildSlackPayload", () => {
     const payload = buildSlackPayload(alert)
 
     expect(payload.call_id).toBe("call-123")
-    expect(payload.agent_id).toBe("agent-456")
     expect(payload.module_name).toBe(MODULE_NAMES.FULL_QA)
     expect(payload.violation_type).toBe(VIOLATION_TYPES.MANAGER_ESCALATION)
     expect(payload.summary).toBeTruthy()
     expect(payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(payload).toHaveProperty("evidence")
+    expect(payload).toHaveProperty("detail")
   })
 
   it("includes enriched Regal context fields when present", () => {
@@ -165,7 +167,7 @@ describe("buildSlackPayload", () => {
     expect(payload.recording_link).toBe("https://recordings.example.com/call-123")
   })
 
-  it("omits Regal context fields when not present", () => {
+  it("defaults Regal context fields to empty string when not present", () => {
     const alert = createAlert({
       call_id: "call-123",
       agent_id: "agent-456",
@@ -173,9 +175,22 @@ describe("buildSlackPayload", () => {
     })
     const payload = buildSlackPayload(alert)
 
-    expect(payload.agent_email).toBeUndefined()
-    expect(payload.contact_name).toBeUndefined()
-    expect(payload.recording_link).toBeUndefined()
+    expect(payload.agent_email).toBe("")
+    expect(payload.contact_name).toBe("")
+    expect(payload.recording_link).toBe("")
+  })
+
+  it("populates evidence and detail for budget compliance", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      result: budgetViolationFixture,
+    })
+    const payload = buildSlackPayload(alert)
+
+    expect(payload.evidence).toBe(budgetViolationFixture.key_evidence_quote)
+    expect(payload.detail).toContain("Housing: collected")
+    expect(payload.detail).toContain("Utilities: skipped")
   })
 })
 
@@ -186,13 +201,12 @@ describe("buildSummary", () => {
 
     expect(summary).toContain("Manager escalation violation")
     expect(summary).toContain("call-1")
-    expect(summary).toContain("agent-1")
     expect(summary).toContain(
       violationFixture.call_overview.manager_review_reason,
     )
   })
 
-  it("builds budget compliance summary with items skipped", () => {
+  it("builds budget compliance summary with violation reason", () => {
     const alert = createAlert({
       module_name: MODULE_NAMES.BUDGET_INPUTS,
       violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
@@ -201,7 +215,7 @@ describe("buildSummary", () => {
     const summary = buildSummary(alert)
 
     expect(summary).toContain("Budget compliance violation")
-    expect(summary).toContain("2 budget item(s) skipped")
+    expect(summary).toContain(budgetViolationFixture.violation_reason)
   })
 
   it("builds warm transfer summary with violation reason", () => {
