@@ -141,10 +141,25 @@ function extractDetail(alert: Alert): string {
     case VIOLATION_TYPES.BUDGET_COMPLIANCE: {
       const r = result as BudgetInputsResult
       const categories = [
-        { name: "Housing", ...r?.housing_payment },
-        { name: "Auto", ...r?.auto_payment },
+        { name: "Housing Status", ...r?.housing_status },
+        { name: "Housing", ...r?.housing },
+        { name: "Housing Insurance", ...r?.housing_insurance },
         { name: "Utilities", ...r?.utilities },
-        { name: "Other", ...r?.other_debts_expenses },
+        { name: "Phone/Internet/TV", ...r?.phone_internet_tv },
+        { name: "Car Payment", ...r?.car_payment },
+        { name: "Car Insurance", ...r?.car_insurance },
+        { name: "Car Fuel", ...r?.car_fuel },
+        { name: "Food & Groceries", ...r?.food_and_groceries },
+        { name: "Medical", ...r?.medical },
+        { name: "Health & Life Insurance", ...r?.health_and_life_insurance },
+        { name: "Household", ...r?.household },
+        { name: "Personal Care", ...r?.personal_care },
+        { name: "Student Loans", ...r?.student_loans },
+        { name: "Legal", ...r?.legal },
+        { name: "Alimony & Child Support", ...r?.alimony_and_child_support },
+        { name: "Back Taxes", ...r?.back_taxes },
+        { name: "Dependent Care", ...r?.dependent_care },
+        { name: "Other Debts", ...r?.other_debts },
       ]
       return categories
         .map((c) => `${c.name}: ${c.collected ? "collected" : "skipped"}`)

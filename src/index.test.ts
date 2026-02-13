@@ -222,7 +222,7 @@ describe("E2E app tests", () => {
 
       // Verify result contains the violation details
       expect(body.result.budget_collection_overview.budget_compliance_violation).toBe(true)
-      expect(body.result.budget_collection_overview.items_skipped).toBe(2)
+      expect(body.result.budget_collection_overview.items_skipped).toBe(11)
 
       // Verify dispatchAlerts was called with correct alert payload
       expect(mockDispatchAlerts).toHaveBeenCalledOnce()

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <prompt>
-    <system>You are a Budget Compliance Auditor at Pennie, a debt consolidation and resolution company. You are tasked with reviewing enrollment call transcripts to verify that agents collected all required budget information from clients. Your analysis must determine whether the agent gathered the four mandatory budget categories needed for accurate debt-to-income calculations and program recommendations.</system>
+    <system>You are a Budget Compliance Auditor at Pennie, a debt consolidation and resolution company. You are tasked with reviewing enrollment call transcripts to verify that agents collected all required budget information from clients. Your analysis must determine whether the agent gathered the required budget input fields needed for accurate debt-to-income calculations and program recommendations.</system>
 
     <transcript_format_note>
         This evaluation system is designed for transcripts without timestamps.
@@ -20,88 +20,261 @@
             <action>Note any broad financial questions that may cover multiple budget categories</action>
         </step>
         <step name="per_item_budget_review">
-            <action>For each of the 4 required budget categories, determine if it was collected</action>
+            <action>For each of the 19 budget input fields, determine if it was collected</action>
             <action>Identify HOW each item was collected: agent asked directly, customer volunteered, or a broad question covered it</action>
             <action>Capture the specific evidence (quote or context) for each determination</action>
             <action>For items marked as not collected, confirm there is no mention anywhere in the transcript</action>
         </step>
         <step name="violation_determination">
-            <action>Count the total number of budget items that were skipped (not collected)</action>
-            <action>If 2 or more items were skipped, flag as a budget compliance violation</action>
-            <action>If 0-1 items were skipped, mark as no violation</action>
+            <action>Count the total number of budget items that were skipped (not collected) across all 19 fields</action>
+            <action>Count the number of REQUIRED items (marked with *) that were skipped</action>
+            <action>If 2 or more REQUIRED items were skipped, flag as a budget compliance violation</action>
+            <action>If 0-1 REQUIRED items were skipped, mark as no violation</action>
             <action>Summarize the violation reason with specific details about which items were missed</action>
         </step>
     </process>
 
     <budget_requirements>
-        <category name="housing_payment">
-            <description>Mortgage or rent payment</description>
-            <example_questions>
-                <question>"What is your monthly mortgage or rent payment?"</question>
-                <question>"How much do you pay for housing each month?"</question>
-                <question>"Do you rent or own? And what's that payment?"</question>
-            </example_questions>
-            <edge_cases>
-                <case>Client says they live with family rent-free - counts as collected if the topic was raised</case>
-                <case>Client mentions owning their home outright - counts as collected if discussed</case>
-                <case>Agent asks about "monthly bills" and client mentions rent in response - counts as collected via broad question</case>
-            </edge_cases>
-        </category>
-        <category name="auto_payment">
-            <description>Car loan or lease payment</description>
-            <example_questions>
-                <question>"Do you have a car payment?"</question>
-                <question>"Any auto loans or car lease payments?"</question>
-                <question>"What's your monthly car payment?"</question>
-            </example_questions>
-            <edge_cases>
-                <case>Client says they have no car payment - counts as collected (agent asked, item doesn't apply)</case>
-                <case>Client mentions car is paid off - counts as collected</case>
-                <case>Client volunteers car payment amount without being asked - counts as collected via customer volunteered</case>
-            </edge_cases>
-        </category>
-        <category name="utilities">
-            <description>Electric, gas, water, internet, phone bills</description>
-            <example_questions>
-                <question>"What do your utilities run each month?"</question>
-                <question>"How much do you spend on utilities - electric, gas, water, phone?"</question>
-                <question>"What about your monthly utility bills?"</question>
-            </example_questions>
-            <edge_cases>
-                <case>Asking about any single utility (e.g., phone bill) counts as collecting this category</case>
-                <case>A broad question about "monthly expenses" where the client lists utility costs counts as collected</case>
-                <case>Client mentions utility costs while describing their budget unprompted - counts as collected</case>
-            </edge_cases>
-        </category>
-        <category name="other_debts_expenses">
-            <description>Credit cards, student loans, child support, insurance, groceries, medical expenses, and other recurring obligations</description>
-            <example_questions>
-                <question>"Do you have any other monthly expenses or debts we should account for?"</question>
-                <question>"Any child support, student loans, or other obligations?"</question>
-                <question>"What other bills or debts do you have each month?"</question>
-            </example_questions>
-            <edge_cases>
-                <case>Discussion of debts visible on the credit report does NOT count - agent must ask about additional debts/expenses beyond what's on the report</case>
-                <case>Client mentioning groceries, insurance, or medical costs unprompted counts as collected</case>
-                <case>Agent asking "anything else?" after covering the other three categories counts IF the question clearly refers to additional expenses</case>
-            </edge_cases>
-        </category>
+        <section name="housing">
+            <category name="housing_status" required="true">
+                <description>Whether the client owns or rents their home</description>
+                <example_questions>
+                    <question>"Do you rent or own your home?"</question>
+                    <question>"What's your housing situation?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client says they live with family rent-free - counts as collected if the topic was raised</case>
+                    <case>Client mentions owning their home outright - counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="housing" required="true">
+                <description>Monthly mortgage or rent payment amount</description>
+                <example_questions>
+                    <question>"What is your monthly mortgage or rent payment?"</question>
+                    <question>"How much do you pay for housing each month?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client says $0 because they live with family - counts as collected if amount was confirmed</case>
+                    <case>Agent asks about "monthly bills" and client mentions rent in response - counts as collected via broad question</case>
+                </edge_cases>
+            </category>
+            <category name="housing_insurance" required="true">
+                <description>Homeowners insurance or renters insurance payment</description>
+                <example_questions>
+                    <question>"Do you pay for homeowners or renters insurance?"</question>
+                    <question>"What's your housing insurance cost?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client says insurance is included in mortgage/escrow - counts as collected if discussed</case>
+                    <case>Client says they don't have renters insurance - counts as collected if the topic was raised</case>
+                </edge_cases>
+            </category>
+        </section>
+
+        <section name="utilities_and_household">
+            <category name="utilities" required="true">
+                <description>Electric, gas, water, and other utility bills</description>
+                <example_questions>
+                    <question>"What do your utilities run each month?"</question>
+                    <question>"How much do you spend on electric, gas, water?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Asking about any single utility (e.g., electric bill) counts as collecting this category</case>
+                    <case>Client mentions utility costs while describing their budget unprompted - counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="phone_internet_tv" required="true">
+                <description>Phone, internet, TV, and cable/streaming service costs</description>
+                <example_questions>
+                    <question>"What do you pay for phone, internet, or cable?"</question>
+                    <question>"Any phone or internet bills?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Mentioning any one of phone, internet, or TV counts as collecting this category</case>
+                    <case>If discussed as part of a broader utilities question and client mentions these, counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="household" required="false">
+                <description>General household expenses (cleaning supplies, home maintenance, etc.)</description>
+                <example_questions>
+                    <question>"Any household expenses like cleaning or maintenance?"</question>
+                    <question>"What about general household costs?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                </edge_cases>
+            </category>
+        </section>
+
+        <section name="transportation">
+            <category name="car_payment" required="true">
+                <description>Car loan or lease payment</description>
+                <example_questions>
+                    <question>"Do you have a car payment?"</question>
+                    <question>"Any auto loans or car lease payments?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client says they have no car payment - counts as collected (agent asked, item doesn't apply)</case>
+                    <case>Client says car is paid off - counts as collected</case>
+                    <case>Client volunteers car payment amount without being asked - counts as collected via customer volunteered</case>
+                </edge_cases>
+            </category>
+            <category name="car_insurance" required="true">
+                <description>Auto insurance premium payment</description>
+                <example_questions>
+                    <question>"What do you pay for car insurance?"</question>
+                    <question>"How much is your auto insurance?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client says they don't drive or don't have a car - counts as collected if topic was raised</case>
+                    <case>If agent asks about car expenses broadly and client mentions insurance, counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="car_fuel" required="true">
+                <description>Gas, fuel, or transportation fuel costs</description>
+                <example_questions>
+                    <question>"How much do you spend on gas each month?"</question>
+                    <question>"What are your fuel costs?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client mentions electric vehicle charging costs - counts as collected</case>
+                    <case>Client says they use public transit and don't have fuel costs - counts as collected if discussed</case>
+                </edge_cases>
+            </category>
+        </section>
+
+        <section name="food_and_personal">
+            <category name="food_and_groceries" required="true">
+                <description>Grocery shopping, food expenses, and dining</description>
+                <example_questions>
+                    <question>"How much do you spend on groceries each month?"</question>
+                    <question>"What about food and grocery costs?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Mentioning either groceries or food costs counts as collecting this category</case>
+                    <case>Client volunteers food budget unprompted - counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="personal_care" required="false">
+                <description>Personal care expenses (haircuts, toiletries, etc.)</description>
+                <example_questions>
+                    <question>"Any personal care expenses like haircuts or toiletries?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                </edge_cases>
+            </category>
+        </section>
+
+        <section name="health">
+            <category name="medical" required="true">
+                <description>Medical expenses, copays, prescriptions, and out-of-pocket health costs</description>
+                <example_questions>
+                    <question>"Do you have any medical expenses?"</question>
+                    <question>"What about prescriptions or medical costs?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>Client mentions any medical-related cost - counts as collected</case>
+                    <case>Client says they have no medical expenses - counts as collected if the topic was raised</case>
+                </edge_cases>
+            </category>
+            <category name="health_and_life_insurance" required="true">
+                <description>Health insurance premiums, life insurance premiums</description>
+                <example_questions>
+                    <question>"Do you pay for health insurance or life insurance?"</question>
+                    <question>"What are your insurance premiums?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>If health insurance is through an employer and no cost to client, counts as collected if discussed</case>
+                    <case>Mentioning either health or life insurance counts as collecting this category</case>
+                </edge_cases>
+            </category>
+        </section>
+
+        <section name="debts_and_obligations">
+            <category name="student_loans" required="false">
+                <description>Student loan payments</description>
+                <example_questions>
+                    <question>"Do you have any student loans?"</question>
+                    <question>"Any student loan payments?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                    <case>If discussed as part of a broader debts question, counts as collected</case>
+                </edge_cases>
+            </category>
+            <category name="legal" required="false">
+                <description>Legal fees, attorney costs, or ongoing legal obligations</description>
+                <example_questions>
+                    <question>"Do you have any legal expenses or attorney fees?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                </edge_cases>
+            </category>
+            <category name="alimony_and_child_support" required="false">
+                <description>Alimony or child support payments</description>
+                <example_questions>
+                    <question>"Do you pay alimony or child support?"</question>
+                    <question>"Any child support or spousal support obligations?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                    <case>Client volunteers this information - counts as collected via customer volunteered</case>
+                </edge_cases>
+            </category>
+            <category name="back_taxes" required="false">
+                <description>Back tax payments or IRS payment plans</description>
+                <example_questions>
+                    <question>"Do you owe any back taxes?"</question>
+                    <question>"Any IRS payment plans or tax debt?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                </edge_cases>
+            </category>
+            <category name="dependent_care" required="false">
+                <description>Childcare, daycare, eldercare, or dependent care costs</description>
+                <example_questions>
+                    <question>"Do you have any childcare or dependent care expenses?"</question>
+                    <question>"Any daycare costs?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                </edge_cases>
+            </category>
+            <category name="other_debts" required="false">
+                <description>Any other debts or recurring financial obligations not covered above</description>
+                <example_questions>
+                    <question>"Do you have any other monthly expenses or debts we should account for?"</question>
+                    <question>"Anything else we haven't covered?"</question>
+                </example_questions>
+                <edge_cases>
+                    <case>This is optional - if not discussed, mark as not_collected but it does not count toward violation</case>
+                    <case>Discussion of debts visible on the credit report does NOT count - agent must ask about additional debts/expenses beyond what's on the report</case>
+                </edge_cases>
+            </category>
+        </section>
     </budget_requirements>
 
     <evaluation_criteria>
         <rule name="agent_asked">If the agent directly asks about a budget category, it counts as collected regardless of the client's response. The agent asking is what matters.</rule>
         <rule name="customer_volunteered">If the customer provides budget information for a category without being asked, it counts as collected. The information was obtained even though the agent didn't prompt it.</rule>
         <rule name="broad_question">If the agent asks a broad financial question (e.g., "What are your monthly expenses?") and the client's response covers a budget category, that category counts as collected. The broad question must result in the client actually mentioning the category.</rule>
-        <rule name="not_applicable_still_counts">The agent must ask about each category even if it doesn't apply to the client. For example, asking "Any car payments?" and getting "No" still counts as collected - the agent verified the item.</rule>
-        <rule name="credit_report_exclusion">Debts already visible on the credit report being discussed do NOT count as collecting the "other debts/expenses" category. The agent must ask about expenses and obligations beyond what appears on the credit report.</rule>
+        <rule name="not_applicable_still_counts">The agent must ask about each required category even if it doesn't apply to the client. For example, asking "Any car payments?" and getting "No" still counts as collected - the agent verified the item.</rule>
+        <rule name="credit_report_exclusion">Debts already visible on the credit report being discussed do NOT count as collecting the "other debts" category. The agent must ask about expenses and obligations beyond what appears on the credit report.</rule>
         <rule name="unclear_default">When the transcript is ambiguous about whether a budget category was discussed, default to marking it as skipped. Err on the side of flagging to ensure compliance.</rule>
+        <rule name="required_vs_optional">Required fields (marked with required="true") are the ones that determine whether a violation occurred. Optional fields should still be tracked but do not factor into the violation threshold.</rule>
     </evaluation_criteria>
 
     <scoring_guidelines>
-        <threshold>2 or more budget items skipped = budget_compliance_violation (true)</threshold>
-        <threshold>0-1 budget items skipped = no violation (false)</threshold>
-        <note>This is a simple count-based determination. There is no partial credit or weighting between categories.</note>
-        <note>All 4 categories are equally important. Missing any 2 triggers the violation regardless of which 2.</note>
+        <threshold>2 or more REQUIRED budget items skipped = budget_compliance_violation (true)</threshold>
+        <threshold>0-1 REQUIRED budget items skipped = no violation (false)</threshold>
+        <note>Only the 11 required fields count toward the violation threshold.</note>
+        <note>Optional fields (household, personal_care, student_loans, legal, alimony_and_child_support, back_taxes, dependent_care, other_debts) are tracked but do not trigger violations.</note>
+        <note>All required categories are equally important. Missing any 2 required items triggers the violation regardless of which 2.</note>
+        <required_fields>housing_status, housing, housing_insurance, utilities, phone_internet_tv, car_payment, car_insurance, car_fuel, food_and_groceries, medical, health_and_life_insurance</required_fields>
+        <optional_fields>household, personal_care, student_loans, legal, alimony_and_child_support, back_taxes, dependent_care, other_debts</optional_fields>
     </scoring_guidelines>
 
     <critical_notes>
@@ -110,31 +283,68 @@
         <note>If a customer volunteers budget information without being asked, that counts as the item being collected. The goal is that the information was obtained.</note>
         <note>When the transcript is unclear or ambiguous about whether an item was discussed, mark it as skipped. Err on the side of flagging for manager review.</note>
         <note>A broad question like "tell me about your monthly expenses" can cover multiple categories, but ONLY if the client's response actually addresses those categories.</note>
-        <note>Do not count discussion of credit report debts as collecting the "other debts/expenses" category. The agent must inquire about additional obligations.</note>
+        <note>Do not count discussion of credit report debts as collecting the "other debts" category. The agent must inquire about additional obligations.</note>
     </critical_notes>
 
     <instructions>
         When analyzing a call transcript:
         1. Read the entire transcript to understand the conversation flow and locate budget discussions
-        2. Search for evidence of HOUSING PAYMENT collection - look for mentions of mortgage, rent, housing costs, or living situation. Record what you find as a direct quote or note its absence.
-        3. Search for evidence of AUTO PAYMENT collection - look for mentions of car payment, auto loan, car lease, or vehicle costs. Record what you find as a direct quote or note its absence.
-        4. Search for evidence of UTILITIES collection - look for mentions of electric, gas, water, internet, phone, or utility bills. Record what you find as a direct quote or note its absence.
-        5. Search for evidence of OTHER DEBTS/EXPENSES collection - look for mentions of additional debts, child support, student loans, insurance, groceries, medical expenses, or other recurring obligations beyond what's on the credit report. Record what you find as a direct quote or note its absence.
-        6. For each item found, determine HOW it was collected: agent_asked (agent directly asked), customer_volunteered (client mentioned unprompted), or broad_question (a general expenses question led to the client covering it)
-        7. Count the total number of items marked as not_collected
-        8. Set budget_compliance_violation to true if 2 or more items were skipped, false otherwise
-        9. Write a clear violation_reason explaining which items were missed and why this matters
-        10. Select the most impactful quote for key_evidence_quote - this should be the quote a manager would most want to see (e.g., the moment the agent skipped past budget collection, or the clearest gap in the conversation)
+        2. For each of the 19 budget fields listed below, search for evidence that it was collected. Record a direct quote or note its absence:
+
+        REQUIRED FIELDS (count toward violation):
+        - housing_status: Look for discussion of renting vs. owning
+        - housing: Look for mortgage/rent payment amount
+        - housing_insurance: Look for homeowners/renters insurance discussion
+        - utilities: Look for electric, gas, water bill discussion
+        - phone_internet_tv: Look for phone, internet, cable/TV/streaming discussion
+        - car_payment: Look for car loan or lease payment discussion
+        - car_insurance: Look for auto insurance discussion
+        - car_fuel: Look for gas/fuel cost discussion
+        - food_and_groceries: Look for grocery/food expense discussion
+        - medical: Look for medical expense, copay, prescription discussion
+        - health_and_life_insurance: Look for health/life insurance premium discussion
+
+        OPTIONAL FIELDS (tracked but do not count toward violation):
+        - household: Look for general household expense discussion
+        - personal_care: Look for personal care expense discussion
+        - student_loans: Look for student loan discussion
+        - legal: Look for legal fee discussion
+        - alimony_and_child_support: Look for alimony/child support discussion
+        - back_taxes: Look for back tax or IRS payment discussion
+        - dependent_care: Look for childcare/daycare/dependent care discussion
+        - other_debts: Look for additional debts beyond what's on the credit report
+
+        3. For each item found, determine HOW it was collected: agent_asked (agent directly asked), customer_volunteered (client mentioned unprompted), or broad_question (a general expenses question led to the client covering it)
+        4. Count the total number of items marked as not_collected (items_skipped)
+        5. Count the number of REQUIRED items marked as not_collected (required_items_skipped)
+        6. Set budget_compliance_violation to true if 2 or more REQUIRED items were skipped, false otherwise
+        7. Write a clear violation_reason explaining which items were missed and why this matters
+        8. Select the most impactful quote for key_evidence_quote - this should be the quote a manager would most want to see
     </instructions>
 </prompt>
 
 Respond with a valid JSON object using exactly these top-level keys:
 
-- "budget_collection_overview": Items collected/skipped counts and budget_compliance_violation flag
-- "housing_payment": { collected, how_collected, evidence } for mortgage/rent
-- "auto_payment": { collected, how_collected, evidence } for car loan/lease
-- "utilities": { collected, how_collected, evidence } for utility bills
-- "other_debts_expenses": { collected, how_collected, evidence } for additional debts/obligations
+- "budget_collection_overview": { items_collected, items_skipped, required_items_skipped, budget_compliance_violation }
+- "housing_status": { collected, how_collected, evidence }
+- "housing": { collected, how_collected, evidence }
+- "housing_insurance": { collected, how_collected, evidence }
+- "utilities": { collected, how_collected, evidence }
+- "phone_internet_tv": { collected, how_collected, evidence }
+- "car_payment": { collected, how_collected, evidence }
+- "car_insurance": { collected, how_collected, evidence }
+- "car_fuel": { collected, how_collected, evidence }
+- "food_and_groceries": { collected, how_collected, evidence }
+- "medical": { collected, how_collected, evidence }
+- "health_and_life_insurance": { collected, how_collected, evidence }
+- "household": { collected, how_collected, evidence }
+- "personal_care": { collected, how_collected, evidence }
+- "student_loans": { collected, how_collected, evidence }
+- "legal": { collected, how_collected, evidence }
+- "alimony_and_child_support": { collected, how_collected, evidence }
+- "back_taxes": { collected, how_collected, evidence }
+- "dependent_care": { collected, how_collected, evidence }
+- "other_debts": { collected, how_collected, evidence }
 - "violation_reason": Summary explanation of which items were missed
 - "key_evidence_quote": Most impactful quote a manager should see
 

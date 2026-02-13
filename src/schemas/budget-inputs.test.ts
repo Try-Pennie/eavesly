@@ -17,21 +17,21 @@ describe("BudgetInputsSchema", () => {
   it("pass fixture has no violation", () => {
     const result = BudgetInputsSchema.parse(passFixture)
     expect(result.budget_collection_overview.budget_compliance_violation).toBe(false)
-    expect(result.budget_collection_overview.items_collected).toBe(4)
+    expect(result.budget_collection_overview.required_items_skipped).toBe(0)
   })
 
   it("violation fixture has violation true", () => {
     const result = BudgetInputsSchema.parse(violationFixture)
     expect(result.budget_collection_overview.budget_compliance_violation).toBe(true)
-    expect(result.budget_collection_overview.items_skipped).toBe(2)
+    expect(result.budget_collection_overview.required_items_skipped).toBe(5)
   })
 
-  it("rejects items_collected above 4", () => {
+  it("rejects items_collected above 19", () => {
     const modified = {
       ...passFixture,
       budget_collection_overview: {
         ...passFixture.budget_collection_overview,
-        items_collected: 5,
+        items_collected: 20,
       },
     }
     expect(BudgetInputsSchema.safeParse(modified).success).toBe(false)
@@ -48,8 +48,8 @@ describe("BudgetInputsSchema", () => {
     expect(BudgetInputsSchema.safeParse(modified).success).toBe(false)
   })
 
-  it("accepts items_collected at boundary values 0 and 4", () => {
-    for (const val of [0, 4]) {
+  it("accepts items_collected at boundary values 0 and 19", () => {
+    for (const val of [0, 19]) {
       const modified = {
         ...passFixture,
         budget_collection_overview: {
@@ -61,11 +61,22 @@ describe("BudgetInputsSchema", () => {
     }
   })
 
+  it("rejects required_items_skipped above 11", () => {
+    const modified = {
+      ...passFixture,
+      budget_collection_overview: {
+        ...passFixture.budget_collection_overview,
+        required_items_skipped: 12,
+      },
+    }
+    expect(BudgetInputsSchema.safeParse(modified).success).toBe(false)
+  })
+
   it("rejects invalid how_collected enum", () => {
     const modified = {
       ...passFixture,
-      housing_payment: {
-        ...passFixture.housing_payment,
+      housing_status: {
+        ...passFixture.housing_status,
         how_collected: "telepathy",
       },
     }
@@ -76,8 +87,8 @@ describe("BudgetInputsSchema", () => {
     for (const method of ["agent_asked", "customer_volunteered", "broad_question", "not_collected"]) {
       const modified = {
         ...passFixture,
-        housing_payment: {
-          ...passFixture.housing_payment,
+        housing: {
+          ...passFixture.housing,
           how_collected: method,
         },
       }
@@ -90,8 +101,13 @@ describe("BudgetInputsSchema", () => {
     expect(BudgetInputsSchema.safeParse(rest).success).toBe(false)
   })
 
-  it("rejects missing budget category", () => {
-    const { housing_payment, ...rest } = passFixture
+  it("rejects missing required budget category", () => {
+    const { housing, ...rest } = passFixture
+    expect(BudgetInputsSchema.safeParse(rest).success).toBe(false)
+  })
+
+  it("rejects missing optional budget category", () => {
+    const { student_loans, ...rest } = passFixture
     expect(BudgetInputsSchema.safeParse(rest).success).toBe(false)
   })
 })

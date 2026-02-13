@@ -1,29 +1,105 @@
 {
   "budget_collection_overview": {
-    "items_collected": 2,
-    "items_skipped": 2,
+    "items_collected": 8,
+    "items_skipped": 11,
+    "required_items_skipped": 5,
     "budget_compliance_violation": true
   },
-  "housing_payment": {
+  "housing_status": {
     "collected": true,
     "how_collected": "agent_asked",
-    "evidence": "Agent asked about rent/mortgage and customer provided $1,800/month."
+    "evidence": "Agent asked about renting vs owning. Client said they rent."
   },
-  "auto_payment": {
+  "housing": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about rent amount. Customer provided $1,800/month."
+  },
+  "housing_insurance": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent did not ask about housing insurance or renters insurance."
+  },
+  "utilities": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about utilities. Client said about $150/month."
+  },
+  "phone_internet_tv": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent did not ask about phone, internet, or TV expenses."
+  },
+  "car_payment": {
     "collected": true,
     "how_collected": "agent_asked",
     "evidence": "Agent asked about vehicle payments. Customer said none."
   },
-  "utilities": {
+  "car_insurance": {
     "collected": false,
     "how_collected": "not_collected",
-    "evidence": "Agent did not ask about utilities or household expenses."
+    "evidence": "Agent did not ask about car insurance."
   },
-  "other_debts_expenses": {
+  "car_fuel": {
     "collected": false,
     "how_collected": "not_collected",
-    "evidence": "Agent skipped asking about other debts or monthly obligations."
+    "evidence": "Agent did not ask about fuel or gas costs."
   },
-  "violation_reason": "Agent skipped 2 of 4 required budget input categories (utilities and other debts/expenses), failing to collect a complete financial picture.",
-  "key_evidence_quote": "Agent moved directly from auto payment to program presentation without collecting utilities or other expenses."
+  "food_and_groceries": {
+    "collected": true,
+    "how_collected": "customer_volunteered",
+    "evidence": "Client mentioned spending about $300 on groceries during budget discussion."
+  },
+  "medical": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent did not ask about medical expenses."
+  },
+  "health_and_life_insurance": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about insurance. Client said $200/month for health insurance."
+  },
+  "household": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Household expenses were not discussed."
+  },
+  "personal_care": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Personal care expenses were not discussed."
+  },
+  "student_loans": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked about student loans. Client said $250/month."
+  },
+  "legal": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Legal expenses were not discussed."
+  },
+  "alimony_and_child_support": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Alimony and child support were not discussed."
+  },
+  "back_taxes": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Back taxes were not discussed."
+  },
+  "dependent_care": {
+    "collected": true,
+    "how_collected": "customer_volunteered",
+    "evidence": "Client mentioned $800/month in daycare costs."
+  },
+  "other_debts": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Agent did not ask about other debts or expenses beyond the credit report."
+  },
+  "violation_reason": "Agent skipped 5 of 11 required budget input fields (housing_insurance, phone_internet_tv, car_insurance, car_fuel, medical), failing to collect a complete financial picture.",
+  "key_evidence_quote": "Agent moved directly from car payment to program presentation without collecting insurance, fuel, phone, or medical expenses."
 }

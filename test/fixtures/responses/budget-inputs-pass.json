@@ -1,29 +1,105 @@
 {
   "budget_collection_overview": {
-    "items_collected": 4,
-    "items_skipped": 0,
+    "items_collected": 15,
+    "items_skipped": 4,
+    "required_items_skipped": 0,
     "budget_compliance_violation": false
   },
-  "housing_payment": {
+  "housing_status": {
     "collected": true,
     "how_collected": "agent_asked",
-    "evidence": "Agent asked: 'And then are you renting or paying a mortgage? How much is rent every month?'"
+    "evidence": "Agent asked: 'Do you rent or own your home?' Client confirmed they own."
   },
-  "auto_payment": {
+  "housing": {
     "collected": true,
     "how_collected": "agent_asked",
-    "evidence": "Agent asked: 'And then any vehicle payments?' Customer confirmed amount."
+    "evidence": "Agent asked: 'And what is your monthly mortgage payment?' Client said $1,412."
+  },
+  "housing_insurance": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Do you pay homeowners insurance?' Client confirmed it's included in escrow."
   },
   "utilities": {
     "collected": true,
-    "how_collected": "customer_volunteered",
-    "evidence": "Customer volunteered utility expenses during budget discussion."
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'What do your utilities run each month?' Client said about $200."
   },
-  "other_debts_expenses": {
+  "phone_internet_tv": {
     "collected": true,
     "how_collected": "agent_asked",
-    "evidence": "Agent asked about other monthly obligations and debts."
+    "evidence": "Agent asked: 'What about phone and internet?' Client said $150."
+  },
+  "car_payment": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Do you have a car payment?' Client confirmed $350/month."
+  },
+  "car_insurance": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'And car insurance?' Client said $120/month."
+  },
+  "car_fuel": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'How much do you spend on gas?' Client said about $200/month."
+  },
+  "food_and_groceries": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'What about groceries?' Client said roughly $400/month."
+  },
+  "medical": {
+    "collected": true,
+    "how_collected": "customer_volunteered",
+    "evidence": "Client mentioned: 'I also have about $50 in prescriptions each month.'"
+  },
+  "health_and_life_insurance": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Do you pay for health or life insurance?' Client said $300/month for health."
+  },
+  "household": {
+    "collected": true,
+    "how_collected": "broad_question",
+    "evidence": "Client mentioned household supplies during broad expenses discussion."
+  },
+  "personal_care": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Personal care expenses were not discussed during the call."
+  },
+  "student_loans": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Any student loans?' Client said no."
+  },
+  "legal": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Legal expenses were not discussed during the call."
+  },
+  "alimony_and_child_support": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Any child support or alimony?' Client said no."
+  },
+  "back_taxes": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Back taxes were not discussed during the call."
+  },
+  "dependent_care": {
+    "collected": false,
+    "how_collected": "not_collected",
+    "evidence": "Dependent care was not discussed during the call."
+  },
+  "other_debts": {
+    "collected": true,
+    "how_collected": "agent_asked",
+    "evidence": "Agent asked: 'Any other monthly debts or expenses?' Client said no."
   },
   "violation_reason": "",
-  "key_evidence_quote": "Agent thoroughly collected all four budget categories through direct questioning."
+  "key_evidence_quote": "Agent thoroughly collected all required budget categories through direct questioning."
 }

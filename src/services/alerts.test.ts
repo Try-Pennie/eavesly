@@ -195,8 +195,8 @@ describe("buildSlackPayload", () => {
     const payload = buildSlackPayload(alert)
 
     expect(payload.evidence).toBe(budgetViolationFixture.key_evidence_quote)
-    expect(payload.detail).toContain("Housing: collected")
-    expect(payload.detail).toContain("Utilities: skipped")
+    expect(payload.detail).toContain("Housing Status: collected")
+    expect(payload.detail).toContain("Housing Insurance: skipped")
   })
 })
 
