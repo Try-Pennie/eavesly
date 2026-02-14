@@ -161,9 +161,20 @@ function extractDetail(alert: Alert): string {
         { name: "Dependent Care", ...r?.dependent_care },
         { name: "Other Debts", ...r?.other_debts },
       ]
-      return categories
-        .map((c) => `${c.name}: ${c.collected ? "collected" : "skipped"}`)
-        .join(", ")
+      const notCollected = categories.filter((c) => !c.collected)
+      const collected = categories.filter((c) => c.collected)
+
+      const lines: string[] = []
+      if (notCollected.length > 0) {
+        lines.push("❌ Not Collected")
+        lines.push(...notCollected.map((c) => c.name))
+      }
+      if (collected.length > 0) {
+        if (lines.length > 0) lines.push("")
+        lines.push("✅ Collected")
+        lines.push(...collected.map((c) => c.name))
+      }
+      return lines.join("\n")
     }
     case VIOLATION_TYPES.WARM_TRANSFER: {
       const reason = (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason

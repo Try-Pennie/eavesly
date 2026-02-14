@@ -195,8 +195,14 @@ describe("buildSlackPayload", () => {
     const payload = buildSlackPayload(alert)
 
     expect(payload.evidence).toBe(budgetViolationFixture.key_evidence_quote)
-    expect(payload.detail).toContain("Housing Status: collected")
-    expect(payload.detail).toContain("Housing Insurance: skipped")
+    expect(payload.detail).toContain("❌ Not Collected")
+    expect(payload.detail).toContain("✅ Collected")
+    expect(payload.detail).toContain("Housing Insurance")
+    expect(payload.detail).toContain("Housing Status")
+    // Not-collected items appear before collected items
+    const notCollectedIdx = payload.detail.indexOf("❌ Not Collected")
+    const collectedIdx = payload.detail.indexOf("✅ Collected")
+    expect(notCollectedIdx).toBeLessThan(collectedIdx)
   })
 })
 
