@@ -16,6 +16,7 @@ vi.mock("../services/database", () => ({
   DatabaseService: class {
     storeModuleResult = vi.fn().mockResolvedValue(undefined)
     storeQAResult = vi.fn().mockResolvedValue(undefined)
+    logRequest = vi.fn().mockResolvedValue(undefined)
   },
 }))
 
