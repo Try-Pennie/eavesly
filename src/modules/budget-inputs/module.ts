@@ -4,6 +4,8 @@ import type { LLMClient } from "../../services/llm-client"
 import {
   BudgetInputsSchema,
   type BudgetInputsResult,
+  BUDGET_REQUIRED_FIELDS,
+  BUDGET_ALL_FIELDS,
 } from "../../schemas/budget-inputs"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/budget-inputs.txt"
@@ -27,7 +29,21 @@ export const budgetInputsModule: EvalModule = {
       "budget_inputs_evaluation",
     )
 
-    const hasViolation = result.budget_collection_overview.budget_compliance_violation
+    // Server-side recount — don't trust LLM arithmetic
+    const actualRequiredSkipped = BUDGET_REQUIRED_FIELDS.filter(
+      (field) => !result[field].collected
+    ).length
+    const actualTotalSkipped = BUDGET_ALL_FIELDS.filter(
+      (field) => !result[field].collected
+    ).length
+    const actualViolation = actualRequiredSkipped >= 2
+
+    result.budget_collection_overview.required_items_skipped = actualRequiredSkipped
+    result.budget_collection_overview.items_skipped = actualTotalSkipped
+    result.budget_collection_overview.items_collected = BUDGET_ALL_FIELDS.length - actualTotalSkipped
+    result.budget_collection_overview.budget_compliance_violation = actualViolation
+
+    const hasViolation = actualViolation
 
     return {
       module_name: MODULE_NAMES.BUDGET_INPUTS,
