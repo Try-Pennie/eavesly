@@ -1,0 +1,16 @@
+{
+  "litigation_discussed": true,
+  "mentions": [
+    {
+      "term_used": "lawsuit",
+      "speaker": "contact",
+      "quote": "I got a letter saying there's a lawsuit on my Capital One account.",
+      "context": "Client brings up legal action during credit review."
+    }
+  ],
+  "agent_communicated_restriction": true,
+  "agent_response_quote": "Because that account has a lawsuit filed against it, we won't be able to include it in the program. We'll need to remove that one from enrollment.",
+  "violation": false,
+  "violation_reason": "Litigation was discussed and the agent clearly communicated that the account with the lawsuit cannot be enrolled in the program.",
+  "key_evidence_quote": "Because that account has a lawsuit filed against it, we won't be able to include it in the program."
+}

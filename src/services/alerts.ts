@@ -3,6 +3,7 @@ import type { Bindings } from "../types/env"
 import type { FullQAResult } from "../schemas/full-qa"
 import type { BudgetInputsResult } from "../schemas/budget-inputs"
 import type { WarmTransferResult } from "../schemas/warm-transfer"
+import type { LitigationCheckResult } from "../schemas/litigation-check"
 import { VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -88,6 +89,8 @@ function formatViolationType(type: string): string {
       return "Budget compliance"
     case VIOLATION_TYPES.WARM_TRANSFER:
       return "Warm transfer"
+    case VIOLATION_TYPES.LITIGATION_CHECK:
+      return "Litigation check"
     default:
       return type
   }
@@ -105,6 +108,9 @@ function extractViolationReason(alert: Alert): string {
     }
     case VIOLATION_TYPES.WARM_TRANSFER: {
       return (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason || "No transfer attempted"
+    }
+    case VIOLATION_TYPES.LITIGATION_CHECK: {
+      return (result as LitigationCheckResult)?.violation_reason || "Litigation check issue"
     }
     default:
       return ""
@@ -124,6 +130,9 @@ function extractEvidence(alert: Alert): string {
     }
     case VIOLATION_TYPES.WARM_TRANSFER: {
       return (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason || ""
+    }
+    case VIOLATION_TYPES.LITIGATION_CHECK: {
+      return (result as LitigationCheckResult)?.key_evidence_quote || ""
     }
     default:
       return ""
@@ -179,6 +188,21 @@ function extractDetail(alert: Alert): string {
     case VIOLATION_TYPES.WARM_TRANSFER: {
       const reason = (result as WarmTransferResult)?.warm_transfer_compliance?.violation_reason
       return reason || "No transfer attempted"
+    }
+    case VIOLATION_TYPES.LITIGATION_CHECK: {
+      const r = result as LitigationCheckResult
+      const lines: string[] = []
+      if (r?.mentions?.length > 0) {
+        lines.push("Litigation/Collections Mentions:")
+        for (const m of r.mentions) {
+          lines.push(`- "${m.quote}" (${m.term_used}, ${m.speaker})`)
+        }
+      }
+      if (r?.agent_response_quote) {
+        lines.push("")
+        lines.push(`Agent Response: "${r.agent_response_quote}"`)
+      }
+      return lines.join("\n") || "Litigation check issue"
     }
     default:
       return ""

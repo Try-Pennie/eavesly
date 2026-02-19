@@ -1,0 +1,22 @@
+{
+  "litigation_discussed": true,
+  "mentions": [
+    {
+      "term_used": "collections",
+      "speaker": "contact",
+      "quote": "That Discover card has been sent to collections already.",
+      "context": "Client mentions collections status during debt review."
+    },
+    {
+      "term_used": "debt collector",
+      "speaker": "contact",
+      "quote": "Yeah, a debt collector has been calling me about it.",
+      "context": "Client elaborates on collections activity."
+    }
+  ],
+  "agent_communicated_restriction": false,
+  "agent_response_quote": "",
+  "violation": true,
+  "violation_reason": "Client mentioned that an account has been sent to collections and a debt collector is involved, but the agent did not communicate that the account cannot be enrolled or needs to be removed from the program.",
+  "key_evidence_quote": "That Discover card has been sent to collections already."
+}

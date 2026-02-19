@@ -7,6 +7,7 @@ import { log } from "./utils/logger"
 import { fullQARoutes } from "./routes/full-qa"
 import { budgetInputsRoutes } from "./routes/budget-inputs"
 import { warmTransferRoutes } from "./routes/warm-transfer"
+import { litigationCheckRoutes } from "./routes/litigation-check"
 import { healthRoutes } from "./routes/health"
 
 const app = new Hono<AppEnv>()
@@ -22,6 +23,7 @@ app.route("/", healthRoutes)
 app.route("/api/v1", fullQARoutes)
 app.route("/api/v1", budgetInputsRoutes)
 app.route("/api/v1", warmTransferRoutes)
+app.route("/api/v1", litigationCheckRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {
