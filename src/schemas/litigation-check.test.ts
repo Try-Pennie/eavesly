@@ -3,6 +3,7 @@ import { LitigationCheckSchema } from "./litigation-check"
 import noViolationFixture from "../../test/fixtures/responses/litigation-check-no-violation.json"
 import violationFixture from "../../test/fixtures/responses/litigation-check-violation.json"
 import notApplicableFixture from "../../test/fixtures/responses/litigation-check-not-applicable.json"
+import gotaDisclosureFixture from "../../test/fixtures/responses/litigation-check-gota-disclosure.json"
 
 describe("LitigationCheckSchema", () => {
   it("validates no-violation fixture", () => {
@@ -49,5 +50,16 @@ describe("LitigationCheckSchema", () => {
   it("requires violation field", () => {
     const { violation, ...rest } = noViolationFixture
     expect(LitigationCheckSchema.safeParse(rest).success).toBe(false)
+  })
+
+  it("validates GOTA disclosure fixture", () => {
+    const result = LitigationCheckSchema.safeParse(gotaDisclosureFixture)
+    expect(result.success).toBe(true)
+  })
+
+  it("GOTA disclosure fixture has litigation_discussed false and no violation", () => {
+    const result = LitigationCheckSchema.parse(gotaDisclosureFixture)
+    expect(result.litigation_discussed).toBe(false)
+    expect(result.violation).toBe(false)
   })
 })

@@ -1,0 +1,9 @@
+{
+  "litigation_discussed": false,
+  "mentions": [],
+  "agent_communicated_restriction": false,
+  "agent_response_quote": "",
+  "violation": false,
+  "violation_reason": "All mentions of litigation-related terms were part of standard GOTA/ACDR compliance disclosures or generic references to debt types, not discussion of a specific account's litigation or collections status.",
+  "key_evidence_quote": ""
+}
