@@ -38,7 +38,7 @@ describe("dispatchAlerts", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+      vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK", text: () => Promise.resolve("ok") }),
     )
     mockSingle.mockResolvedValue({
       data: { manager_email: "manager@example.com" },
@@ -135,7 +135,7 @@ describe("dispatchAlerts", () => {
   it("catches webhook errors without throwing", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: "Internal Server Error" }),
+      vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: "Internal Server Error", text: () => Promise.resolve("server error") }),
     )
     const ctx = createMockCtx()
     const env = createEnv()

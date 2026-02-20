@@ -44,6 +44,19 @@ async function processAlert(alert: Alert, env: Bindings): Promise<void> {
 
   const managerEmail = await lookupManagerEmail(env, alert.agent_email)
   const payload = buildSlackPayload(alert, managerEmail)
+
+  log("info", "Slack payload built", {
+    callId: alert.call_id,
+    fields: Object.fromEntries(
+      Object.entries(payload).map(([k, v]) => [k, v ? v.length : 0])
+    ),
+  })
+
+  log("info", "Sending Slack webhook", {
+    callId: alert.call_id,
+    webhookUrlTail: env.SLACK_WEBHOOK_URL.slice(-8),
+  })
+
   await sendSlackWebhook(env.SLACK_WEBHOOK_URL, payload)
 }
 
@@ -264,9 +277,17 @@ async function sendSlackWebhook(
     body: JSON.stringify(payload),
   })
 
+  const responseBody = await response.text()
+
+  log(response.ok ? "info" : "error", "Slack webhook response", {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseBody,
+  })
+
   if (!response.ok) {
     throw new Error(
-      `Slack webhook failed: ${response.status} ${response.statusText}`,
+      `Slack webhook failed: ${response.status} ${response.statusText} — ${responseBody}`,
     )
   }
 }
