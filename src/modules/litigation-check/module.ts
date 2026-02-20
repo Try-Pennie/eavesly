@@ -56,6 +56,7 @@ export const litigationCheckModule: EvalModule = {
         recording_link: callData?.recording_link,
         transcript_url: callData?.transcript_url,
         sfdc_lead_id: callData?.sfdc_lead_id,
+        call_duration: callData?.transcript.metadata.duration,
       },
     ]
   },

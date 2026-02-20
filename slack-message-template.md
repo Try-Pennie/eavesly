@@ -9,8 +9,10 @@ Use these variables in the Slack Workflow "Send a message" step.
 *{summary}*
 
 **Agent:** {agent_email}
+**Manager:** {manager_email}
 **Contact:** {contact_name}
 **Call ID:** {call_id}
+**Call Duration:** {call_duration}
 **Violation Type:** {violation_type}
 **Time:** {timestamp}
 

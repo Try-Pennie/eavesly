@@ -21,6 +21,7 @@ export interface Alert {
   recording_link?: string
   transcript_url?: string
   sfdc_lead_id?: string
+  call_duration?: number
 }
 
 export interface EvalModule {

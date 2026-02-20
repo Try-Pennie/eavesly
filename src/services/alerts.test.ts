@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { dispatchAlerts, buildSlackPayload, buildSummary } from "./alerts"
+import { dispatchAlerts, buildSlackPayload, buildSummary, lookupManagerEmail, formatDuration } from "./alerts"
 import type { Alert } from "../modules/types"
 import type { Bindings } from "../types/env"
 import { createEnv } from "../../test/helpers/mock-env"
@@ -7,6 +7,15 @@ import { VIOLATION_TYPES, MODULE_NAMES } from "../modules/constants"
 import violationFixture from "../../test/fixtures/responses/full-qa-violation.json"
 import budgetViolationFixture from "../../test/fixtures/responses/budget-inputs-violation.json"
 import warmViolationFixture from "../../test/fixtures/responses/warm-transfer-violation.json"
+
+const mockSingle = vi.fn()
+const mockEq = vi.fn(() => ({ single: mockSingle }))
+const mockSelect = vi.fn(() => ({ eq: mockEq }))
+const mockFrom = vi.fn(() => ({ select: mockSelect }))
+
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({ from: mockFrom })),
+}))
 
 function createMockCtx() {
   return {
@@ -31,6 +40,10 @@ describe("dispatchAlerts", () => {
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
     )
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "manager@example.com" },
+      error: null,
+    })
   })
 
   afterEach(() => {
@@ -106,6 +119,7 @@ describe("dispatchAlerts", () => {
     expect(body.timestamp).toBeTruthy()
     expect(body).toHaveProperty("evidence")
     expect(body).toHaveProperty("detail")
+    expect(body).toHaveProperty("call_duration")
   })
 
   it("skips webhook when SLACK_WEBHOOK_URL is not set", async () => {
@@ -131,6 +145,94 @@ describe("dispatchAlerts", () => {
     await (ctx.waitUntil as any).mock.calls[0][0]
     // No throw — test passes if we get here
   })
+
+  it("includes manager email in payload when agent has valid mapping", async () => {
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "boss@example.com" },
+      error: null,
+    })
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: "agent@example.com" })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("boss@example.com")
+  })
+
+  it("sends empty manager email when agent not found in mapping", async () => {
+    mockSingle.mockResolvedValue({ data: null, error: { code: "PGRST116" } })
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: "unknown@example.com" })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("")
+  })
+
+  it("sends empty manager email when manager is 'NONE'", async () => {
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "NONE" },
+      error: null,
+    })
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: "agent@example.com" })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("")
+  })
+
+  it("sends empty manager email when manager is 'No longer at Pennie'", async () => {
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "No longer at Pennie" },
+      error: null,
+    })
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: "agent@example.com" })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("")
+  })
+
+  it("sends empty manager email when agent_email is undefined", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: undefined })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("")
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it("still sends alert when manager lookup throws an error", async () => {
+    mockSingle.mockRejectedValue(new Error("DB connection failed"))
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({ agent_email: "agent@example.com" })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).toHaveBeenCalled()
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.manager_email).toBe("")
+  })
 })
 
 describe("buildSlackPayload", () => {
@@ -149,6 +251,13 @@ describe("buildSlackPayload", () => {
     expect(payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(payload).toHaveProperty("evidence")
     expect(payload).toHaveProperty("detail")
+    expect(payload.manager_email).toBe("")
+  })
+
+  it("includes manager_email when passed explicitly", () => {
+    const alert = createAlert({ call_id: "call-123" })
+    const payload = buildSlackPayload(alert, "manager@example.com")
+    expect(payload.manager_email).toBe("manager@example.com")
   })
 
   it("includes enriched Regal context fields when present", () => {
@@ -184,6 +293,18 @@ describe("buildSlackPayload", () => {
     expect(payload.recording_link).toBe("")
     expect(payload.transcript_url).toBe("")
     expect(payload.sfdc_lead_id).toBe("")
+  })
+
+  it("defaults call_duration to empty string when not present", () => {
+    const alert = createAlert({ call_id: "call-123" })
+    const payload = buildSlackPayload(alert)
+    expect(payload.call_duration).toBe("")
+  })
+
+  it("formats call_duration correctly when present", () => {
+    const alert = createAlert({ call_id: "call-123", call_duration: 272 })
+    const payload = buildSlackPayload(alert)
+    expect(payload.call_duration).toBe("4m 32s")
   })
 
   it("populates evidence and detail for budget compliance", () => {
@@ -250,5 +371,31 @@ describe("buildSummary", () => {
 
     expect(summary).toContain("Manager escalation violation")
     expect(summary).toContain("Manager review required")
+  })
+})
+
+describe("formatDuration", () => {
+  it("returns empty string for undefined", () => {
+    expect(formatDuration(undefined)).toBe("")
+  })
+
+  it("returns empty string for negative values", () => {
+    expect(formatDuration(-1)).toBe("")
+  })
+
+  it("formats zero seconds", () => {
+    expect(formatDuration(0)).toBe("0m 0s")
+  })
+
+  it("formats seconds only", () => {
+    expect(formatDuration(45)).toBe("0m 45s")
+  })
+
+  it("formats minutes and seconds", () => {
+    expect(formatDuration(272)).toBe("4m 32s")
+  })
+
+  it("formats exact minutes", () => {
+    expect(formatDuration(120)).toBe("2m 0s")
   })
 })

@@ -6,6 +6,9 @@ import type { WarmTransferResult } from "../schemas/warm-transfer"
 import type { LitigationCheckResult } from "../schemas/litigation-check"
 import { VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
+import { createClient } from "@supabase/supabase-js"
+
+const INVALID_MANAGER_VALUES = ["no longer at pennie", "none"]
 
 export async function dispatchAlerts(
   alerts: Alert[],
@@ -39,8 +42,39 @@ async function processAlert(alert: Alert, env: Bindings): Promise<void> {
     return
   }
 
-  const payload = buildSlackPayload(alert)
+  const managerEmail = await lookupManagerEmail(env, alert.agent_email)
+  const payload = buildSlackPayload(alert, managerEmail)
   await sendSlackWebhook(env.SLACK_WEBHOOK_URL, payload)
+}
+
+export async function lookupManagerEmail(
+  env: Bindings,
+  agentEmail: string | undefined,
+): Promise<string> {
+  if (!agentEmail) return ""
+
+  try {
+    const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+    const { data, error } = await supabase
+      .from("agent_manager_mapping")
+      .select("manager_email")
+      .eq("agent_email", agentEmail)
+      .single()
+
+    if (error || !data?.manager_email) return ""
+
+    if (INVALID_MANAGER_VALUES.includes(data.manager_email.toLowerCase())) {
+      return ""
+    }
+
+    return data.manager_email
+  } catch (err) {
+    log("warn", "Manager email lookup failed", {
+      agentEmail,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return ""
+  }
 }
 
 export interface SlackPayload {
@@ -48,6 +82,7 @@ export interface SlackPayload {
   violation_type: string
   module_name: string
   agent_email: string
+  manager_email: string
   summary: string
   timestamp: string
   evidence: string
@@ -56,14 +91,23 @@ export interface SlackPayload {
   recording_link: string
   transcript_url: string
   sfdc_lead_id: string
+  call_duration: string
 }
 
-export function buildSlackPayload(alert: Alert): SlackPayload {
+export function formatDuration(seconds?: number): string {
+  if (seconds == null || seconds < 0) return ""
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  return `${m}m ${s}s`
+}
+
+export function buildSlackPayload(alert: Alert, managerEmail = ""): SlackPayload {
   return {
     call_id: alert.call_id,
     violation_type: alert.violation_type,
     module_name: alert.module_name,
     agent_email: alert.agent_email ?? "",
+    manager_email: managerEmail,
     summary: buildSummary(alert),
     timestamp: new Date().toISOString(),
     evidence: extractEvidence(alert),
@@ -72,6 +116,7 @@ export function buildSlackPayload(alert: Alert): SlackPayload {
     recording_link: alert.recording_link ?? "",
     transcript_url: alert.transcript_url ?? "",
     sfdc_lead_id: alert.sfdc_lead_id ?? "",
+    call_duration: formatDuration(alert.call_duration),
   }
 }
 
