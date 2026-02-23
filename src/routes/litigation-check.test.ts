@@ -2,15 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { Hono } from "hono"
 import type { AppEnv } from "../types/env"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
-import noViolationFixture from "../../test/fixtures/responses/litigation-check-no-violation.json"
-
-const mockGetStructuredResponse = vi.fn().mockResolvedValue(noViolationFixture)
-
-vi.mock("../services/llm-client", () => ({
-  createLLMClient: () => ({
-    getStructuredResponse: mockGetStructuredResponse,
-  }),
-}))
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
@@ -20,16 +11,20 @@ vi.mock("../services/database", () => ({
   },
 }))
 
-vi.mock("../services/alerts", () => ({
-  dispatchAlerts: vi.fn(),
-}))
-
 import { litigationCheckRoutes } from "./litigation-check"
+
+const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "test-instance-id" })
 
 function createApp() {
   const app = new Hono<AppEnv>()
   app.route("/api/v1", litigationCheckRoutes)
   return app
+}
+
+function createEnvWithWorkflow() {
+  return createEnv({
+    EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+  })
 }
 
 const validBody = {
@@ -43,8 +38,8 @@ const validBody = {
 
 describe("litigation-check routes", () => {
   beforeEach(() => {
-    mockGetStructuredResponse.mockClear()
-    mockGetStructuredResponse.mockResolvedValue(noViolationFixture)
+    mockWorkflowCreate.mockClear()
+    mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
   })
 
   describe("POST /evaluate/litigation-check", () => {
@@ -54,7 +49,7 @@ describe("litigation-check routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validBody),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(401)
     })
 
@@ -67,11 +62,11 @@ describe("litigation-check routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({}),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
-    it("returns 200 with valid request", async () => {
+    it("returns 202 with workflow_instance_id for valid request", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/litigation-check", {
         method: "POST",
@@ -80,15 +75,35 @@ describe("litigation-check routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.module).toBe("litigation_check")
+      expect(body.workflow_instance_id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
+      expect(body.call_id).toBe("test-call-123")
+    })
+
+    it("calls EVALUATION_WORKFLOW.create with correct params", async () => {
+      const app = createApp()
+      await app.request("/api/v1/evaluate/litigation-check", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify(validBody),
+      }, createEnvWithWorkflow())
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("test-call-123-litigation_check")
+      expect(createArgs.params.moduleName).toBe("litigation_check")
+      expect(createArgs.params.callData.call_id).toBe("test-call-123")
     })
   })
 
   describe("POST /evaluate/litigation-check/batch", () => {
-    it("returns 200 with valid batch", async () => {
+    it("returns 202 with workflow instances", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/litigation-check/batch", {
         method: "POST",
@@ -97,8 +112,13 @@ describe("litigation-check routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [validBody] }),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
+      expect(body.total).toBe(1)
+      expect(body.instances).toHaveLength(1)
+      expect(body.instances[0].id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
     })
 
     it("returns 400 with more than 10 calls", async () => {
@@ -114,7 +134,7 @@ describe("litigation-check routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
@@ -127,7 +147,7 @@ describe("litigation-check routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [] }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
   })

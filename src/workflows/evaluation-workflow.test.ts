@@ -9,6 +9,27 @@ describe("module-registry", () => {
     expect(typeof mod.extractAlerts).toBe("function")
   })
 
+  it("returns full_qa module", () => {
+    const mod = getModule("full_qa")
+    expect(mod.name).toBe("full_qa")
+    expect(typeof mod.evaluate).toBe("function")
+    expect(typeof mod.extractAlerts).toBe("function")
+  })
+
+  it("returns warm_transfer module", () => {
+    const mod = getModule("warm_transfer")
+    expect(mod.name).toBe("warm_transfer")
+    expect(typeof mod.evaluate).toBe("function")
+    expect(typeof mod.extractAlerts).toBe("function")
+  })
+
+  it("returns litigation_check module", () => {
+    const mod = getModule("litigation_check")
+    expect(mod.name).toBe("litigation_check")
+    expect(typeof mod.evaluate).toBe("function")
+    expect(typeof mod.extractAlerts).toBe("function")
+  })
+
   it("throws for unknown module", () => {
     expect(() => getModule("nonexistent")).toThrow("Unknown module: nonexistent")
   })

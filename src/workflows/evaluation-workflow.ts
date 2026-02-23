@@ -5,6 +5,7 @@ import { getModule } from "./module-registry"
 import { createLLMClient } from "../services/llm-client"
 import { DatabaseService } from "../services/database"
 import { processAlert } from "../services/alerts"
+import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
 type EvaluationParams = {
@@ -38,6 +39,18 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       return alerts
     })
 
+    // Step 2b: Store QA result in legacy table (full_qa only)
+    if (moduleName === MODULE_NAMES.FULL_QA) {
+      await step.do("store-qa-result", {
+        retries: { limit: 3, delay: "2 seconds", backoff: "exponential" },
+        timeout: "1 minute",
+      }, async () => {
+        const db = new DatabaseService(this.env)
+        const r = result as any
+        await db.storeQAResult(callData.call_id, r.result, r.processing_time_ms)
+      })
+    }
+
     // Step 3: Dispatch alerts (Slack webhook) — best-effort, non-fatal
     if (alerts.length > 0) {
       await step.do("dispatch-alerts", {
@@ -65,7 +78,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     }, async () => {
       const db = new DatabaseService(this.env)
       await db.logRequest({
-        endpoint: "budget-inputs",
+        endpoint: moduleName.replace(/_/g, "-"),
         callId: callData.call_id,
         status: "workflow_completed",
         statusCode: 200,

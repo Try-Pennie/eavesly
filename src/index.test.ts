@@ -1,19 +1,8 @@
 import { describe, it, expect, vi } from "vitest"
 import { createEnv, TEST_API_KEY } from "../test/helpers/mock-env"
-import excellentFixture from "../test/fixtures/responses/full-qa-excellent.json"
-import violationFixture from "../test/fixtures/responses/full-qa-violation.json"
-import warmTransferFixture from "../test/fixtures/responses/warm-transfer-no-violation.json"
 
-const { mockGetStructuredResponse, mockDispatchAlerts, mockStoreModuleResult } = vi.hoisted(() => ({
-  mockGetStructuredResponse: vi.fn(),
-  mockDispatchAlerts: vi.fn(),
+const { mockStoreModuleResult } = vi.hoisted(() => ({
   mockStoreModuleResult: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock("./services/llm-client", () => ({
-  createLLMClient: () => ({
-    getStructuredResponse: mockGetStructuredResponse,
-  }),
 }))
 
 vi.mock("./services/database", () => ({
@@ -26,7 +15,7 @@ vi.mock("./services/database", () => ({
 }))
 
 vi.mock("./services/alerts", () => ({
-  dispatchAlerts: mockDispatchAlerts,
+  dispatchAlerts: vi.fn(),
   processAlert: vi.fn(),
 }))
 
@@ -91,6 +80,15 @@ describe("E2E app tests", () => {
       }, createEnv())
       expect(res.status).toBe(401)
     })
+
+    it("rejects unauthenticated litigation-check request", async () => {
+      const res = await app.request("/api/v1/evaluate/litigation-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }, createEnv())
+      expect(res.status).toBe(401)
+    })
   })
 
   describe("CORS headers", () => {
@@ -121,9 +119,12 @@ describe("E2E app tests", () => {
     })
   })
 
-  describe("full-qa happy path", () => {
-    it("processes excellent call successfully", async () => {
-      mockGetStructuredResponse.mockResolvedValue(excellentFixture)
+  describe("full-qa workflow dispatch", () => {
+    it("returns 202 with workflow_instance_id", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-instance-123" })
+      const env = createEnv({
+        EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+      })
       const res = await app.request("/api/v1/evaluate/full-qa", {
         method: "POST",
         headers: {
@@ -131,28 +132,18 @@ describe("E2E app tests", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, env)
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
-      expect(body.has_violation).toBe(false)
       expect(body.module).toBe("full_qa")
-    })
+      expect(body.workflow_instance_id).toBe("wf-instance-123")
+      expect(body.status).toBe("queued")
 
-    it("processes violation call successfully", async () => {
-      mockGetStructuredResponse.mockResolvedValue(violationFixture)
-      const mockExecCtx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() }
-      const res = await app.request("/api/v1/evaluate/full-qa", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${TEST_API_KEY}`,
-        },
-        body: JSON.stringify(validBody),
-      }, createEnv(), mockExecCtx)
-      expect(res.status).toBe(200)
-      const body = (await res.json()) as any
-      expect(body.has_violation).toBe(true)
-      expect(body.violation_type).toBe("manager_escalation")
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("e2e-call-123-full_qa")
+      expect(createArgs.params.moduleName).toBe("full_qa")
+      expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
     })
   })
 
@@ -178,9 +169,12 @@ describe("E2E app tests", () => {
     })
   })
 
-  describe("warm-transfer happy path", () => {
-    it("processes warm transfer call successfully", async () => {
-      mockGetStructuredResponse.mockResolvedValue(warmTransferFixture)
+  describe("warm-transfer workflow dispatch", () => {
+    it("returns 202 with workflow_instance_id", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-instance-123" })
+      const env = createEnv({
+        EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+      })
       const res = await app.request("/api/v1/evaluate/warm-transfer", {
         method: "POST",
         headers: {
@@ -188,22 +182,37 @@ describe("E2E app tests", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, env)
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.module).toBe("warm_transfer")
-      expect(body.has_violation).toBe(false)
+      expect(body.workflow_instance_id).toBe("wf-instance-123")
+      expect(body.status).toBe("queued")
+
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("e2e-call-123-warm_transfer")
+      expect(createArgs.params.moduleName).toBe("warm_transfer")
+      expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
     })
   })
 
-  describe("budget-inputs violation dispatches to workflow", () => {
-    it("returns 202 even for violation payloads (workflow handles evaluation)", async () => {
-      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-violation-456" })
+  describe("litigation-check workflow dispatch", () => {
+    it("rejects unauthenticated request", async () => {
+      const res = await app.request("/api/v1/evaluate/litigation-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }, createEnv())
+      expect(res.status).toBe(401)
+    })
+
+    it("returns 202 with workflow_instance_id", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-instance-123" })
       const env = createEnv({
         EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
       })
-
-      const res = await app.request("/api/v1/evaluate/budget-inputs", {
+      const res = await app.request("/api/v1/evaluate/litigation-check", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -211,21 +220,16 @@ describe("E2E app tests", () => {
         },
         body: JSON.stringify(validBody),
       }, env)
-
       expect(res.status).toBe(202)
       const body = (await res.json()) as any
-      expect(body.call_id).toBe("e2e-call-123")
-      expect(body.module).toBe("budget_inputs")
-      expect(body.workflow_instance_id).toBe("wf-violation-456")
+      expect(body.module).toBe("litigation_check")
+      expect(body.workflow_instance_id).toBe("wf-instance-123")
       expect(body.status).toBe("queued")
-      expect(body.correlation_id).toBeTruthy()
-      expect(body.timestamp).toBeTruthy()
 
-      // Verify workflow was triggered with correct params
       expect(mockWorkflowCreate).toHaveBeenCalledOnce()
       const createArgs = mockWorkflowCreate.mock.calls[0][0]
-      expect(createArgs.id).toBe("e2e-call-123-budget_inputs")
-      expect(createArgs.params.moduleName).toBe("budget_inputs")
+      expect(createArgs.id).toBe("e2e-call-123-litigation_check")
+      expect(createArgs.params.moduleName).toBe("litigation_check")
       expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
     })
   })

@@ -2,33 +2,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { Hono } from "hono"
 import type { AppEnv } from "../types/env"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
-import noViolationFixture from "../../test/fixtures/responses/warm-transfer-no-violation.json"
-
-const mockGetStructuredResponse = vi.fn().mockResolvedValue(noViolationFixture)
-
-vi.mock("../services/llm-client", () => ({
-  createLLMClient: () => ({
-    getStructuredResponse: mockGetStructuredResponse,
-  }),
-}))
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
     storeModuleResult = vi.fn().mockResolvedValue(undefined)
     storeQAResult = vi.fn().mockResolvedValue(undefined)
+    logRequest = vi.fn().mockResolvedValue(undefined)
   },
 }))
 
-vi.mock("../services/alerts", () => ({
-  dispatchAlerts: vi.fn(),
-}))
-
 import { warmTransferRoutes } from "./warm-transfer"
+
+const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "test-instance-id" })
 
 function createApp() {
   const app = new Hono<AppEnv>()
   app.route("/api/v1", warmTransferRoutes)
   return app
+}
+
+function createEnvWithWorkflow() {
+  return createEnv({
+    EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+  })
 }
 
 const validBody = {
@@ -42,8 +38,8 @@ const validBody = {
 
 describe("warm-transfer routes", () => {
   beforeEach(() => {
-    mockGetStructuredResponse.mockClear()
-    mockGetStructuredResponse.mockResolvedValue(noViolationFixture)
+    mockWorkflowCreate.mockClear()
+    mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
   })
 
   describe("POST /evaluate/warm-transfer", () => {
@@ -53,7 +49,7 @@ describe("warm-transfer routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validBody),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(401)
     })
 
@@ -66,11 +62,11 @@ describe("warm-transfer routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({}),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
-    it("returns 200 with valid request", async () => {
+    it("returns 202 with workflow_instance_id for valid request", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/warm-transfer", {
         method: "POST",
@@ -79,15 +75,35 @@ describe("warm-transfer routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.module).toBe("warm_transfer")
+      expect(body.workflow_instance_id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
+      expect(body.call_id).toBe("test-call-123")
+    })
+
+    it("calls EVALUATION_WORKFLOW.create with correct params", async () => {
+      const app = createApp()
+      await app.request("/api/v1/evaluate/warm-transfer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify(validBody),
+      }, createEnvWithWorkflow())
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("test-call-123-warm_transfer")
+      expect(createArgs.params.moduleName).toBe("warm_transfer")
+      expect(createArgs.params.callData.call_id).toBe("test-call-123")
     })
   })
 
   describe("POST /evaluate/warm-transfer/batch", () => {
-    it("returns 200 with valid batch", async () => {
+    it("returns 202 with workflow instances", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/warm-transfer/batch", {
         method: "POST",
@@ -96,8 +112,13 @@ describe("warm-transfer routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [validBody] }),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
+      expect(body.total).toBe(1)
+      expect(body.instances).toHaveLength(1)
+      expect(body.instances[0].id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
     })
 
     it("returns 400 with more than 10 calls", async () => {
@@ -113,7 +134,7 @@ describe("warm-transfer routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
@@ -126,7 +147,7 @@ describe("warm-transfer routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [] }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
   })

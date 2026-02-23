@@ -2,33 +2,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { Hono } from "hono"
 import type { AppEnv } from "../types/env"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
-import excellentFixture from "../../test/fixtures/responses/full-qa-excellent.json"
-
-const mockGetStructuredResponse = vi.fn().mockResolvedValue(excellentFixture)
-
-vi.mock("../services/llm-client", () => ({
-  createLLMClient: () => ({
-    getStructuredResponse: mockGetStructuredResponse,
-  }),
-}))
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
     storeModuleResult = vi.fn().mockResolvedValue(undefined)
     storeQAResult = vi.fn().mockResolvedValue(undefined)
+    logRequest = vi.fn().mockResolvedValue(undefined)
   },
 }))
 
-vi.mock("../services/alerts", () => ({
-  dispatchAlerts: vi.fn(),
-}))
-
 import { fullQARoutes } from "./full-qa"
+
+const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "test-instance-id" })
 
 function createApp() {
   const app = new Hono<AppEnv>()
   app.route("/api/v1", fullQARoutes)
   return app
+}
+
+function createEnvWithWorkflow() {
+  return createEnv({
+    EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+  })
 }
 
 const validBody = {
@@ -42,8 +38,8 @@ const validBody = {
 
 describe("full-qa routes", () => {
   beforeEach(() => {
-    mockGetStructuredResponse.mockClear()
-    mockGetStructuredResponse.mockResolvedValue(excellentFixture)
+    mockWorkflowCreate.mockClear()
+    mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
   })
 
   describe("POST /evaluate/full-qa", () => {
@@ -53,7 +49,7 @@ describe("full-qa routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validBody),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(401)
     })
 
@@ -65,12 +61,12 @@ describe("full-qa routes", () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
-        body: JSON.stringify({ invalid: true }),
-      }, createEnv())
+        body: JSON.stringify({}),
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
-    it("returns 200 with valid request", async () => {
+    it("returns 202 with workflow_instance_id for valid request", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/full-qa", {
         method: "POST",
@@ -79,31 +75,35 @@ describe("full-qa routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
-      const body = (await res.json()) as Record<string, unknown>
-      expect(body.call_id).toBe("test-call-123")
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
       expect(body.module).toBe("full_qa")
+      expect(body.workflow_instance_id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
+      expect(body.call_id).toBe("test-call-123")
     })
 
-    it("returns result from LLM", async () => {
+    it("calls EVALUATION_WORKFLOW.create with correct params", async () => {
       const app = createApp()
-      const res = await app.request("/api/v1/evaluate/full-qa", {
+      await app.request("/api/v1/evaluate/full-qa", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      const body = (await res.json()) as any
-      expect(body.result).toBeTruthy()
-      expect(body.has_violation).toBe(false)
+      }, createEnvWithWorkflow())
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("test-call-123-full_qa")
+      expect(createArgs.params.moduleName).toBe("full_qa")
+      expect(createArgs.params.callData.call_id).toBe("test-call-123")
     })
   })
 
   describe("POST /evaluate/full-qa/batch", () => {
-    it("returns 200 with valid batch", async () => {
+    it("returns 202 with workflow instances", async () => {
       const app = createApp()
       const res = await app.request("/api/v1/evaluate/full-qa/batch", {
         method: "POST",
@@ -112,11 +112,13 @@ describe("full-qa routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [validBody] }),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.total).toBe(1)
-      expect(body.success).toBe(1)
+      expect(body.instances).toHaveLength(1)
+      expect(body.instances[0].id).toBe("test-instance-id")
+      expect(body.status).toBe("queued")
     })
 
     it("returns 400 with more than 10 calls", async () => {
@@ -132,7 +134,7 @@ describe("full-qa routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
@@ -145,7 +147,7 @@ describe("full-qa routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [] }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(400)
     })
 
@@ -155,7 +157,7 @@ describe("full-qa routes", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ calls: [validBody] }),
-      }, createEnv())
+      }, createEnvWithWorkflow())
       expect(res.status).toBe(401)
     })
   })
