@@ -21,6 +21,11 @@ type = "Text"
 globs = ["prompts/**/*.txt"]
 fallthrough = true
 
+[[workflows]]
+name = "eavesly-evaluation"
+binding = "EVALUATION_WORKFLOW"
+class_name = "EvaluationWorkflow"
+
 [observability]
 [observability.logs]
 enabled = false
@@ -30,6 +35,16 @@ invocation_logs = true
 name = "eavesly-staging"
 vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1" }
 
+[[env.staging.workflows]]
+name = "eavesly-evaluation-staging"
+binding = "EVALUATION_WORKFLOW"
+class_name = "EvaluationWorkflow"
+
 [env.production]
 name = "eavesly-production"
 vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1" }
+
+[[env.production.workflows]]
+name = "eavesly-evaluation-production"
+binding = "EVALUATION_WORKFLOW"
+class_name = "EvaluationWorkflow"

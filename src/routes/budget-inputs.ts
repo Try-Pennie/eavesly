@@ -5,11 +5,9 @@ import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
 } from "../schemas/requests"
-import { createLLMClient } from "../services/llm-client"
 import { DatabaseService } from "../services/database"
-import { budgetInputsModule } from "../modules/budget-inputs/module"
+import { MODULE_NAMES } from "../modules/constants"
 import { auth } from "../middleware/auth"
-import { evaluateAndRespond, batchEvaluateAndRespond } from "./shared"
 
 const budgetInputsRoutes = new Hono<AppEnv>()
 
@@ -69,9 +67,8 @@ budgetInputsRoutes.post("/evaluate/budget-inputs", async (c) => {
     )
   }
 
-  // 4. Process normally
+  // 4. Dispatch to workflow
   const callData = validation.data
-  const llm = createLLMClient(c.env)
 
   await db.logRequest({
     endpoint: "budget-inputs",
@@ -80,31 +77,32 @@ budgetInputsRoutes.post("/evaluate/budget-inputs", async (c) => {
     correlationId,
   })
 
+  const instanceId = `${callData.call_id}-budget_inputs`
+
   try {
-    const response = await evaluateAndRespond(
-      c,
-      budgetInputsModule,
-      callData,
-      llm,
-      db,
-    )
-    await db.logRequest({
-      endpoint: "budget-inputs",
-      callId: callData.call_id,
-      status: "success",
-      statusCode: 200,
-      correlationId,
+    const instance = await c.env.EVALUATION_WORKFLOW.create({
+      id: instanceId,
+      params: { moduleName: MODULE_NAMES.BUDGET_INPUTS, callData, correlationId },
     })
-    return response
+
+    return c.json({
+      call_id: callData.call_id,
+      module: "budget_inputs",
+      correlation_id: correlationId,
+      workflow_instance_id: instance.id,
+      status: "queued",
+      timestamp: new Date().toISOString(),
+    }, 202)
   } catch (e) {
-    await db.logRequest({
-      endpoint: "budget-inputs",
-      callId: callData.call_id,
-      status: "processing_error",
-      statusCode: 500,
-      errorMessage: e instanceof Error ? e.message : String(e),
-      correlationId,
-    })
+    if (e instanceof Error && e.message.includes("already exists")) {
+      return c.json({
+        call_id: callData.call_id,
+        module: "budget_inputs",
+        workflow_instance_id: instanceId,
+        status: "already_exists",
+        message: "Evaluation already submitted for this call_id",
+      }, 409)
+    }
     throw e
   }
 })
@@ -114,9 +112,22 @@ budgetInputsRoutes.post(
   zValidator("json", BatchEvaluateRequestSchema),
   async (c) => {
     const { calls } = c.req.valid("json")
-    const llm = createLLMClient(c.env)
-    const db = new DatabaseService(c.env)
-    return batchEvaluateAndRespond(c, budgetInputsModule, calls, llm, db)
+    const correlationId = c.get("correlationId") ?? crypto.randomUUID()
+    const instances = await Promise.all(
+      calls.map(callData =>
+        c.env.EVALUATION_WORKFLOW.create({
+          id: `${callData.call_id}-budget_inputs`,
+          params: { moduleName: MODULE_NAMES.BUDGET_INPUTS, callData, correlationId },
+        })
+      )
+    )
+    return c.json({
+      correlation_id: correlationId,
+      total: calls.length,
+      instances: instances.map(inst => ({ id: inst.id })),
+      status: "queued",
+      timestamp: new Date().toISOString(),
+    }, 202)
   },
 )
 

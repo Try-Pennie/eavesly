@@ -2,8 +2,6 @@ import { describe, it, expect, vi } from "vitest"
 import { createEnv, TEST_API_KEY } from "../test/helpers/mock-env"
 import excellentFixture from "../test/fixtures/responses/full-qa-excellent.json"
 import violationFixture from "../test/fixtures/responses/full-qa-violation.json"
-import budgetPassFixture from "../test/fixtures/responses/budget-inputs-pass.json"
-import budgetViolationFixture from "../test/fixtures/responses/budget-inputs-violation.json"
 import warmTransferFixture from "../test/fixtures/responses/warm-transfer-no-violation.json"
 
 const { mockGetStructuredResponse, mockDispatchAlerts, mockStoreModuleResult } = vi.hoisted(() => ({
@@ -29,6 +27,7 @@ vi.mock("./services/database", () => ({
 
 vi.mock("./services/alerts", () => ({
   dispatchAlerts: mockDispatchAlerts,
+  processAlert: vi.fn(),
 }))
 
 import app from "./index"
@@ -157,9 +156,12 @@ describe("E2E app tests", () => {
     })
   })
 
-  describe("budget-inputs happy path", () => {
-    it("processes budget inputs call successfully", async () => {
-      mockGetStructuredResponse.mockResolvedValue(budgetPassFixture)
+  describe("budget-inputs workflow dispatch", () => {
+    it("returns 202 with workflow_instance_id", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-instance-123" })
+      const env = createEnv({
+        EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+      })
       const res = await app.request("/api/v1/evaluate/budget-inputs", {
         method: "POST",
         headers: {
@@ -167,11 +169,12 @@ describe("E2E app tests", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv())
-      expect(res.status).toBe(200)
+      }, env)
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.module).toBe("budget_inputs")
-      expect(body.has_violation).toBe(false)
+      expect(body.workflow_instance_id).toBe("wf-instance-123")
+      expect(body.status).toBe("queued")
     })
   })
 
@@ -193,11 +196,12 @@ describe("E2E app tests", () => {
     })
   })
 
-  describe("budget-inputs violation triggers alert", () => {
-    it("returns violation with alert_dispatched and dispatches Slack alert", async () => {
-      mockGetStructuredResponse.mockResolvedValue(budgetViolationFixture)
-      mockDispatchAlerts.mockClear()
-      const mockExecCtx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() }
+  describe("budget-inputs violation dispatches to workflow", () => {
+    it("returns 202 even for violation payloads (workflow handles evaluation)", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-violation-456" })
+      const env = createEnv({
+        EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+      })
 
       const res = await app.request("/api/v1/evaluate/budget-inputs", {
         method: "POST",
@@ -206,53 +210,23 @@ describe("E2E app tests", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnv(), mockExecCtx)
+      }, env)
 
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(202)
       const body = (await res.json()) as any
-
-      // Verify response shape matches production expectations
       expect(body.call_id).toBe("e2e-call-123")
       expect(body.module).toBe("budget_inputs")
-      expect(body.has_violation).toBe(true)
-      expect(body.violation_type).toBe("budget_compliance")
-      expect(body.alert_dispatched).toBe(true)
+      expect(body.workflow_instance_id).toBe("wf-violation-456")
+      expect(body.status).toBe("queued")
       expect(body.correlation_id).toBeTruthy()
       expect(body.timestamp).toBeTruthy()
-      expect(body.processing_time_ms).toBeGreaterThanOrEqual(0)
 
-      // Verify result contains the violation details
-      expect(body.result.budget_collection_overview.budget_compliance_violation).toBe(true)
-      expect(body.result.budget_collection_overview.items_skipped).toBe(11)
-
-      // Verify dispatchAlerts was called with correct alert payload
-      expect(mockDispatchAlerts).toHaveBeenCalledOnce()
-      const [alerts, ctx, env] = mockDispatchAlerts.mock.calls[0]
-      expect(alerts).toHaveLength(1)
-      expect(alerts[0]).toMatchObject({
-        module_name: "budget_inputs",
-        violation_type: "budget_compliance",
-        call_id: "e2e-call-123",
-        agent_id: "agent-456",
-        agent_email: "agent@example.com",
-        contact_name: "John Doe",
-        recording_link: "https://recordings.example.com/e2e-call-123",
-      })
-
-      // Verify storeModuleResult was called with callData including new fields
-      expect(mockStoreModuleResult).toHaveBeenCalledWith(
-        "e2e-call-123",
-        expect.any(Object),
-        true,
-        expect.objectContaining({
-          agent_email: "agent@example.com",
-          contact_name: "John Doe",
-          contact_phone: "+15551234567",
-          recording_link: "https://recordings.example.com/e2e-call-123",
-          call_summary: "Test call summary",
-          transcript_url: "https://transcripts.example.com/e2e-call-123",
-        }),
-      )
+      // Verify workflow was triggered with correct params
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("e2e-call-123-budget_inputs")
+      expect(createArgs.params.moduleName).toBe("budget_inputs")
+      expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
     })
   })
 })

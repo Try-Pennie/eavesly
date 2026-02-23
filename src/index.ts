@@ -9,6 +9,7 @@ import { budgetInputsRoutes } from "./routes/budget-inputs"
 import { warmTransferRoutes } from "./routes/warm-transfer"
 import { litigationCheckRoutes } from "./routes/litigation-check"
 import { healthRoutes } from "./routes/health"
+import { statusRoutes } from "./routes/status"
 
 const app = new Hono<AppEnv>()
 
@@ -24,6 +25,7 @@ app.route("/api/v1", fullQARoutes)
 app.route("/api/v1", budgetInputsRoutes)
 app.route("/api/v1", warmTransferRoutes)
 app.route("/api/v1", litigationCheckRoutes)
+app.route("/api/v1", statusRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {
@@ -38,3 +40,4 @@ app.onError((err, c) => {
 })
 
 export default app
+export { EvaluationWorkflow } from "./workflows/evaluation-workflow"

@@ -8,6 +8,7 @@ export interface Bindings {
   CF_GATEWAY_ID: string
   CF_AIG_TOKEN: string
   SLACK_WEBHOOK_URL?: string
+  EVALUATION_WORKFLOW: Workflow
 }
 
 export interface Variables {

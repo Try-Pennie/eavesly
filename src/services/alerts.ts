@@ -28,7 +28,7 @@ export async function dispatchAlerts(
   }
 }
 
-async function processAlert(alert: Alert, env: Bindings): Promise<void> {
+export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   log("info", "Alert dispatched", {
     module: alert.module_name,
     violationType: alert.violation_type,

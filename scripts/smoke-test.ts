@@ -336,6 +336,32 @@ async function testHealthCheck(): Promise<{ violation?: string }> {
   return {}
 }
 
+const ASYNC_MODULES = new Set(["budget-inputs"])
+const POLL_INTERVAL_MS = 5_000
+const POLL_MAX_MS = 90_000
+
+async function pollWorkflowStatus(
+  instanceId: string,
+): Promise<Record<string, unknown>> {
+  const start = Date.now()
+  while (Date.now() - start < POLL_MAX_MS) {
+    const res = await fetch(`${BASE_URL}/api/v1/status/${instanceId}`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    })
+    if (!res.ok) {
+      throw new Error(`Status poll failed: ${res.status}`)
+    }
+    const body = (await res.json()) as Record<string, unknown>
+    const status = body.status as string
+
+    if (status === "complete") return body
+    if (status === "errored") throw new Error(`Workflow errored: ${body.error ?? "unknown"}`)
+
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+  }
+  throw new Error(`Workflow did not complete within ${POLL_MAX_MS / 1000}s`)
+}
+
 async function testModule(
   module: string,
 ): Promise<{ violation?: string }> {
@@ -347,6 +373,28 @@ async function testModule(
     },
     body: JSON.stringify(CALL_PAYLOAD),
   })
+
+  // Async workflow modules return 202
+  if (ASYNC_MODULES.has(module)) {
+    if (res.status !== 202) {
+      const text = await res.text()
+      throw new Error(`Expected 202, got ${res.status}: ${text.slice(0, 200)}`)
+    }
+    const body = (await res.json()) as Record<string, unknown>
+    if (!body.workflow_instance_id)
+      throw new Error("Missing workflow_instance_id in 202 response")
+
+    // Poll until complete
+    const result = await pollWorkflowStatus(body.workflow_instance_id as string)
+    const output = result.output as Record<string, unknown> | undefined
+    return {
+      violation: output?.has_violation
+        ? (output.violation_type as string) ?? "yes"
+        : undefined,
+    }
+  }
+
+  // Synchronous modules return 200
   if (!res.ok) {
     const text = await res.text()
     throw new Error(`Status ${res.status}: ${text.slice(0, 200)}`)
