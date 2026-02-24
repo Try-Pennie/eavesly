@@ -20,6 +20,8 @@
                 - Enrollment agreement walkthrough language about general risks
                 - Legal protection product descriptions (e.g., "...litigation or collection efforts if needed")
                 - Any scripted/boilerplate language the agent is required to read about general possibilities, not about a specific account
+                - Agent screening/due-diligence questions about litigation status where the client responds negatively (e.g., "do any of them have any type of judgment or litigation?" / "not that I'm aware of")
+                - References to "collection accounts" as a debt type/category, without indication of specific active legal proceedings on a particular account
             </action>
             <action>EXCLUDE mentions where the contact casually uses words like "collections" to generically describe old debts without indicating a specific account has been served, sued, or sent to a collection agency (e.g., "the collections, and then the high interest loans" when listing debt types)</action>
             <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation, collections, having a lawsuit filed, being sent to a collection agency, receiving a summons, or similar concrete legal action against a particular debt</action>
@@ -59,12 +61,15 @@
             <case>Agent describing a legal protection product or service feature (e.g., "...litigation or collection efforts if needed")</case>
             <case>Contact casually referring to debts as "collections" or "the collections" without indicating a specific account has active legal action (e.g., "the collections, and then the high interest loans")</case>
             <case>Any scripted/boilerplate language about general possibilities that is not about a specific account's actual litigation or collections status</case>
+            <case>Agent asking a screening question about litigation/judgments AND the client responding negatively — this is proper intake screening, not discussion of a specific account in litigation</case>
+            <case>Agent or contact describing debts as "collection accounts" as a general category (not active legal proceedings against a specific account)</case>
         </excluded_from_litigation_discussed>
 
         <no_violation_cases>
             <case>Litigation/delinquent/collections is never mentioned on the call — set litigation_discussed to false, no violation</case>
             <case>All mentions are standard compliance disclosures, GOTA/ACDR script reading, or generic references (see excluded cases above) — set litigation_discussed to false, no violation</case>
             <case>A specific account's litigation/collections status is discussed AND the agent clearly communicates the enrollment restriction — no violation</case>
+            <case>Agent asks a screening question about litigation and the client denies it — set litigation_discussed to false, no violation</case>
         </no_violation_cases>
     </evaluation_criteria>
 
@@ -73,7 +78,7 @@
         1. Scan the entire transcript for any mention of litigation, delinquent accounts, collections, lawsuits, garnishment, judgments, or related legal terms
         2. If NONE of these topics come up, return litigation_discussed=false, empty mentions array, agent_communicated_restriction=false, violation=false
         3. If mentions are found, classify each one as either a "standard disclosure" or "specific account discussion":
-           - Standard disclosures include: GOTA/ACDR script reading, enrollment agreement walkthroughs, legal protection product descriptions, and generic/casual references to debt types
+           - Standard disclosures include: GOTA/ACDR script reading, enrollment agreement walkthroughs, legal protection product descriptions, generic/casual references to debt types, and agent screening questions about litigation where the client denies any litigation
            - Specific account discussions include: a contact or agent discussing a particular account that has been sued, served, sent to collections, has a judgment, etc.
         4. If ALL mentions are standard disclosures or generic references, return litigation_discussed=false, empty mentions array, agent_communicated_restriction=false, violation=false
         5. If any mentions involve a SPECIFIC account's litigation/collections status, include only those mentions, set litigation_discussed=true, and check whether the AGENT explicitly told the client that the account cannot be enrolled or needs to be removed

@@ -1,0 +1,9 @@
+{
+  "litigation_discussed": false,
+  "mentions": [],
+  "agent_communicated_restriction": false,
+  "agent_response_quote": "",
+  "violation": false,
+  "violation_reason": "The agent asked a screening question about litigation/judgments and the client responded negatively ('not that I'm aware of'). References to 'collection accounts' were used as a general debt category, not as indication of active legal proceedings on a specific account. This is proper intake due diligence, not discussion of a specific account in litigation.",
+  "key_evidence_quote": ""
+}

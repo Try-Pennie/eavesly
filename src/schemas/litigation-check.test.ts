@@ -4,6 +4,7 @@ import noViolationFixture from "../../test/fixtures/responses/litigation-check-n
 import violationFixture from "../../test/fixtures/responses/litigation-check-violation.json"
 import notApplicableFixture from "../../test/fixtures/responses/litigation-check-not-applicable.json"
 import gotaDisclosureFixture from "../../test/fixtures/responses/litigation-check-gota-disclosure.json"
+import screeningNegativeFixture from "../../test/fixtures/responses/litigation-check-screening-negative.json"
 
 describe("LitigationCheckSchema", () => {
   it("validates no-violation fixture", () => {
@@ -59,6 +60,17 @@ describe("LitigationCheckSchema", () => {
 
   it("GOTA disclosure fixture has litigation_discussed false and no violation", () => {
     const result = LitigationCheckSchema.parse(gotaDisclosureFixture)
+    expect(result.litigation_discussed).toBe(false)
+    expect(result.violation).toBe(false)
+  })
+
+  it("validates screening-negative fixture", () => {
+    const result = LitigationCheckSchema.safeParse(screeningNegativeFixture)
+    expect(result.success).toBe(true)
+  })
+
+  it("screening-negative fixture has litigation_discussed false and no violation", () => {
+    const result = LitigationCheckSchema.parse(screeningNegativeFixture)
     expect(result.litigation_discussed).toBe(false)
     expect(result.violation).toBe(false)
   })

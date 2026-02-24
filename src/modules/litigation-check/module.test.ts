@@ -5,6 +5,7 @@ import { createEvaluateRequest } from "../../../test/helpers/create-request"
 import noViolationFixture from "../../../test/fixtures/responses/litigation-check-no-violation.json"
 import violationFixture from "../../../test/fixtures/responses/litigation-check-violation.json"
 import notApplicableFixture from "../../../test/fixtures/responses/litigation-check-not-applicable.json"
+import screeningNegativeFixture from "../../../test/fixtures/responses/litigation-check-screening-negative.json"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 
 describe("litigationCheckModule", () => {
@@ -58,6 +59,18 @@ describe("litigationCheckModule", () => {
       )
       expect(result.has_violation).toBe(true)
       expect(result.violation_type).toBe(VIOLATION_TYPES.LITIGATION_CHECK)
+    })
+
+    it("sets has_violation false for screening question with negative response", async () => {
+      const llm = createMockLLM(screeningNegativeFixture)
+      const request = createEvaluateRequest()
+      const result = await litigationCheckModule.evaluate(
+        request.transcript.transcript,
+        request,
+        llm as any,
+      )
+      expect(result.has_violation).toBe(false)
+      expect(result.violation_type).toBeNull()
     })
 
     it("server-side recount overrides LLM if it miscounts — forces violation when discussed but not communicated", async () => {
