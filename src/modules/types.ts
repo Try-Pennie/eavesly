@@ -1,4 +1,3 @@
-import type { z } from "zod"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { LLMClient } from "../services/llm-client"
 
@@ -32,4 +31,31 @@ export interface EvalModule {
     llm: LLMClient,
   ): Promise<ModuleResult>
   extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[]
+}
+
+export function extractAlerts(
+  moduleName: string,
+  violationType: string,
+  result: ModuleResult,
+  callId: string,
+  agentId: string,
+  callData?: EvaluateRequest,
+): Alert[] {
+  if (!result.has_violation) return []
+
+  return [
+    {
+      module_name: moduleName,
+      violation_type: violationType,
+      call_id: callId,
+      agent_id: agentId,
+      result: result.result,
+      agent_email: callData?.agent_email,
+      contact_name: callData?.contact_name,
+      recording_link: callData?.recording_link,
+      transcript_url: callData?.transcript_url,
+      sfdc_lead_id: callData?.sfdc_lead_id,
+      call_duration: callData?.transcript.metadata.duration,
+    },
+  ]
 }

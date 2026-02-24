@@ -1,9 +1,9 @@
-import type { EvalModule, ModuleResult, Alert } from "../types"
+import type { EvalModule, ModuleResult } from "../types"
+import { extractAlerts } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import {
   BudgetInputsSchema,
-  type BudgetInputsResult,
   BUDGET_REQUIRED_FIELDS,
   BUDGET_ALL_FIELDS,
 } from "../../schemas/budget-inputs"
@@ -43,34 +43,15 @@ export const budgetInputsModule: EvalModule = {
     result.budget_collection_overview.items_collected = BUDGET_ALL_FIELDS.length - actualTotalSkipped
     result.budget_collection_overview.budget_compliance_violation = actualViolation
 
-    const hasViolation = actualViolation
-
     return {
       module_name: MODULE_NAMES.BUDGET_INPUTS,
       result,
-      has_violation: hasViolation,
-      violation_type: hasViolation ? VIOLATION_TYPES.BUDGET_COMPLIANCE : null,
+      has_violation: actualViolation,
+      violation_type: actualViolation ? VIOLATION_TYPES.BUDGET_COMPLIANCE : null,
       processing_time_ms: Date.now() - start,
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[] {
-    if (!result.has_violation) return []
-
-    return [
-      {
-        module_name: MODULE_NAMES.BUDGET_INPUTS,
-        violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
-        call_id: callId,
-        agent_id: agentId,
-        result: result.result,
-        agent_email: callData?.agent_email,
-        contact_name: callData?.contact_name,
-        recording_link: callData?.recording_link,
-        transcript_url: callData?.transcript_url,
-        sfdc_lead_id: callData?.sfdc_lead_id,
-        call_duration: callData?.transcript.metadata.duration,
-      },
-    ]
-  },
+  extractAlerts: (result, callId, agentId, callData) =>
+    extractAlerts(MODULE_NAMES.BUDGET_INPUTS, VIOLATION_TYPES.BUDGET_COMPLIANCE, result, callId, agentId, callData),
 }

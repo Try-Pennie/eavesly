@@ -1,10 +1,8 @@
-import type { EvalModule, ModuleResult, Alert } from "../types"
+import type { EvalModule, ModuleResult } from "../types"
+import { extractAlerts } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
-import {
-  WarmTransferSchema,
-  type WarmTransferResult,
-} from "../../schemas/warm-transfer"
+import { WarmTransferSchema } from "../../schemas/warm-transfer"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/warm-transfer.txt"
 
@@ -38,23 +36,6 @@ export const warmTransferModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[] {
-    if (!result.has_violation) return []
-
-    return [
-      {
-        module_name: MODULE_NAMES.WARM_TRANSFER,
-        violation_type: VIOLATION_TYPES.WARM_TRANSFER,
-        call_id: callId,
-        agent_id: agentId,
-        result: result.result,
-        agent_email: callData?.agent_email,
-        contact_name: callData?.contact_name,
-        recording_link: callData?.recording_link,
-        transcript_url: callData?.transcript_url,
-        sfdc_lead_id: callData?.sfdc_lead_id,
-        call_duration: callData?.transcript.metadata.duration,
-      },
-    ]
-  },
+  extractAlerts: (result, callId, agentId, callData) =>
+    extractAlerts(MODULE_NAMES.WARM_TRANSFER, VIOLATION_TYPES.WARM_TRANSFER, result, callId, agentId, callData),
 }

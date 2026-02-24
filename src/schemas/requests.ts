@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const TranscriptMetadataSchema = z.object({
+const TranscriptMetadataSchema = z.object({
   duration: z.coerce.number().nonnegative(),
   timestamp: z.string(),
   talk_time: z.coerce.number().nonnegative().optional(),
@@ -8,7 +8,7 @@ export const TranscriptMetadataSchema = z.object({
   campaign_name: z.string().optional(),
 })
 
-export const TranscriptDataSchema = z.object({
+const TranscriptDataSchema = z.object({
   transcript: z.string().max(200000),
   metadata: TranscriptMetadataSchema,
 })
@@ -32,4 +32,4 @@ export const BatchEvaluateRequestSchema = z.object({
   calls: z.array(EvaluateRequestSchema).min(1).max(10),
 })
 
-export type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>
+type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>

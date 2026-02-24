@@ -150,3 +150,9 @@ test_results.log
 # IDE specific (personal preferences)
 .vscode/
 .idea/
+
+# Wrangler temp files
+.wrangler/
+
+# Python virtual environments
+.venv/

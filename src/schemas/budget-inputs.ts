@@ -64,7 +64,7 @@ export const BUDGET_REQUIRED_FIELDS = [
   "health_and_life_insurance",
 ] as const
 
-export const BUDGET_OPTIONAL_FIELDS = [
+const BUDGET_OPTIONAL_FIELDS = [
   "household",
   "personal_care",
   "student_loans",

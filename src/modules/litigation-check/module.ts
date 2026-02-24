@@ -1,10 +1,8 @@
-import type { EvalModule, ModuleResult, Alert } from "../types"
+import type { EvalModule, ModuleResult } from "../types"
+import { extractAlerts } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
-import {
-  LitigationCheckSchema,
-  type LitigationCheckResult,
-} from "../../schemas/litigation-check"
+import { LitigationCheckSchema } from "../../schemas/litigation-check"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import systemPrompt from "../../../prompts/litigation-check.txt"
 
@@ -41,23 +39,6 @@ export const litigationCheckModule: EvalModule = {
     }
   },
 
-  extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[] {
-    if (!result.has_violation) return []
-
-    return [
-      {
-        module_name: MODULE_NAMES.LITIGATION_CHECK,
-        violation_type: VIOLATION_TYPES.LITIGATION_CHECK,
-        call_id: callId,
-        agent_id: agentId,
-        result: result.result,
-        agent_email: callData?.agent_email,
-        contact_name: callData?.contact_name,
-        recording_link: callData?.recording_link,
-        transcript_url: callData?.transcript_url,
-        sfdc_lead_id: callData?.sfdc_lead_id,
-        call_duration: callData?.transcript.metadata.duration,
-      },
-    ]
-  },
+  extractAlerts: (result, callId, agentId, callData) =>
+    extractAlerts(MODULE_NAMES.LITIGATION_CHECK, VIOLATION_TYPES.LITIGATION_CHECK, result, callId, agentId, callData),
 }

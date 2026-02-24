@@ -90,7 +90,7 @@ export async function lookupManagerEmail(
   }
 }
 
-export interface SlackPayload {
+interface SlackPayload {
   call_id: string
   violation_type: string
   module_name: string

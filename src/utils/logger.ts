@@ -1,4 +1,4 @@
-export interface LogContext {
+interface LogContext {
   correlationId?: string
   module?: string
   [key: string]: unknown

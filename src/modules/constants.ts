@@ -12,5 +12,5 @@ export const VIOLATION_TYPES = {
   LITIGATION_CHECK: "litigation_check",
 } as const
 
-export type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]
-export type ViolationType = (typeof VIOLATION_TYPES)[keyof typeof VIOLATION_TYPES]
+type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]
+type ViolationType = (typeof VIOLATION_TYPES)[keyof typeof VIOLATION_TYPES]
