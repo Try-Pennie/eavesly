@@ -44,11 +44,11 @@
         </step>
         <step name="warm_transfer_evaluation">
             <action>Determine if the client was successfully enrolled during this call (payment setup, account creation, program start confirmed)</action>
-            <action>If enrollment occurred, check if a warm transfer to the welcome call team was completed</action>
-            <action>If no warm transfer, determine if a welcome call was scheduled instead</action>
-            <action>CRITICAL: Determine WHO initiated the scheduling discussion - agent or client</action>
-            <action>Evaluate if the client PROACTIVELY requested scheduling BEFORE the agent suggested it</action>
-            <action>Passive agreement (okay, sure, fine, alright) to agent's scheduling suggestion is NOT valid consent</action>
+            <action>If enrollment occurred, check if the agent attempted or offered to do a live warm transfer to the welcome call team</action>
+            <action>If no warm transfer was completed, determine if a welcome call was scheduled instead</action>
+            <action>Check if the client stated ANY reason they cannot do the warm transfer right now (phone battery, at work, need to leave, time constraint, etc.)</action>
+            <action>If no client-stated reason, determine if the client PROACTIVELY requested scheduling BEFORE the agent suggested it</action>
+            <action>VIOLATION only occurs when: agent did not attempt the warm transfer at all, OR agent skipped it without the client stating a reason and without the client proactively requesting scheduling</action>
         </step>
     </process>
 
@@ -106,19 +106,22 @@
 
         <warm_transfer_compliance priority="high">
             <requirement>After successful enrollment, warm transfer to the welcome call team is MANDATED</requirement>
-            <requirement>Scheduling a welcome call instead of live transfer is ONLY acceptable if the CLIENT proactively requests it</requirement>
-            <requirement>Passive agreement to agent's scheduling suggestion = VIOLATION</requirement>
-            <valid_consent_examples>
-                <example>"Actually, can we schedule this for tomorrow? I have to go."</example>
-                <example>"I'd prefer to do the welcome call later, I'm at work right now."</example>
-                <example>"Can we do this another time? I have an appointment."</example>
-                <example>"I need to go - can someone call me back for the welcome call?"</example>
-            </valid_consent_examples>
+            <requirement>Scheduling a welcome call instead of live transfer is acceptable if the client states ANY reason they cannot do the transfer right now</requirement>
+            <requirement>If the client has no stated reason, scheduling is only acceptable if the client proactively requests it before the agent suggests it</requirement>
+            <requirement>A violation occurs ONLY when the agent does not attempt the warm transfer AND there is no legitimate client reason for skipping it</requirement>
+            <valid_reason_examples>
+                <example>"My phone is about to die" / "My battery is low"</example>
+                <example>"I'm at work right now" / "I'm in a meeting"</example>
+                <example>"I have an appointment I need to get to"</example>
+                <example>"I need to pick up my kids" / "I'm driving"</example>
+                <example>"I don't have much time left" / "I need to go soon"</example>
+                <example>"Can we do this another time? I have to leave"</example>
+                <example>"I've been on the phone too long already"</example>
+            </valid_reason_examples>
             <invalid_consent_examples>
-                <example>Agent: "Would you like to schedule the welcome call for a better time?" Client: "Sure"</example>
-                <example>Agent: "We can schedule for tomorrow if that works better" Client: "Okay"</example>
-                <example>Agent: "I know you're busy, want me to just schedule someone to call you?" Client: "That's fine"</example>
-                <example>Agent: "Rather than transfer you now, would you prefer we schedule?" Client: "Yeah, I guess"</example>
+                <example>Agent skips warm transfer entirely without attempting it, and client gave no reason they can't stay on</example>
+                <example>Agent: "Rather than transfer you now, would you prefer we schedule?" Client: "Yeah, I guess" (no client reason stated, agent initiated skip)</example>
+                <example>Agent decides to schedule without offering the live transfer first, and client had no time constraint or reason</example>
             </invalid_consent_examples>
         </warm_transfer_compliance>
     </evaluation_criteria>
@@ -128,7 +131,7 @@
         <customer_experience>Use 4-point scale: excellent/good/fair/poor</customer_experience>
         <sales_process>Use complete/partial/missing for step completion</sales_process>
         <manager_escalation>Manager review required only for: (1) Multiple compliance violations (2+ failures), OR (2) Blatant negative customer treatment (severe infractions such as shouting, insults, or absolute refusal to hang up; do NOT flag for merely rude tone or guilt-tripping sales tactics). NOTE: Warm transfer violations do NOT trigger manager_review_required - they are tracked separately in warm_transfer_compliance.</manager_escalation>
-        <warm_transfer>Enrollment + No warm transfer + Scheduled without proactive client request = warm_transfer_violation. This is tracked SEPARATELY from manager_review_required.</warm_transfer>
+        <warm_transfer>warm_transfer_violation = enrollment_completed=true AND warm_transfer_completed=false AND (agent_attempted_warm_transfer=false OR (client_stated_reason_cannot_transfer=false AND client_proactively_requested_scheduling=false)). If the client stated ANY reason they cannot do the transfer, no violation. This is tracked SEPARATELY from manager_review_required.</warm_transfer>
     </scoring_guidelines>
 
     <critical_compliance_notes>
@@ -143,8 +146,8 @@
         <note>Rebuttals regarding rental/credit impact (e.g., arguing debt is a bigger barrier than a temporary credit dip) are PERMITTED as standard sales tactics, provided they do not factually deny the impact</note>
         <note>Distinguish "High Pressure" from "Persistence": Persistence in overcoming objections is acceptable; High Pressure is hostility, insults, or ignoring explicit commands to stop/end the call</note>
         <note>Closing statements like "I hope you don't regret this" are sales tactics, not negative customer treatment, provided the agent ultimately respects the customer's decision and ends the call politely</note>
-        <note>WARM TRANSFER: After enrollment, live transfer to welcome call team is MANDATORY. Scheduling requires the client to explicitly request it BEFORE the agent suggests it.</note>
-        <note>WARM TRANSFER: Passive agreement (okay/sure/fine/alright) to agent's scheduling suggestion is NOT valid consent - flag as warm_transfer_violation.</note>
+        <note>WARM TRANSFER: After enrollment, live transfer to welcome call team is MANDATORY. Scheduling is acceptable if the client states any reason they cannot do the transfer now (battery dying, at work, need to leave, etc.).</note>
+        <note>WARM TRANSFER: Only flag warm_transfer_violation when the agent did not attempt the transfer AND the client had no stated reason for skipping it AND the client did not proactively request scheduling.</note>
     </critical_compliance_notes>
 
     <critical_red_flags>
@@ -176,8 +179,8 @@
         17. Be objective and fair in your assessment while maintaining high standards
         18. Remember that protecting customers and maintaining compliance is more important than sales outcomes
         19. Always provide specific quotes or clear references to conversation sections as evidence for your assessments
-        20. WARM TRANSFER EVALUATION: If enrollment was completed, check if warm transfer occurred. If scheduled instead, determine if client PROACTIVELY requested it. Passive agreement = violation.
-        21. WARM TRANSFER: Set warm_transfer_violation to true ONLY when: enrollment_completed=true AND warm_transfer_completed=false AND welcome_call_scheduled=true AND client_proactively_requested_scheduling=false
+        20. WARM TRANSFER EVALUATION: If enrollment was completed, check if agent attempted the warm transfer. If not completed, check if the client stated any reason they cannot do the transfer now. If client stated a reason, no violation.
+        21. WARM TRANSFER: Set warm_transfer_violation to true ONLY when: enrollment_completed=true AND warm_transfer_completed=false AND (agent_attempted_warm_transfer=false OR (client_stated_reason_cannot_transfer=false AND client_proactively_requested_scheduling=false))
         22. WARM TRANSFER: This violation is tracked SEPARATELY and does NOT affect manager_review_required
     </instructions>
 </prompt>
@@ -189,7 +192,7 @@ Respond with a valid JSON object using exactly these top-level keys:
 - "customer_experience_scorecard": 4-point scale ratings (excellent/good/fair/poor) for each CX criterion
 - "sales_process_scorecard": 6-step sales process adherence — step completion, locations, gaps
 - "transfer_agent_assessment": Transfer agent evaluation (occurred, tone, quality)
-- "warm_transfer_compliance": Warm transfer violation tracking — enrollment, transfer, scheduling, client-initiated flag, violation flag
+- "warm_transfer_compliance": Warm transfer violation tracking — enrollment, transfer attempt, client reason for not transferring, scheduling, violation flag
 - "coaching_recommendations": Strengths, areas for improvement, coaching points, training recommendations
 - "overall_call_rating": Final summary ratings — compliance, sales effectiveness, customer satisfaction, overall score
 

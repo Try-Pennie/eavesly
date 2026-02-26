@@ -91,6 +91,9 @@ export const WarmTransferSchema = z.object({
   warm_transfer_compliance: z.object({
     enrollment_completed: z.boolean(),
     warm_transfer_completed: z.boolean(),
+    agent_attempted_warm_transfer: z.boolean(),
+    client_stated_reason_cannot_transfer: z.boolean(),
+    client_stated_reason: z.string(),
     welcome_call_scheduled: z.boolean(),
     client_proactively_requested_scheduling: z.boolean(),
     warm_transfer_violation: z.boolean(),
