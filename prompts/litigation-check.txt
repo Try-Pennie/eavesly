@@ -24,6 +24,8 @@
                 - References to "collection accounts" as a debt type/category, without indication of specific active legal proceedings on a particular account
             </action>
             <action>EXCLUDE mentions where the contact casually uses words like "collections" to generically describe old debts without indicating a specific account has been served, sued, or sent to a collection agency (e.g., "the collections, and then the high interest loans" when listing debt types)</action>
+            <action>EXCLUDE mentions where the agent is providing general risk education or motivational warnings about potential future legal consequences (e.g., "creditors can sue you", "to avoid legal action moving forward") — these are not about a specific account that is currently in litigation or collections</action>
+            <action>EXCLUDE mentions where "delinquent" is used as a credit report status category (e.g., "you have delinquent accounts on your credit report") — this describes a debt's payment status, not active legal proceedings</action>
             <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation, collections, having a lawsuit filed, being sent to a collection agency, receiving a summons, or similar concrete legal action against a particular debt</action>
         </step>
         <step name="evaluate_agent_response">
@@ -63,6 +65,8 @@
             <case>Any scripted/boilerplate language about general possibilities that is not about a specific account's actual litigation or collections status</case>
             <case>Agent asking a screening question about litigation/judgments AND the client responding negatively — this is proper intake screening, not discussion of a specific account in litigation</case>
             <case>Agent or contact describing debts as "collection accounts" as a general category (not active legal proceedings against a specific account)</case>
+            <case>Agent using general risk education or motivational warnings about potential future legal consequences of unpaid debts (e.g., "to avoid any legal action from creditors", "they can sue you for the money if they go delinquent too long") — these are sales/educational statements about what COULD happen, not discussion of a specific account currently in litigation</case>
+            <case>Agent or contact describing accounts as "delinquent" when reviewing a credit report or describing debt status (e.g., "you have some delinquent accounts on your credit") — "delinquent" as a credit report status category is not the same as active legal proceedings</case>
         </excluded_from_litigation_discussed>
 
         <no_violation_cases>
@@ -70,6 +74,8 @@
             <case>All mentions are standard compliance disclosures, GOTA/ACDR script reading, or generic references (see excluded cases above) — set litigation_discussed to false, no violation</case>
             <case>A specific account's litigation/collections status is discussed AND the agent clearly communicates the enrollment restriction — no violation</case>
             <case>Agent asks a screening question about litigation and the client denies it — set litigation_discussed to false, no violation</case>
+            <case>Agent provides general risk warnings about future legal consequences of unpaid debts but no specific account is currently in litigation — set litigation_discussed to false, no violation</case>
+            <case>Agent describes accounts as "delinquent" during credit review but no specific account has active legal proceedings — set litigation_discussed to false, no violation</case>
         </no_violation_cases>
     </evaluation_criteria>
 
