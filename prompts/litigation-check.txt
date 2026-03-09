@@ -26,6 +26,8 @@
             <action>EXCLUDE mentions where the contact casually uses words like "collections" to generically describe old debts without indicating a specific account has been served, sued, or sent to a collection agency (e.g., "the collections, and then the high interest loans" when listing debt types)</action>
             <action>EXCLUDE mentions where the agent is providing general risk education or motivational warnings about potential future legal consequences (e.g., "creditors can sue you", "to avoid legal action moving forward") — these are not about a specific account that is currently in litigation or collections</action>
             <action>EXCLUDE mentions where "delinquent" is used as a credit report status category (e.g., "you have delinquent accounts on your credit report") — this describes a debt's payment status, not active legal proceedings</action>
+            <action>EXCLUDE mentions where accounts are discussed as being "in collections" or with third-party collection agencies (debt collectors), but no active legal proceedings are indicated. Having a debt transferred to a collection agency is a common debt lifecycle stage, not litigation. Only flag these accounts if there is specific indication of a lawsuit, summons, judgment, garnishment, or other court action on the account.</action>
+            <action>EXCLUDE mentions where the agent discusses collection accounts and then asks a follow-up screening question about summons/litigation, and the client responds negatively. The agent's screening question + client's denial clears the concern for those accounts.</action>
             <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation, collections, having a lawsuit filed, being sent to a collection agency, receiving a summons, or similar concrete legal action against a particular debt</action>
         </step>
         <step name="evaluate_agent_response">
@@ -67,6 +69,8 @@
             <case>Agent or contact describing debts as "collection accounts" as a general category (not active legal proceedings against a specific account)</case>
             <case>Agent using general risk education or motivational warnings about potential future legal consequences of unpaid debts (e.g., "to avoid any legal action from creditors", "they can sue you for the money if they go delinquent too long") — these are sales/educational statements about what COULD happen, not discussion of a specific account currently in litigation</case>
             <case>Agent or contact describing accounts as "delinquent" when reviewing a credit report or describing debt status (e.g., "you have some delinquent accounts on your credit") — "delinquent" as a credit report status category is not the same as active legal proceedings</case>
+            <case>Agent or contact discussing accounts that have been transferred to or are being managed by third-party collection agencies — this describes a debt's collection status, not active legal proceedings. A debt being "in collections" or "with a collection agency" is a common stage in the debt lifecycle and does not by itself indicate litigation.</case>
+            <case>Agent asks a follow-up screening question about summons, lawsuits, or litigation on accounts that are in collections, and the client responds negatively — the screening question clears the litigation concern for those accounts.</case>
         </excluded_from_litigation_discussed>
 
         <no_violation_cases>
@@ -76,6 +80,7 @@
             <case>Agent asks a screening question about litigation and the client denies it — set litigation_discussed to false, no violation</case>
             <case>Agent provides general risk warnings about future legal consequences of unpaid debts but no specific account is currently in litigation — set litigation_discussed to false, no violation</case>
             <case>Agent describes accounts as "delinquent" during credit review but no specific account has active legal proceedings — set litigation_discussed to false, no violation</case>
+            <case>Specific accounts are discussed as being in collections or with collection agencies, the agent asks about summons/litigation, and the client denies any active legal proceedings — set litigation_discussed to false, no violation</case>
         </no_violation_cases>
     </evaluation_criteria>
 
