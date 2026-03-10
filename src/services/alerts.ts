@@ -35,29 +35,34 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
     callId: alert.call_id,
   })
 
-  if (!env.SLACK_WEBHOOK_URL) {
-    log("warn", "SLACK_WEBHOOK_URL not set, skipping Slack notification", {
+  const isFullQA = alert.violation_type === VIOLATION_TYPES.MANAGER_ESCALATION
+  const webhookUrl = isFullQA ? env.SLACK_WEBHOOK_URL_FULL_QA : env.SLACK_WEBHOOK_URL
+
+  if (!webhookUrl) {
+    log("warn", `${isFullQA ? "SLACK_WEBHOOK_URL_FULL_QA" : "SLACK_WEBHOOK_URL"} not set, skipping Slack notification`, {
       callId: alert.call_id,
     })
     return
   }
 
   const managerEmail = await lookupManagerEmail(env, alert.agent_email)
-  const payload = buildSlackPayload(alert, managerEmail)
+  const payload = isFullQA
+    ? buildFullQASlackPayload(alert, managerEmail)
+    : buildSlackPayload(alert, managerEmail)
 
   log("info", "Slack payload built", {
     callId: alert.call_id,
     fields: Object.fromEntries(
-      Object.entries(payload).map(([k, v]) => [k, v ? v.length : 0])
+      Object.entries(payload).map(([k, v]) => [k, typeof v === "string" ? v.length : 0])
     ),
   })
 
   log("info", "Sending Slack webhook", {
     callId: alert.call_id,
-    webhookUrlTail: env.SLACK_WEBHOOK_URL.slice(-8),
+    webhookUrlTail: webhookUrl.slice(-8),
   })
 
-  await sendSlackWebhook(env.SLACK_WEBHOOK_URL, payload)
+  await sendSlackWebhook(webhookUrl, payload)
 }
 
 export async function lookupManagerEmail(
@@ -105,6 +110,44 @@ interface SlackPayload {
   transcript_url: string
   sfdc_lead_id: string
   call_duration: string
+}
+
+interface FullQASlackPayload {
+  manager_review_reason: string
+  agent_email: string
+  manager_email: string
+  call_id: string
+  sfdc_lead_id: string
+  contact_name: string
+  call_duration: string
+  overall_tone: string
+  call_outcome: string
+  compliance_violations: string
+  areas_for_improvement: string
+  specific_coaching_points: string
+  transcript_url: string
+  recording_link: string
+}
+
+export function buildFullQASlackPayload(alert: Alert, managerEmail = ""): FullQASlackPayload {
+  const result = alert.result as FullQAResult | undefined
+
+  return {
+    manager_review_reason: result?.call_overview?.manager_review_reason || "",
+    agent_email: alert.agent_email ?? "",
+    manager_email: managerEmail,
+    call_id: alert.call_id,
+    sfdc_lead_id: alert.sfdc_lead_id ?? "",
+    contact_name: alert.contact_name ?? "",
+    call_duration: formatDuration(alert.call_duration),
+    overall_tone: result?.call_overview?.overall_tone || "",
+    call_outcome: result?.call_overview?.call_outcome || "",
+    compliance_violations: result?.compliance_scorecard?.compliance_violations?.join("\n") || "",
+    areas_for_improvement: result?.coaching_recommendations?.areas_for_improvement?.join("\n") || "",
+    specific_coaching_points: result?.coaching_recommendations?.specific_coaching_points?.join("\n") || "",
+    transcript_url: alert.transcript_url ?? "",
+    recording_link: alert.recording_link ?? "",
+  }
 }
 
 export function formatDuration(seconds?: number): string {
@@ -269,7 +312,7 @@ function extractDetail(alert: Alert): string {
 
 async function sendSlackWebhook(
   url: string,
-  payload: SlackPayload,
+  payload: SlackPayload | FullQASlackPayload,
 ): Promise<void> {
   const response = await fetch(url, {
     method: "POST",

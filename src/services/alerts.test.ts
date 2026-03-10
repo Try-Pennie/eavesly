@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { dispatchAlerts, buildSlackPayload, buildSummary, lookupManagerEmail, formatDuration } from "./alerts"
+import { dispatchAlerts, buildSlackPayload, buildFullQASlackPayload, buildSummary, lookupManagerEmail, formatDuration } from "./alerts"
 import type { Alert } from "../modules/types"
 import type { Bindings } from "../types/env"
 import { createEnv } from "../../test/helpers/mock-env"
@@ -81,13 +81,33 @@ describe("dispatchAlerts", () => {
     expect(passedArg).toBeInstanceOf(Promise)
   })
 
-  it("POSTs to Slack webhook when URL is set", async () => {
+  it("POSTs full_qa alerts to SLACK_WEBHOOK_URL_FULL_QA", async () => {
     const ctx = createMockCtx()
     const env = createEnv()
     const alert = createAlert({ result: violationFixture })
 
     await dispatchAlerts([alert], ctx, env)
-    // waitUntil captures the promise; resolve it
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).toHaveBeenCalledWith(
+      env.SLACK_WEBHOOK_URL_FULL_QA,
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    )
+  })
+
+  it("POSTs non-full_qa alerts to SLACK_WEBHOOK_URL", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
 
     expect(fetch).toHaveBeenCalledWith(
@@ -99,7 +119,7 @@ describe("dispatchAlerts", () => {
     )
   })
 
-  it("sends correct payload shape to Slack", async () => {
+  it("sends full_qa payload shape to Slack", async () => {
     const ctx = createMockCtx()
     const env = createEnv()
     const alert = createAlert({
@@ -113,18 +133,31 @@ describe("dispatchAlerts", () => {
 
     const body = JSON.parse((fetch as any).mock.calls[0][1].body)
     expect(body.call_id).toBe("call-abc")
-    expect(body.module_name).toBe(MODULE_NAMES.FULL_QA)
-    expect(body.violation_type).toBe(VIOLATION_TYPES.MANAGER_ESCALATION)
-    expect(body.summary).toContain("call-abc")
-    expect(body.timestamp).toBeTruthy()
-    expect(body).toHaveProperty("evidence")
-    expect(body).toHaveProperty("detail")
-    expect(body).toHaveProperty("call_duration")
+    expect(body.manager_review_reason).toBe(violationFixture.call_overview.manager_review_reason)
+    expect(body.overall_tone).toBe(violationFixture.call_overview.overall_tone)
+    expect(body.call_outcome).toBe(violationFixture.call_overview.call_outcome)
+    expect(body).toHaveProperty("compliance_violations")
+    expect(body).toHaveProperty("areas_for_improvement")
+    expect(body).toHaveProperty("specific_coaching_points")
   })
 
-  it("skips webhook when SLACK_WEBHOOK_URL is not set", async () => {
+  it("skips webhook when SLACK_WEBHOOK_URL is not set for non-full_qa alerts", async () => {
     const ctx = createMockCtx()
     const env = createEnv({ SLACK_WEBHOOK_URL: undefined })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it("skips webhook when SLACK_WEBHOOK_URL_FULL_QA is not set for full_qa alerts", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv({ SLACK_WEBHOOK_URL_FULL_QA: undefined })
 
     await dispatchAlerts([createAlert()], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -153,7 +186,12 @@ describe("dispatchAlerts", () => {
     })
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: "agent@example.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "agent@example.com",
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -166,7 +204,12 @@ describe("dispatchAlerts", () => {
     mockSingle.mockResolvedValue({ data: null, error: { code: "PGRST116" } })
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: "unknown@example.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "unknown@example.com",
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -182,7 +225,12 @@ describe("dispatchAlerts", () => {
     })
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: "agent@example.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "agent@example.com",
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -198,7 +246,12 @@ describe("dispatchAlerts", () => {
     })
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: "agent@example.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "agent@example.com",
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -210,7 +263,12 @@ describe("dispatchAlerts", () => {
   it("sends empty manager email when agent_email is undefined", async () => {
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: undefined })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: undefined,
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -224,7 +282,12 @@ describe("dispatchAlerts", () => {
     mockSingle.mockRejectedValue(new Error("DB connection failed"))
     const ctx = createMockCtx()
     const env = createEnv()
-    const alert = createAlert({ agent_email: "agent@example.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "agent@example.com",
+      result: budgetViolationFixture,
+    })
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
@@ -324,6 +387,50 @@ describe("buildSlackPayload", () => {
     const notCollectedIdx = payload.detail.indexOf("❌ Not Collected")
     const collectedIdx = payload.detail.indexOf("✅ Collected")
     expect(notCollectedIdx).toBeLessThan(collectedIdx)
+  })
+})
+
+describe("buildFullQASlackPayload", () => {
+  it("extracts all fields from a full_qa violation result", () => {
+    const alert = createAlert({
+      call_id: "call-123",
+      agent_email: "agent@example.com",
+      contact_name: "John Doe",
+      sfdc_lead_id: "00Q123",
+      call_duration: 300,
+      recording_link: "https://recording.example.com/123",
+      transcript_url: "https://transcript.example.com/123",
+      result: violationFixture,
+    })
+    const payload = buildFullQASlackPayload(alert, "manager@example.com")
+
+    expect(payload.manager_review_reason).toBe(violationFixture.call_overview.manager_review_reason)
+    expect(payload.agent_email).toBe("agent@example.com")
+    expect(payload.manager_email).toBe("manager@example.com")
+    expect(payload.call_id).toBe("call-123")
+    expect(payload.sfdc_lead_id).toBe("00Q123")
+    expect(payload.contact_name).toBe("John Doe")
+    expect(payload.call_duration).toBe("5m 0s")
+    expect(payload.overall_tone).toBe(violationFixture.call_overview.overall_tone)
+    expect(payload.call_outcome).toBe(violationFixture.call_overview.call_outcome)
+    expect(payload.compliance_violations).toBe(violationFixture.compliance_scorecard.compliance_violations.join("\n"))
+    expect(payload.areas_for_improvement).toBe(violationFixture.coaching_recommendations.areas_for_improvement.join("\n"))
+    expect(payload.specific_coaching_points).toBe(violationFixture.coaching_recommendations.specific_coaching_points.join("\n"))
+    expect(payload.transcript_url).toBe("https://transcript.example.com/123")
+    expect(payload.recording_link).toBe("https://recording.example.com/123")
+  })
+
+  it("defaults all fields gracefully when result is empty", () => {
+    const alert = createAlert({ result: {} })
+    const payload = buildFullQASlackPayload(alert)
+
+    expect(payload.manager_review_reason).toBe("")
+    expect(payload.manager_email).toBe("")
+    expect(payload.overall_tone).toBe("")
+    expect(payload.call_outcome).toBe("")
+    expect(payload.compliance_violations).toBe("")
+    expect(payload.areas_for_improvement).toBe("")
+    expect(payload.specific_coaching_points).toBe("")
   })
 })
 

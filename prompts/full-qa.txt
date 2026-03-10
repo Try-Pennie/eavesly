@@ -45,7 +45,7 @@
 
     <evaluation_criteria>
         <compliance_requirements priority="highest">
-            <requirement name="credit_pull_consent">Did the agent obtain explicit verbal consent before pulling credit ("Do I have your permission to pull your credit?")?</requirement>
+            <requirement name="credit_pull_consent">Did the agent obtain verbal consent before pulling credit? The agent should ask for permission (e.g., "Do I have your permission to pull your credit?") and the customer must give a clear affirmative response (e.g., "yes", "mhmm", "yeah", "sure", "okay"). Any recognizable verbal affirmative counts as consent.</requirement>
             <requirement name="social_security_verification">Did the agent properly request and verify SSN for security purposes?</requirement>
             <requirement name="accurate_representations">Did the agent make only truthful statements about Pennie's services, processes, and potential outcomes?</requirement>
             <requirement name="no_misleading_claims">Did the agent avoid making unrealistic promises or guarantees about debt resolution outcomes?</requirement>
@@ -105,7 +105,7 @@
 
     <critical_compliance_notes>
         <note>Pennie is NOT a lender - they work with a network of 1,000+ financial partners</note>
-        <note>Credit pulls must be explicitly authorized with customer saying "yes" or "I agree"</note>
+        <note>Credit pulls must be explicitly authorized with customer giving clear verbal affirmation (e.g., "yes", "I agree", "mhmm", "yeah", "sure", "okay", "go ahead"). The key requirement is that the agent ASKED for permission and the customer gave an affirmative response — not that specific magic words were used.</note>
         <note>Debt resolution is presented as education, not high-pressure sales</note>
         <note>All representations about savings, timelines, and outcomes must be realistic</note>
         <note>Customer's financial situation should drive recommendations, not sales quotas</note>

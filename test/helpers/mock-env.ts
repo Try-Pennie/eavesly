@@ -13,6 +13,7 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     CF_GATEWAY_ID: "test-gateway",
     CF_AIG_TOKEN: "test-token",
     SLACK_WEBHOOK_URL: "https://hooks.slack.com/workflows/test",
+    SLACK_WEBHOOK_URL_FULL_QA: "https://hooks.slack.com/workflows/test-full-qa",
     EVALUATION_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
     ...overrides,
   }
