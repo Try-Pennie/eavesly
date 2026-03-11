@@ -55,25 +55,22 @@ export class DatabaseService {
   ): Promise<void> {
     const { error } = await this.client
       .from("eavesly_transcription_qa")
-      .upsert(
-        {
-          call_id: callData.call_id,
-          agent_email: callData.agent_email ?? null,
-          sfdc_lead_id: callData.sfdc_lead_id ?? null,
-          overall_score: qaResult.overall_call_rating?.overall_score ?? null,
-          compliance_rating: qaResult.overall_call_rating?.compliance_rating ?? null,
-          customer_satisfaction_likely: qaResult.overall_call_rating?.customer_satisfaction_likely ?? null,
-          manager_escalation: qaResult.call_overview?.manager_review_required ?? false,
-          call_summary: qaResult.call_overview?.call_outcome ?? null,
-          qa_json: qaResult,
-          original_transcript: callData.transcript.transcript,
-          transcription_link: callData.transcript_url ?? null,
-          recording_link: callData.recording_link ?? null,
-          manager_email: managerEmail || null,
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: "call_id" },
-      )
+      .insert({
+        call_id: callData.call_id,
+        agent_email: callData.agent_email ?? null,
+        sfdc_lead_id: callData.sfdc_lead_id ?? null,
+        overall_score: qaResult.overall_call_rating?.overall_score ?? null,
+        compliance_rating: qaResult.overall_call_rating?.compliance_rating ?? null,
+        customer_satisfaction_likely: qaResult.overall_call_rating?.customer_satisfaction_likely ?? null,
+        manager_escalation: qaResult.call_overview?.manager_review_required ?? false,
+        call_summary: qaResult.call_overview?.call_outcome ?? null,
+        qa_json: qaResult,
+        original_transcript: callData.transcript.transcript,
+        transcription_link: callData.transcript_url ?? null,
+        recording_link: callData.recording_link ?? null,
+        manager_email: managerEmail || null,
+        created_at: new Date().toISOString(),
+      })
 
     if (error) {
       log("warn", "Failed to store QA result to legacy table", {

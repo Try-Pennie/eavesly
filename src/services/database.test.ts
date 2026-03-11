@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createEnv } from "../../test/helpers/mock-env"
 
 const mockUpsert = vi.fn()
+const mockInsert = vi.fn()
 const mockSelect = vi.fn()
 const mockFrom = vi.fn()
 
@@ -16,13 +17,16 @@ import { DatabaseService } from "./database"
 describe("DatabaseService", () => {
   beforeEach(() => {
     mockUpsert.mockReset()
+    mockInsert.mockReset()
     mockSelect.mockReset()
     mockFrom.mockReset()
     mockFrom.mockImplementation(() => ({
       upsert: mockUpsert,
+      insert: mockInsert,
       select: mockSelect,
     }))
     mockUpsert.mockResolvedValue({ error: null })
+    mockInsert.mockResolvedValue({ error: null })
     mockSelect.mockReturnValue({
       limit: vi.fn().mockResolvedValue({ error: null }),
     })
@@ -187,7 +191,7 @@ describe("DatabaseService", () => {
       const db = new DatabaseService(createEnv())
       await db.storeQAResult(mockCallData, mockQaResult, "manager@test.com")
 
-      expect(mockUpsert).toHaveBeenCalledWith(
+      expect(mockInsert).toHaveBeenCalledWith(
         expect.objectContaining({
           call_id: "call-1",
           agent_email: "agent@test.com",
@@ -203,12 +207,11 @@ describe("DatabaseService", () => {
           recording_link: "https://example.com/recording",
           manager_email: "manager@test.com",
         }),
-        { onConflict: "call_id" },
       )
     })
 
     it("does not throw on error (non-fatal)", async () => {
-      mockUpsert.mockResolvedValue({ error: { message: "Legacy table error" } })
+      mockInsert.mockResolvedValue({ error: { message: "Legacy table error" } })
       const db = new DatabaseService(createEnv())
       // Should not throw
       await db.storeQAResult(mockCallData, {}, "")
