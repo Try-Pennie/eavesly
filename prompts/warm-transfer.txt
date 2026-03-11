@@ -183,6 +183,12 @@
         21. WARM TRANSFER: Set warm_transfer_violation to true ONLY when: enrollment_completed=true AND warm_transfer_completed=false AND (agent_attempted_warm_transfer=false OR (client_stated_reason_cannot_transfer=false AND client_proactively_requested_scheduling=false))
         22. WARM TRANSFER: This violation is tracked SEPARATELY and does NOT affect manager_review_required
     </instructions>
+    <prior_call_context>
+        <note>The user prompt may include a &lt;prior_call_history&gt; block before the transcript. This contains summaries of previous calls with the same lead.</note>
+        <note>When prior call history is present, this is NOT the first interaction with the lead. The agent may reference prior conversations or follow up on previous topics.</note>
+        <note>Warm transfer compliance should only be evaluated based on what happens during THIS call. If the client was enrolled on a prior call (not this one), do not expect a warm transfer on this call.</note>
+        <note>If no &lt;prior_call_history&gt; block is present, evaluate the call as a standalone interaction.</note>
+    </prior_call_context>
 </prompt>
 
 Respond with a valid JSON object using exactly these top-level keys:

@@ -5,6 +5,7 @@ const CollectionMethod = z.enum([
   "customer_volunteered",
   "broad_question",
   "not_collected",
+  "prior_call",
 ])
 
 const BudgetCategorySchema = z.object({

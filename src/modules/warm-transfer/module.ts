@@ -1,5 +1,5 @@
-import type { EvalModule, ModuleResult } from "../types"
-import { extractAlerts } from "../types"
+import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
+import { extractAlerts, buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { WarmTransferSchema } from "../../schemas/warm-transfer"
@@ -13,10 +13,15 @@ export const warmTransferModule: EvalModule = {
     transcript: string,
     callData: EvaluateRequest,
     llm: LLMClient,
+    callHistory?: CallHistoryContext | null,
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    const userPrompt = `Please evaluate the following enrollment call transcript for warm transfer compliance and full QA:\n\n${transcript}`
+    const userPrompt = buildUserPrompt(
+      "Please evaluate the following enrollment call transcript for warm transfer compliance and full QA:",
+      transcript,
+      callHistory,
+    )
 
     const result = await llm.getStructuredResponse(
       systemPrompt,

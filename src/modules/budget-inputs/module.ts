@@ -1,5 +1,5 @@
-import type { EvalModule, ModuleResult } from "../types"
-import { extractAlerts } from "../types"
+import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
+import { extractAlerts, buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import {
@@ -17,10 +17,15 @@ export const budgetInputsModule: EvalModule = {
     transcript: string,
     callData: EvaluateRequest,
     llm: LLMClient,
+    callHistory?: CallHistoryContext | null,
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    const userPrompt = `Please evaluate the following enrollment call transcript for budget input compliance:\n\n${transcript}`
+    const userPrompt = buildUserPrompt(
+      "Please evaluate the following enrollment call transcript for budget input compliance:",
+      transcript,
+      callHistory,
+    )
 
     const result = await llm.getStructuredResponse(
       systemPrompt,

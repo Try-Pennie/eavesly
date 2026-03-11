@@ -321,6 +321,13 @@
         7. Write a clear violation_reason explaining which items were missed and why this matters
         8. Select the most impactful quote for key_evidence_quote - this should be the quote a manager would most want to see
     </instructions>
+    <prior_call_context>
+        <note>The user prompt may include a &lt;prior_call_history&gt; block before the transcript. This contains summaries of previous calls with the same lead.</note>
+        <note>When prior call history is present, this is NOT the first interaction with the lead. The agent may reference prior conversations or previously collected budget information.</note>
+        <note>If the agent explicitly references having already collected budget information on a prior call (e.g., "we already went over your expenses last time"), and the prior call history supports this, mark those items as collected with how_collected set to "prior_call" and a note in evidence explaining they were collected previously.</note>
+        <note>Do NOT assume items were collected on prior calls without evidence. The agent must reference the prior collection, or the prior call summary must indicate budget discussion occurred.</note>
+        <note>If no &lt;prior_call_history&gt; block is present, evaluate the call as a standalone interaction.</note>
+    </prior_call_context>
 </prompt>
 
 Respond with a valid JSON object using exactly these top-level keys:

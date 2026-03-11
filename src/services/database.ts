@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
-import type { ModuleResult } from "../modules/types"
+import type { ModuleResult, CallHistoryContext, PriorCall } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
 import { log } from "../utils/logger"
 
@@ -96,6 +96,82 @@ export class DatabaseService {
       })
     } catch {
       // Never let logging break the main flow
+    }
+  }
+
+  async getPriorCallContext(
+    sfdcLeadId: string,
+    currentCallId: string,
+  ): Promise<CallHistoryContext | null> {
+    const { count, error: countError } = await this.client
+      .from("eavesly_calls")
+      .select("call_id", { count: "exact", head: true })
+      .eq("sfdc_lead_id", sfdcLeadId)
+      .neq("call_id", currentCallId)
+
+    if (countError) {
+      log("warn", "Failed to fetch prior call count", {
+        sfdcLeadId,
+        error: countError.message,
+      })
+    }
+
+    const totalPriorCalls = count ?? 0
+
+    const { data, error } = await this.client
+      .from("eavesly_calls")
+      .select(`
+        call_id,
+        started_at,
+        disposition,
+        direction,
+        talk_time,
+        agent_email,
+        campaign_name,
+        notes,
+        eavesly_transcription_qa (
+          call_summary,
+          overall_score,
+          compliance_rating
+        )
+      `)
+      .eq("sfdc_lead_id", sfdcLeadId)
+      .neq("call_id", currentCallId)
+      .order("started_at", { ascending: false })
+      .limit(5)
+
+    if (error) {
+      log("warn", "Failed to fetch prior call context", {
+        sfdcLeadId,
+        error: error.message,
+      })
+      return null
+    }
+
+    if (!data || data.length === 0) return null
+
+    const priorCalls: PriorCall[] = data.map((row: any) => {
+      const qa = Array.isArray(row.eavesly_transcription_qa)
+        ? row.eavesly_transcription_qa[0]
+        : row.eavesly_transcription_qa
+      return {
+        call_id: row.call_id,
+        started_at: row.started_at,
+        disposition: row.disposition,
+        direction: row.direction,
+        talk_time: row.talk_time,
+        agent_email: row.agent_email,
+        campaign_name: row.campaign_name,
+        notes: row.notes,
+        call_summary: qa?.call_summary ?? null,
+        overall_score: qa?.overall_score ?? null,
+        compliance_rating: qa?.compliance_rating ?? null,
+      }
+    })
+
+    return {
+      total_prior_calls: totalPriorCalls || priorCalls.length,
+      prior_calls: priorCalls,
     }
   }
 

@@ -22,9 +22,9 @@ export function createLLMClient(env: Bindings) {
     userPrompt: string,
     schema: z.ZodType<T>,
     schemaName: string,
-    options: { temperature?: number; maxTokens?: number } = {},
+    options: { temperature?: number } = {},
   ): Promise<T> {
-    const { temperature = 0.3, maxTokens = 16000 } = options
+    const { temperature = 0.3 } = options
 
     return withRetry(async () => {
       const response = await client.chat.completions.create({
@@ -35,7 +35,6 @@ export function createLLMClient(env: Bindings) {
         ],
         response_format: zodResponseFormat(schema, schemaName),
         temperature,
-        max_tokens: maxTokens,
       })
 
       log("info", "LLM call completed", {

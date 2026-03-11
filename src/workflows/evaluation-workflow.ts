@@ -19,13 +19,23 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     const { moduleName, callData, correlationId } = event.payload
     const mod = getModule(moduleName)
 
+    // Step 0: Fetch prior call context (if sfdc_lead_id available)
+    const callHistory = await step.do("fetch-call-history", {
+      retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+      timeout: "30 seconds",
+    }, async () => {
+      if (!callData.sfdc_lead_id) return null
+      const db = new DatabaseService(this.env)
+      return await db.getPriorCallContext(callData.sfdc_lead_id, callData.call_id)
+    })
+
     // Step 1: LLM evaluation (the expensive step)
     const result = await step.do("evaluate-llm", {
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
       const llm = createLLMClient(this.env)
-      return await mod.evaluate(callData.transcript.transcript, callData, llm)
+      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory)
     })
 
     // Step 2: Store result in Supabase

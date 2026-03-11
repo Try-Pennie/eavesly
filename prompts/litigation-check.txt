@@ -100,6 +100,12 @@
         9. Do NOT flag calls where litigation is never mentioned — most calls will not discuss this topic
         10. Do NOT flag calls where the only mentions are from standard compliance disclosures or generic language — agents are required to read these scripts
     </instructions>
+    <prior_call_context>
+        <note>The user prompt may include a &lt;prior_call_history&gt; block before the transcript. This contains summaries of previous calls with the same lead.</note>
+        <note>When prior call history is present, this is NOT the first interaction with the lead. The agent may reference prior conversations about litigation or account issues.</note>
+        <note>If prior call history shows that a litigation issue was already addressed and the account was removed on a prior call, and the agent references this on the current call, do not flag a new violation for the same account.</note>
+        <note>If no &lt;prior_call_history&gt; block is present, evaluate the call as a standalone interaction.</note>
+    </prior_call_context>
 </prompt>
 
 Respond with a valid JSON object using exactly these top-level keys:

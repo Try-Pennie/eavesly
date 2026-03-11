@@ -147,6 +147,13 @@
         18. Remember that protecting customers and maintaining compliance is more important than sales outcomes
         19. Always provide specific quotes or clear references to conversation sections as evidence for your assessments
     </instructions>
+    <prior_call_context>
+        <note>The user prompt may include a &lt;prior_call_history&gt; block before the transcript. This contains summaries of previous calls with the same lead.</note>
+        <note>When prior call history is present, this is NOT the first interaction with the lead. The agent may reference prior conversations, skip introductory steps already completed, or follow up on previous topics.</note>
+        <note>Do not penalize the agent for skipping sales process steps (e.g., agenda setting, credit review) that were completed on a prior call. Mark such steps as "missing" with a note that they were handled previously, but do not count them as compliance failures or negative performance indicators.</note>
+        <note>Compliance requirements that must be met on EVERY call (e.g., credit pull consent for a new credit pull) should still be evaluated normally regardless of prior call history.</note>
+        <note>If no &lt;prior_call_history&gt; block is present, evaluate the call as a standalone interaction.</note>
+    </prior_call_context>
 </prompt>
 
 Respond with a valid JSON object using exactly these top-level keys:
