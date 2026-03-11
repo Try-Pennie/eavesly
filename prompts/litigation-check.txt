@@ -31,8 +31,8 @@
             <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation, collections, having a lawsuit filed, being sent to a collection agency, receiving a summons, or similar concrete legal action against a particular debt</action>
         </step>
         <step name="evaluate_agent_response">
-            <action>If any mentions remain after filtering (i.e., a specific account's litigation/collections status was discussed), determine whether the AGENT clearly communicated that the account cannot be enrolled or needs to be removed from the program</action>
-            <action>Record the agent's response quote if they communicated the restriction</action>
+            <action>If any mentions remain after filtering (i.e., a specific account's litigation/collections status was discussed), determine whether the AGENT clearly communicated that the account cannot be enrolled or needs to be removed from the program. "Communicating the restriction" includes the agent taking action to remove or exclude the account from the program (e.g., "I'll take that off", "let me remove that one", "we'll leave that one out") — the agent does not need to explicitly say "this account cannot be enrolled" if they are actively removing or excluding it.</action>
+            <action>Record the agent's response quote if they communicated the restriction, including quotes where the agent offers or confirms removal/exclusion of the account</action>
             <action>If the agent did not address the restriction, note this as a violation</action>
         </step>
     </process>
@@ -81,6 +81,7 @@
             <case>Agent provides general risk warnings about future legal consequences of unpaid debts but no specific account is currently in litigation — set litigation_discussed to false, no violation</case>
             <case>Agent describes accounts as "delinquent" during credit review but no specific account has active legal proceedings — set litigation_discussed to false, no violation</case>
             <case>Specific accounts are discussed as being in collections or with collection agencies, the agent asks about summons/litigation, and the client denies any active legal proceedings — set litigation_discussed to false, no violation</case>
+            <case>Agent acknowledges an account's litigation/legal status (e.g., active garnishment, levy, judgment, lawsuit) and removes or excludes it from the program — this satisfies the restriction requirement even without an explicit verbal statement that the account "cannot be enrolled" (e.g., "I'll take that off for you", "let me remove that one", "we won't include that account")</case>
         </no_violation_cases>
     </evaluation_criteria>
 
