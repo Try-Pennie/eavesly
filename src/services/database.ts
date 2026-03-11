@@ -118,42 +118,44 @@ export class DatabaseService {
 
     const totalPriorCalls = count ?? 0
 
-    const { data, error } = await this.client
+    const { data: callData, error: callError } = await this.client
       .from("eavesly_calls")
-      .select(`
-        call_id,
-        started_at,
-        disposition,
-        direction,
-        talk_time,
-        agent_email,
-        campaign_name,
-        notes,
-        eavesly_transcription_qa (
-          call_summary,
-          overall_score,
-          compliance_rating
-        )
-      `)
+      .select("call_id, started_at, disposition, direction, talk_time, agent_email, campaign_name, notes")
       .eq("sfdc_lead_id", sfdcLeadId)
       .neq("call_id", currentCallId)
       .order("started_at", { ascending: false })
       .limit(5)
 
-    if (error) {
+    if (callError) {
       log("warn", "Failed to fetch prior call context", {
         sfdcLeadId,
-        error: error.message,
+        error: callError.message,
       })
       return null
     }
 
-    if (!data || data.length === 0) return null
+    if (!callData || callData.length === 0) return null
 
-    const priorCalls: PriorCall[] = data.map((row: any) => {
-      const qa = Array.isArray(row.eavesly_transcription_qa)
-        ? row.eavesly_transcription_qa[0]
-        : row.eavesly_transcription_qa
+    const callIds = callData.map((row: any) => row.call_id)
+
+    const { data: qaData, error: qaError } = await this.client
+      .from("eavesly_transcription_qa")
+      .select("call_id, call_summary, overall_score, compliance_rating")
+      .in("call_id", callIds)
+
+    if (qaError) {
+      log("warn", "Failed to fetch prior call QA data", {
+        sfdcLeadId,
+        error: qaError.message,
+      })
+    }
+
+    const qaMap = new Map(
+      (qaData ?? []).map((row: any) => [row.call_id, row]),
+    )
+
+    const priorCalls: PriorCall[] = callData.map((row: any) => {
+      const qa = qaMap.get(row.call_id)
       return {
         call_id: row.call_id,
         started_at: row.started_at,
