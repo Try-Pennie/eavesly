@@ -161,22 +161,47 @@ describe("DatabaseService", () => {
   })
 
   describe("storeQAResult()", () => {
+    const mockCallData = {
+      call_id: "call-1",
+      agent_id: "agent-1",
+      agent_email: "agent@test.com",
+      sfdc_lead_id: "lead-1",
+      transcript_url: "https://example.com/transcript",
+      recording_link: "https://example.com/recording",
+      transcript: { transcript: "hello world", metadata: { duration: 60, timestamp: "2026-01-01" } },
+    }
+
+    const mockQaResult = {
+      overall_call_rating: { overall_score: "good", compliance_rating: "pass", customer_satisfaction_likely: "high" },
+      call_overview: { manager_review_required: false, call_outcome: "Call went well" },
+    }
+
     it("upserts to eavesly_transcription_qa table", async () => {
       const db = new DatabaseService(createEnv())
-      await db.storeQAResult("call-1", { qa: "data" }, 150)
+      await db.storeQAResult(mockCallData, mockQaResult, "manager@test.com")
 
       expect(mockFrom).toHaveBeenCalledWith("eavesly_transcription_qa")
     })
 
     it("includes correct fields", async () => {
       const db = new DatabaseService(createEnv())
-      await db.storeQAResult("call-1", { qa: "data" }, 150)
+      await db.storeQAResult(mockCallData, mockQaResult, "manager@test.com")
 
       expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           call_id: "call-1",
-          qa_result: { qa: "data" },
-          processing_time_ms: 150,
+          agent_email: "agent@test.com",
+          sfdc_lead_id: "lead-1",
+          overall_score: "good",
+          compliance_rating: "pass",
+          customer_satisfaction_likely: "high",
+          manager_escalation: false,
+          call_summary: "Call went well",
+          qa_json: mockQaResult,
+          original_transcript: "hello world",
+          transcription_link: "https://example.com/transcript",
+          recording_link: "https://example.com/recording",
+          manager_email: "manager@test.com",
         }),
         { onConflict: "call_id" },
       )
@@ -186,7 +211,7 @@ describe("DatabaseService", () => {
       mockUpsert.mockResolvedValue({ error: { message: "Legacy table error" } })
       const db = new DatabaseService(createEnv())
       // Should not throw
-      await db.storeQAResult("call-1", {}, 50)
+      await db.storeQAResult(mockCallData, {}, "")
     })
   })
 

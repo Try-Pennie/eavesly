@@ -4,7 +4,7 @@ import type { EvaluateRequest } from "../schemas/requests"
 import { getModule } from "./module-registry"
 import { createLLMClient } from "../services/llm-client"
 import { DatabaseService } from "../services/database"
-import { processAlert } from "../services/alerts"
+import { processAlert, lookupManagerEmail } from "../services/alerts"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -57,7 +57,8 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       }, async () => {
         const db = new DatabaseService(this.env)
         const r = result as any
-        await db.storeQAResult(callData.call_id, r.result, r.processing_time_ms)
+        const managerEmail = await lookupManagerEmail(this.env, callData.agent_email)
+        await db.storeQAResult(callData, r.result, managerEmail)
       })
     }
 
