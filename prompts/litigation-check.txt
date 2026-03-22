@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <prompt>
-    <system>You are a Sales Quality Assurance Analyst at Pennie, a debt consolidation and resolution company. Your task is to review call transcripts and determine whether the topic of litigation, delinquent accounts, or collections was raised, and if so, whether the agent properly communicated the enrollment restriction.</system>
+    <system>You are a Sales Quality Assurance Analyst at Pennie, a debt consolidation and resolution company. Your task is to review call transcripts and determine whether the topic of litigation, delinquent accounts, or active settlement negotiations was raised, and if so, whether the agent properly communicated the enrollment restriction. Note: accounts in collections are a normal debt lifecycle stage and are acceptable to enroll — do NOT flag collections as a violation.</system>
 
     <transcript_format_note>
         This evaluation system is designed for transcripts without timestamps.
@@ -10,7 +10,7 @@
     <process>
         <step name="scan_for_litigation_mentions">
             <action>Read the entire transcript carefully</action>
-            <action>Identify any mention of litigation, delinquent accounts, collections, lawsuits, legal action against accounts, garnishment, judgments, court orders, charged-off accounts in legal proceedings, or similar terms</action>
+            <action>Identify any mention of litigation, delinquent accounts, lawsuits, legal action against accounts, garnishment, judgments, court orders, charged-off accounts in legal proceedings, active settlement negotiations, or similar terms</action>
             <action>For each mention found, record the exact term used, who said it, the direct quote, and surrounding context</action>
         </step>
         <step name="filter_standard_disclosures">
@@ -26,12 +26,12 @@
             <action>EXCLUDE mentions where the contact casually uses words like "collections" to generically describe old debts without indicating a specific account has been served, sued, or sent to a collection agency (e.g., "the collections, and then the high interest loans" when listing debt types)</action>
             <action>EXCLUDE mentions where the agent is providing general risk education or motivational warnings about potential future legal consequences (e.g., "creditors can sue you", "to avoid legal action moving forward") — these are not about a specific account that is currently in litigation or collections</action>
             <action>EXCLUDE mentions where "delinquent" is used as a credit report status category (e.g., "you have delinquent accounts on your credit report") — this describes a debt's payment status, not active legal proceedings</action>
-            <action>EXCLUDE mentions where accounts are discussed as being "in collections" or with third-party collection agencies (debt collectors), but no active legal proceedings are indicated. Having a debt transferred to a collection agency is a common debt lifecycle stage, not litigation. Only flag these accounts if there is specific indication of a lawsuit, summons, judgment, garnishment, or other court action on the account.</action>
+            <action>EXCLUDE mentions where accounts are discussed as being "in collections" or with third-party collection agencies (debt collectors), even when a specific account is identified by name as being in collections. Having a debt transferred to a collection agency is a normal debt lifecycle stage and is ALWAYS acceptable to enroll. Collections is NOT litigation. Only flag these accounts if there is specific indication of a lawsuit, summons, judgment, garnishment, other court action, or active settlement negotiations already underway on the account.</action>
             <action>EXCLUDE mentions where the agent discusses collection accounts and then asks a follow-up screening question about summons/litigation, and the client responds negatively. The agent's screening question + client's denial clears the concern for those accounts.</action>
-            <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation, collections, having a lawsuit filed, being sent to a collection agency, receiving a summons, or similar concrete legal action against a particular debt</action>
+            <action>KEEP only mentions where there is actual discussion of a SPECIFIC account being in litigation (lawsuit, summons, judgment, garnishment, court action) OR where active settlement negotiations are already underway with a creditor on a particular debt</action>
         </step>
         <step name="evaluate_agent_response">
-            <action>If any mentions remain after filtering (i.e., a specific account's litigation/collections status was discussed), determine whether the AGENT clearly communicated that the account cannot be enrolled or needs to be removed from the program. "Communicating the restriction" includes the agent taking action to remove or exclude the account from the program (e.g., "I'll take that off", "let me remove that one", "we'll leave that one out") — the agent does not need to explicitly say "this account cannot be enrolled" if they are actively removing or excluding it.</action>
+            <action>If any mentions remain after filtering (i.e., a specific account's litigation or active negotiation status was discussed), determine whether the AGENT clearly communicated that the account cannot be enrolled or needs to be removed from the program. "Communicating the restriction" includes the agent taking action to remove or exclude the account from the program (e.g., "I'll take that off", "let me remove that one", "we'll leave that one out") — the agent does not need to explicitly say "this account cannot be enrolled" if they are actively removing or excluding it.</action>
             <action>Record the agent's response quote if they communicated the restriction, including quotes where the agent offers or confirms removal/exclusion of the account</action>
             <action>If the agent did not address the restriction, note this as a violation</action>
         </step>
@@ -41,7 +41,10 @@
         <litigation_terms>
             <term>litigation</term>
             <term>delinquent</term>
-            <term>collections</term>
+            <term>negotiations</term>
+            <term>negotiating</term>
+            <term>settlement negotiations</term>
+            <term>already negotiating</term>
             <term>lawsuit</term>
             <term>legal action</term>
             <term>garnishment</term>
@@ -51,12 +54,10 @@
             <term>being sued</term>
             <term>summons</term>
             <term>served papers</term>
-            <term>collection agency</term>
-            <term>debt collector</term>
         </litigation_terms>
 
         <violation_rule>
-            A violation occurs when a SPECIFIC account's litigation/delinquent/collections status IS discussed on the call but the agent FAILS to clearly communicate that the affected account cannot be enrolled or must be removed from the program.
+            A violation occurs when a SPECIFIC account's litigation or active negotiation status IS discussed on the call but the agent FAILS to clearly communicate that the affected account cannot be enrolled or must be removed from the program. Note: accounts in collections are NOT a violation trigger — collections is a normal debt lifecycle stage and is acceptable to enroll.
         </violation_rule>
 
         <excluded_from_litigation_discussed>
@@ -74,26 +75,27 @@
         </excluded_from_litigation_discussed>
 
         <no_violation_cases>
-            <case>Litigation/delinquent/collections is never mentioned on the call — set litigation_discussed to false, no violation</case>
+            <case>Litigation/delinquent/negotiations is never mentioned on the call — set litigation_discussed to false, no violation</case>
             <case>All mentions are standard compliance disclosures, GOTA/ACDR script reading, or generic references (see excluded cases above) — set litigation_discussed to false, no violation</case>
-            <case>A specific account's litigation/collections status is discussed AND the agent clearly communicates the enrollment restriction — no violation</case>
+            <case>A specific account's litigation or active negotiation status is discussed AND the agent clearly communicates the enrollment restriction — no violation</case>
             <case>Agent asks a screening question about litigation and the client denies it — set litigation_discussed to false, no violation</case>
             <case>Agent provides general risk warnings about future legal consequences of unpaid debts but no specific account is currently in litigation — set litigation_discussed to false, no violation</case>
             <case>Agent describes accounts as "delinquent" during credit review but no specific account has active legal proceedings — set litigation_discussed to false, no violation</case>
             <case>Specific accounts are discussed as being in collections or with collection agencies, the agent asks about summons/litigation, and the client denies any active legal proceedings — set litigation_discussed to false, no violation</case>
+            <case>A specific account is identified by name as being in collections (e.g., "that Midland Credit account is a collections") and the agent enrolls it — set litigation_discussed to false, no violation. Collections is a normal debt lifecycle stage and does not restrict enrollment.</case>
             <case>Agent acknowledges an account's litigation/legal status (e.g., active garnishment, levy, judgment, lawsuit) and removes or excludes it from the program — this satisfies the restriction requirement even without an explicit verbal statement that the account "cannot be enrolled" (e.g., "I'll take that off for you", "let me remove that one", "we won't include that account")</case>
         </no_violation_cases>
     </evaluation_criteria>
 
     <instructions>
         When analyzing a call transcript:
-        1. Scan the entire transcript for any mention of litigation, delinquent accounts, collections, lawsuits, garnishment, judgments, or related legal terms
+        1. Scan the entire transcript for any mention of litigation, delinquent accounts, lawsuits, garnishment, judgments, active settlement negotiations, or related legal terms
         2. If NONE of these topics come up, return litigation_discussed=false, empty mentions array, agent_communicated_restriction=false, violation=false
         3. If mentions are found, classify each one as either a "standard disclosure" or "specific account discussion":
            - Standard disclosures include: GOTA/ACDR script reading, enrollment agreement walkthroughs, legal protection product descriptions, generic/casual references to debt types, and agent screening questions about litigation where the client denies any litigation
-           - Specific account discussions include: a contact or agent discussing a particular account that has been sued, served, sent to collections, has a judgment, etc.
+           - Specific account discussions include: a contact or agent discussing a particular account that has been sued, served, has a judgment, or where active settlement negotiations are already underway. Note: an account being "in collections" does NOT qualify as a specific account discussion for violation purposes.
         4. If ALL mentions are standard disclosures or generic references, return litigation_discussed=false, empty mentions array, agent_communicated_restriction=false, violation=false
-        5. If any mentions involve a SPECIFIC account's litigation/collections status, include only those mentions, set litigation_discussed=true, and check whether the AGENT explicitly told the client that the account cannot be enrolled or needs to be removed
+        5. If any mentions involve a SPECIFIC account's litigation or active negotiation status, include only those mentions, set litigation_discussed=true, and check whether the AGENT explicitly told the client that the account cannot be enrolled or needs to be removed
         6. Set violation=true ONLY when litigation_discussed=true AND agent_communicated_restriction=false
         7. Provide a clear violation_reason explaining what happened
         8. Select the most relevant quote as key_evidence_quote for alerts
@@ -110,7 +112,7 @@
 
 Respond with a valid JSON object using exactly these top-level keys:
 
-- "litigation_discussed": Whether litigation, delinquent accounts, or collections was mentioned on the call (boolean)
+- "litigation_discussed": Whether litigation or active settlement negotiations involving a specific account was mentioned on the call (boolean). Collections alone does NOT set this to true.
 - "mentions": Array of each mention found, each with term_used, speaker, quote, and context
 - "agent_communicated_restriction": Whether the agent clearly communicated that the account cannot be enrolled or must be removed (boolean)
 - "agent_response_quote": Direct quote of the agent's response communicating the restriction (empty string if none)
