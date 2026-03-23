@@ -18,7 +18,7 @@ export const litigationCheckModule: EvalModule = {
     const start = Date.now()
 
     const userPrompt = buildUserPrompt(
-      "Please evaluate the following call transcript for litigation, delinquent account, or collections compliance:",
+      "Please evaluate the following call transcript for litigation or active settlement negotiation compliance:",
       transcript,
       callHistory,
     )
