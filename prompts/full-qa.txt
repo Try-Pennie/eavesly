@@ -48,7 +48,7 @@
             <requirement name="credit_pull_consent">Did the agent obtain verbal consent before pulling credit? The agent should ask for permission (e.g., "Do I have your permission to pull your credit?") and the customer must give a clear affirmative response (e.g., "yes", "mhmm", "yeah", "sure", "okay"). Any recognizable verbal affirmative counts as consent.</requirement>
             <requirement name="social_security_verification">Did the agent properly request and verify SSN for security purposes?</requirement>
             <requirement name="accurate_representations">Did the agent make only truthful statements about Pennie's services, processes, and potential outcomes?</requirement>
-            <requirement name="no_misleading_claims">Did the agent avoid making unrealistic promises or guarantees about debt resolution outcomes?</requirement>
+            <requirement name="no_misleading_claims">Did the agent avoid making misleading promises/guarantees about outcomes (e.g., savings, timelines, settlement %, credit impact), while allowing appropriately qualified estimates/projections (e.g., "estimated", "on average", "usually", "roughly", "this can vary")?</requirement>
         </compliance_requirements>
 
         <customer_experience priority="high">
@@ -103,11 +103,53 @@
         <manager_escalation>Manager review required only for: (1) Multiple compliance violations (2+ failures), OR (2) Blatant negative customer treatment (severe infractions such as shouting, insults, or absolute refusal to hang up; do NOT flag for merely rude tone or guilt-tripping sales tactics)</manager_escalation>
     </scoring_guidelines>
 
+    <range_words_policy>
+        <purpose>Agents must utilize range words when pitching to clients. Avoid providing guarantees, even without using the word "guarantee". Range words help qualify outcomes and are compliant when they clearly indicate variability.</purpose>
+        <accepted_range_words>Typically, Commonly, Mostly, Naturally, Routinely, Ordinarily, Mainly, Most often, Per usual, Approximately, About, Around, On average, Estimated, Projected, Roughly, Usually, Normally</accepted_range_words>
+        <qualifying_phrases_examples>this can vary; depends on your situation; results vary; not guaranteed</qualifying_phrases_examples>
+        <accepted_compliant_phrasing_examples>signs of recovery; get resolved; first step; become debt-free</accepted_compliant_phrasing_examples>
+        <scoring_rules>
+            <rule>Do NOT mark a "no_misleading_claims" failure solely because the agent used accepted range words.</rule>
+            <rule>Do NOT penalize the agent for using accepted compliant phrasing examples (e.g., "signs of recovery", "resolved", "first step", "become debt-free") unless they are paired with an unqualified guarantee (certainty) or otherwise misleading claim.</rule>
+            <rule>Still mark a failure if the agent communicates certainty (a promise/guarantee), even if a range word appears elsewhere in the conversation. Evaluate the full claim in context.</rule>
+            <rule>When uncertain, prefer evidence-based interpretation: if the listener would reasonably interpret the statement as guaranteed/certain, score as FAIL; if it is clearly qualified/variable, score as PASS.</rule>
+        </scoring_rules>
+    </range_words_policy>
+
+    <examples_range_words>
+        <pass>Your program term is estimated at around 48 months, but this can vary.</pass>
+        <pass>On average, clients reduce overall debt, though results vary by creditor and situation.</pass>
+        <pass>Your projected savings from the program is about $15,000 (this can vary).</pass>
+        <pass>Clients can see signs of recovery to their credit as accounts get resolved through the course of the program.</pass>
+        <pass>Take your first step towards a debt-free future; many clients become debt-free in about 24–48 months (this can vary).</pass>
+        <fail>You will be out of debt in 48 months.</fail>
+        <fail>I guarantee your debt will be settled at 50%.</fail>
+        <fail>Your credit score will go up by 50 points in 2 months.</fail>
+        <fail>Your credit score is going to go up in 3-6 months.</fail>
+        <fail>Your accounts will be negotiated in 3 months.</fail>
+        <fail>You won't receive any calls from the creditors.</fail>
+        <fail>We will handle all the communication from your creditors.</fail>
+        <fail>I'm certain all of your creditors will settle your debt.</fail>
+        <fail>You should see all your debts settled in 48 months.</fail>
+        <fail>It takes about 3-6 months to get your settlements in place. (Implies ALL settlements happen in that window; the compliant framing is that the FIRST settlement typically occurs in 3-6 months.)</fail>
+    </examples_range_words>
+
+    <forbidden_phrases>
+        <purpose>These phrases are factually incorrect or misrepresent Pennie's program. They should ALWAYS be flagged as a "no_misleading_claims" failure regardless of context or qualifiers.</purpose>
+        <phrase reason="Interest is not eliminated; it may continue to accrue during the program">"This program eliminates your interest"</phrase>
+        <phrase reason="Interest is not reduced to zero; it may continue to accrue during the program">"Zero percent interest"</phrase>
+        <phrase reason="Settled accounts are not reported as 'paid as agreed'; they are reported as settled for less than the full balance">"Paid as agreed"</phrase>
+        <phrase reason="Creditors may still report negative information; the program does not prevent this">"Doesn't blacklist you with creditors"</phrase>
+        <phrase reason="The program is a form of debt relief; denying this misrepresents the service">"This isn't debt relief"</phrase>
+        <phrase reason="The program involves debt settlement; denying this misrepresents the service">"This isn't debt settlement"</phrase>
+    </forbidden_phrases>
+
     <critical_compliance_notes>
         <note>Pennie is NOT a lender - they work with a network of 1,000+ financial partners</note>
         <note>Credit pulls must be explicitly authorized with customer giving clear verbal affirmation (e.g., "yes", "I agree", "mhmm", "yeah", "sure", "okay", "go ahead"). The key requirement is that the agent ASKED for permission and the customer gave an affirmative response — not that specific magic words were used.</note>
         <note>Debt resolution is presented as education, not high-pressure sales</note>
         <note>All representations about savings, timelines, and outcomes must be realistic</note>
+        <note>Range words are permitted and should NOT be penalized as guarantees when used to properly qualify outcomes (e.g., "estimated", "on average", "usually", "projected", "approximately", "around"). Evaluate the full statement: qualified/variable projections PASS; unqualified certainty/promise FAIL.</note>
         <note>Customer's financial situation should drive recommendations, not sales quotas</note>
         <note>Manager review only required for: Multiple compliance violations (2+ failures) OR blatant negative customer treatment</note>
         <note>Single compliance violations should be noted but do not automatically trigger manager review</note>
@@ -119,7 +161,7 @@
 
     <critical_red_flags>
         <red_flag>Failure to obtain explicit credit pull consent</red_flag>
-        <red_flag>Guaranteeing specific debt resolution outcomes, savings, timelines, or credit score improvements</red_flag>
+        <red_flag>Unqualified guarantees/promises of specific outcomes (e.g., debt resolution outcomes, savings, timelines, settlement %, or credit score improvements stated as certain). Qualified projections using accepted range words (estimated/on average/usually/etc.) are NOT red flags unless presented as guaranteed.</red_flag>
         <red_flag>Misrepresenting Pennie's program factuals (e.g., implying it is a government program or interest stops immediately) rather than just framing/positioning</red_flag>
         <red_flag>Hostile behavior or refusal to end the call after explicit rejection (standard objection handling and persistence are NOT red flags)</red_flag>
         <red_flag>Customer expressing confusion or misunderstanding without the agent providing clear clarification</red_flag>
@@ -132,6 +174,8 @@
         3. Capture every piece of evidence using this structure: Speaker label (Agent/Customer/Transfer Agent/etc.), direct quote in quotation marks, contextual timing note (e.g., "after credit discussion"), and Pennie 6-step tag (Step 1 Agenda Setting, Step 2 Credit Review, Step 3 Agent Inputs, Step 4 Paydown Projections, Step 5 Loan Offers, Step 6 Debt Resolution, or Off-Cycle)
         4. Record exact quotes or clear contextual descriptions for every compliance requirement (pass or fail) using the evidence structure above
         5. Cross-check the transcript against Pennie's high-risk compliance checklist (credit pull consent, outcome guarantees, interest accrual accuracy, graduation loan positioning, compliant terminology, legal action framing, program regulation accuracy, GOTA script adherence, co-applicant approval) and document outcomes with structured evidence; if an item is not observed or not applicable, return an empty evidence array rather than null or omitting the field
+        5a. Range words compliance: Do NOT penalize agents for using accepted range words (estimated/on average/usually/roughly/about/around/etc.) to qualify outcomes. Still flag unqualified certainty/promise. Evaluate the entire claim in context.
+        5b. Forbidden phrases: Check the transcript for any forbidden phrases listed in the forbidden_phrases section. These are ALWAYS a "no_misleading_claims" failure regardless of context or qualifiers.
         6. Document specific quotes demonstrating customer experience quality (both positive and negative) using the same structure
         7. Note where in the conversation each sales process step occurs (e.g., "during opening", "after credit discussion") and align with the Pennie 6-step tags
         8. Evaluate customer treatment and experience quality with specific structured evidence
