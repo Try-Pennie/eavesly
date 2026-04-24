@@ -1,0 +1,33 @@
+{
+  "enrollment_completed": true,
+  "enrollment_evidence_quote": "You'll click the sign button there. By signing below you agree to the terms and conditions of this enrollment agreement.",
+  "phase_activation_covered": false,
+  "phase_activation_evidence": "",
+  "phase_traction_covered": false,
+  "phase_traction_evidence": "",
+  "phase_momentum_covered": false,
+  "phase_momentum_evidence": "",
+  "phase_graduation_covered": false,
+  "phase_graduation_evidence": "",
+  "credit_impact_downside_covered": false,
+  "credit_impact_evidence": "",
+  "payments_withheld_downside_covered": false,
+  "payments_withheld_evidence": "",
+  "accounts_may_close_downside_covered": false,
+  "accounts_may_close_evidence": "",
+  "adjustment_period_downside_covered": false,
+  "adjustment_period_evidence": "",
+  "missing_elements": [
+    "Phase 1: Activation (Months 1–3)",
+    "Phase 2: Traction (Months 4–9)",
+    "Phase 3: Momentum (Months 10–60)",
+    "Phase 4: Graduation (Months 60+)",
+    "Downside: credit score may decline",
+    "Downside: payments are withheld",
+    "Downside: accounts may close",
+    "Downside: adjustment period upfront is normal"
+  ],
+  "violation": true,
+  "violation_reason": "Enrollment completed but agent went directly from budget to DocuSign enrollment agreement without walking the client through the Program Expectations page — none of the four phases or required downsides were covered.",
+  "key_evidence_quote": "Section 10, Beyond does not have the ability to give you any tax or legal advice."
+}
