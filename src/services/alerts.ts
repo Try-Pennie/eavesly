@@ -4,6 +4,7 @@ import type { FullQAResult } from "../schemas/full-qa"
 import type { BudgetInputsResult } from "../schemas/budget-inputs"
 import type { WarmTransferResult } from "../schemas/warm-transfer"
 import type { LitigationCheckResult } from "../schemas/litigation-check"
+import type { ProgramExpectationsResult } from "../schemas/program-expectations"
 import { VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 import { createClient } from "@supabase/supabase-js"
@@ -192,6 +193,8 @@ function formatViolationType(type: string): string {
       return "Warm transfer"
     case VIOLATION_TYPES.LITIGATION_CHECK:
       return "Litigation check"
+    case VIOLATION_TYPES.PROGRAM_EXPECTATIONS:
+      return "Program expectations"
     default:
       return type
   }
@@ -212,6 +215,9 @@ function extractViolationReason(alert: Alert): string {
     }
     case VIOLATION_TYPES.LITIGATION_CHECK: {
       return (result as LitigationCheckResult)?.violation_reason || "Litigation check issue"
+    }
+    case VIOLATION_TYPES.PROGRAM_EXPECTATIONS: {
+      return (result as ProgramExpectationsResult)?.violation_reason || "Program expectations not reviewed"
     }
     default:
       return ""
@@ -234,6 +240,9 @@ function extractEvidence(alert: Alert): string {
     }
     case VIOLATION_TYPES.LITIGATION_CHECK: {
       return (result as LitigationCheckResult)?.key_evidence_quote || ""
+    }
+    case VIOLATION_TYPES.PROGRAM_EXPECTATIONS: {
+      return (result as ProgramExpectationsResult)?.key_evidence_quote || ""
     }
     default:
       return ""
@@ -304,6 +313,35 @@ function extractDetail(alert: Alert): string {
         lines.push(`Agent Response: "${r.agent_response_quote}"`)
       }
       return lines.join("\n") || "Litigation check issue"
+    }
+    case VIOLATION_TYPES.PROGRAM_EXPECTATIONS: {
+      const r = result as ProgramExpectationsResult
+      const lines: string[] = []
+      if (r?.missing_elements?.length > 0) {
+        lines.push("Missing from program expectations review:")
+        for (const m of r.missing_elements) {
+          lines.push(`- ${m}`)
+        }
+      }
+      const covered: string[] = []
+      if (r?.phase_activation_covered) covered.push("Phase 1: Activation")
+      if (r?.phase_traction_covered) covered.push("Phase 2: Traction")
+      if (r?.phase_momentum_covered) covered.push("Phase 3: Momentum")
+      if (r?.phase_graduation_covered) covered.push("Phase 4: Graduation")
+      if (r?.credit_impact_downside_covered) covered.push("Downside: credit score decline")
+      if (r?.payments_withheld_downside_covered) covered.push("Downside: payments withheld")
+      if (r?.accounts_may_close_downside_covered) covered.push("Downside: accounts may close")
+      if (r?.adjustment_period_downside_covered) covered.push("Downside: adjustment period")
+      if (covered.length > 0) {
+        if (lines.length > 0) lines.push("")
+        lines.push("Covered on call:")
+        for (const c of covered) lines.push(`- ${c}`)
+      }
+      if (r?.enrollment_evidence_quote) {
+        lines.push("")
+        lines.push(`Enrollment confirmed: "${r.enrollment_evidence_quote}"`)
+      }
+      return lines.join("\n") || "Program expectations not reviewed"
     }
     default:
       return ""

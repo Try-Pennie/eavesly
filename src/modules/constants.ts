@@ -3,6 +3,7 @@ export const MODULE_NAMES = {
   BUDGET_INPUTS: "budget_inputs",
   WARM_TRANSFER: "warm_transfer",
   LITIGATION_CHECK: "litigation_check",
+  PROGRAM_EXPECTATIONS: "program_expectations",
 } as const
 
 export const VIOLATION_TYPES = {
@@ -10,6 +11,7 @@ export const VIOLATION_TYPES = {
   BUDGET_COMPLIANCE: "budget_compliance",
   WARM_TRANSFER: "warm_transfer",
   LITIGATION_CHECK: "litigation_check",
+  PROGRAM_EXPECTATIONS: "program_expectations",
 } as const
 
 type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]
