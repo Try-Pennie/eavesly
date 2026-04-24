@@ -122,6 +122,8 @@
         <pass>Your projected savings from the program is about $15,000 (this can vary).</pass>
         <pass>Clients can see signs of recovery to their credit as accounts get resolved through the course of the program.</pass>
         <pass>Take your first step towards a debt-free future; many clients become debt-free in about 24–48 months (this can vary).</pass>
+        <pass>A soft inquiry has no impact on your credit score. (Soft pulls do not affect credit — this is factually accurate and is NOT an outcome guarantee.)</pass>
+        <pass>I can guarantee you there'll be no impact on your credit with the soft inquiry. (Unqualified soft-inquiry statements are accurate and permitted.)</pass>
         <fail>You will be out of debt in 48 months.</fail>
         <fail>I guarantee your debt will be settled at 50%.</fail>
         <fail>Your credit score will go up by 50 points in 2 months.</fail>
@@ -155,6 +157,7 @@
         <note>Single compliance violations should be noted but do not automatically trigger manager review</note>
         <note>Focus manager escalation on serious patterns of violations or clear customer mistreatment</note>
         <note>Rebuttals regarding rental/credit impact (e.g., arguing debt is a bigger barrier than a temporary credit dip) are PERMITTED as standard sales tactics, provided they do not factually deny the impact</note>
+        <note>Soft credit inquiries (soft pulls) do NOT impact credit scores. Unqualified agent statements to this effect — including categorical guarantees such as "a soft inquiry won't impact your credit", "there's no credit impact from a soft inquiry", or "I can guarantee no credit impact from the soft inquiry" — are FACTUALLY ACCURATE and MUST NOT be flagged as `no_misleading_claims`, `accurate_representations`, or `Outcome guarantee` violations. This carve-out applies ONLY to soft inquiries. Guarantees about hard inquiries, post-enrollment credit score changes, program-driven credit improvement, or general future credit score movement REMAIN compliance violations and must still be flagged per the range-words policy.</note>
         <note>Distinguish "High Pressure" from "Persistence": Persistence in overcoming objections is acceptable; High Pressure is hostility, insults, or ignoring explicit commands to stop/end the call</note>
         <note>Closing statements like "I hope you don't regret this" are sales tactics, not negative customer treatment, provided the agent ultimately respects the customer's decision and ends the call politely</note>
     </critical_compliance_notes>
