@@ -47,9 +47,10 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   }
 
   const managerEmail = await lookupManagerEmail(env, alert.agent_email)
+  const reviewUrl = buildReviewUrl(env, alert.call_id, alert.module_name)
   const payload = isFullQA
-    ? buildFullQASlackPayload(alert, managerEmail)
-    : buildSlackPayload(alert, managerEmail)
+    ? buildFullQASlackPayload(alert, managerEmail, reviewUrl)
+    : buildSlackPayload(alert, managerEmail, reviewUrl)
 
   log("info", "Slack payload built", {
     callId: alert.call_id,
@@ -111,6 +112,7 @@ interface SlackPayload {
   transcript_url: string
   sfdc_lead_id: string
   call_duration: string
+  review_url: string
 }
 
 interface FullQASlackPayload {
@@ -128,9 +130,24 @@ interface FullQASlackPayload {
   specific_coaching_points: string
   transcript_url: string
   recording_link: string
+  review_url: string
 }
 
-export function buildFullQASlackPayload(alert: Alert, managerEmail = ""): FullQASlackPayload {
+export function buildReviewUrl(
+  env: Bindings,
+  callId: string,
+  moduleName: string,
+): string {
+  const base = env.DASHBOARD_BASE_URL?.replace(/\/+$/, "")
+  if (!base) return ""
+  return `${base}/dashboard/alerts/${encodeURIComponent(callId)}/${encodeURIComponent(moduleName)}`
+}
+
+export function buildFullQASlackPayload(
+  alert: Alert,
+  managerEmail = "",
+  reviewUrl = "",
+): FullQASlackPayload {
   const result = alert.result as FullQAResult | undefined
 
   return {
@@ -148,6 +165,7 @@ export function buildFullQASlackPayload(alert: Alert, managerEmail = ""): FullQA
     specific_coaching_points: result?.coaching_recommendations?.specific_coaching_points?.join("\n") || "",
     transcript_url: alert.transcript_url ?? "",
     recording_link: alert.recording_link ?? "",
+    review_url: reviewUrl,
   }
 }
 
@@ -158,7 +176,11 @@ export function formatDuration(seconds?: number): string {
   return `${m}m ${s}s`
 }
 
-export function buildSlackPayload(alert: Alert, managerEmail = ""): SlackPayload {
+export function buildSlackPayload(
+  alert: Alert,
+  managerEmail = "",
+  reviewUrl = "",
+): SlackPayload {
   return {
     call_id: alert.call_id,
     violation_type: alert.violation_type,
@@ -174,6 +196,7 @@ export function buildSlackPayload(alert: Alert, managerEmail = ""): SlackPayload
     transcript_url: alert.transcript_url ?? "",
     sfdc_lead_id: alert.sfdc_lead_id ?? "",
     call_duration: formatDuration(alert.call_duration),
+    review_url: reviewUrl,
   }
 }
 

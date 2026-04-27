@@ -21,3 +21,5 @@ Use these variables in the Slack Workflow "Send a message" step.
 **Detail:** {detail}
 
 **Recording:** {recording_link}
+
+<{review_url}|:eyes: Review on Eavesly Dashboard>

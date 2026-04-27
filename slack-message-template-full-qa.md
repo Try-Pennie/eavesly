@@ -22,7 +22,8 @@ The webhook trigger payload uses the field names below as variable keys.
   "areas_for_improvement": "string (newline-separated list)",
   "specific_coaching_points": "string (newline-separated list)",
   "transcript_url": "string (URL)",
-  "recording_link": "string (URL)"
+  "recording_link": "string (URL)",
+  "review_url": "string (URL — empty if DASHBOARD_BASE_URL is not set)"
 }
 ```
 
@@ -57,3 +58,4 @@ Please review the below due to *{manager_review_reason}*:
 ---
 <{transcript_url}|:link: View Transcript & Recording on Regal>
 <{recording_link}|:speaking_head_in_silhouette: Listen to Call Recording>
+<{review_url}|:eyes: Review on Eavesly Dashboard>

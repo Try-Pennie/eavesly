@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { dispatchAlerts, buildSlackPayload, buildFullQASlackPayload, buildSummary, lookupManagerEmail, formatDuration } from "./alerts"
+import { dispatchAlerts, buildSlackPayload, buildFullQASlackPayload, buildSummary, lookupManagerEmail, formatDuration, buildReviewUrl } from "./alerts"
 import type { Alert } from "../modules/types"
 import type { Bindings } from "../types/env"
 import { createEnv } from "../../test/helpers/mock-env"
@@ -478,6 +478,121 @@ describe("buildSummary", () => {
 
     expect(summary).toContain("Manager escalation violation")
     expect(summary).toContain("Manager review required")
+  })
+})
+
+describe("buildReviewUrl", () => {
+  it("returns empty string when DASHBOARD_BASE_URL is not set", () => {
+    const env = createEnv({ DASHBOARD_BASE_URL: undefined })
+    expect(buildReviewUrl(env, "call-1", "full_qa")).toBe("")
+  })
+
+  it("builds the dashboard deep link when base URL is set", () => {
+    const env = createEnv({ DASHBOARD_BASE_URL: "https://eavesly.com" })
+    expect(buildReviewUrl(env, "call-1", "full_qa")).toBe(
+      "https://eavesly.com/dashboard/alerts/call-1/full_qa",
+    )
+  })
+
+  it("strips trailing slashes from the base URL", () => {
+    const env = createEnv({ DASHBOARD_BASE_URL: "https://eavesly.com/" })
+    expect(buildReviewUrl(env, "call-1", "full_qa")).toBe(
+      "https://eavesly.com/dashboard/alerts/call-1/full_qa",
+    )
+  })
+
+  it("URL-encodes special characters in the call id", () => {
+    const env = createEnv({ DASHBOARD_BASE_URL: "https://eavesly.com" })
+    expect(buildReviewUrl(env, "call/with spaces", "full_qa")).toBe(
+      "https://eavesly.com/dashboard/alerts/call%2Fwith%20spaces/full_qa",
+    )
+  })
+})
+
+describe("review_url propagation", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK", text: () => Promise.resolve("ok") }),
+    )
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "manager@example.com" },
+      error: null,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("includes review_url in non-full_qa Slack payload when DASHBOARD_BASE_URL is set", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv({ DASHBOARD_BASE_URL: "https://eavesly.com" })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      call_id: "call-xyz",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.review_url).toBe(
+      "https://eavesly.com/dashboard/alerts/call-xyz/budget_inputs",
+    )
+  })
+
+  it("includes review_url in full_qa Slack payload when DASHBOARD_BASE_URL is set", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv({ DASHBOARD_BASE_URL: "https://eavesly.com" })
+    const alert = createAlert({
+      call_id: "call-abc",
+      result: violationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.review_url).toBe(
+      "https://eavesly.com/dashboard/alerts/call-abc/full_qa",
+    )
+  })
+
+  it("sends empty review_url when DASHBOARD_BASE_URL is not set", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv({ DASHBOARD_BASE_URL: undefined })
+    const alert = createAlert({ result: violationFixture })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const body = JSON.parse((fetch as any).mock.calls[0][1].body)
+    expect(body.review_url).toBe("")
+  })
+
+  it("buildSlackPayload accepts an explicit reviewUrl arg", () => {
+    const alert = createAlert({ call_id: "call-1" })
+    const payload = buildSlackPayload(alert, "manager@example.com", "https://eavesly.com/dashboard/alerts/call-1/full_qa")
+    expect(payload.review_url).toBe(
+      "https://eavesly.com/dashboard/alerts/call-1/full_qa",
+    )
+  })
+
+  it("buildFullQASlackPayload accepts an explicit reviewUrl arg", () => {
+    const alert = createAlert({ call_id: "call-1", result: violationFixture })
+    const payload = buildFullQASlackPayload(alert, "manager@example.com", "https://eavesly.com/dashboard/alerts/call-1/full_qa")
+    expect(payload.review_url).toBe(
+      "https://eavesly.com/dashboard/alerts/call-1/full_qa",
+    )
+  })
+
+  it("payload review_url defaults to empty string when not passed", () => {
+    const alert = createAlert({ call_id: "call-1" })
+    expect(buildSlackPayload(alert).review_url).toBe("")
+    expect(buildFullQASlackPayload(alert).review_url).toBe("")
   })
 })
 

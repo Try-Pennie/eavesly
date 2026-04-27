@@ -16,6 +16,7 @@ OPENROUTER_MODEL = "openai/gpt-4.1"
 # CF_AIG_TOKEN
 # SLACK_WEBHOOK_URL
 # SLACK_WEBHOOK_URL_FULL_QA
+# DASHBOARD_BASE_URL  (e.g. https://eavesly.com — used to build review_url in Slack alerts)
 
 [[rules]]
 type = "Text"
