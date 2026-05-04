@@ -129,6 +129,8 @@ const MODULE_NAME_MAP: Record<string, string> = {
   "full-qa": "full_qa",
   "warm-transfer": "warm_transfer",
   "litigation-check": "litigation_check",
+  "program-expectations": "program_expectations",
+  "active-settlements": "active_settlements",
 }
 
 async function verifyDbResult(
@@ -190,7 +192,14 @@ interface TestResult {
   dbVerified?: boolean
 }
 
-const MODULES = ["budget-inputs", "full-qa", "warm-transfer", "litigation-check"] as const
+const MODULES = [
+  "budget-inputs",
+  "full-qa",
+  "warm-transfer",
+  "litigation-check",
+  "program-expectations",
+  "active-settlements",
+] as const
 
 async function runTest(
   name: string,

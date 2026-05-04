@@ -9,6 +9,7 @@ import { budgetInputsRoutes } from "./routes/budget-inputs"
 import { warmTransferRoutes } from "./routes/warm-transfer"
 import { litigationCheckRoutes } from "./routes/litigation-check"
 import { programExpectationsRoutes } from "./routes/program-expectations"
+import { activeSettlementsRoutes } from "./routes/active-settlements"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
 
@@ -27,6 +28,7 @@ app.route("/api/v1", budgetInputsRoutes)
 app.route("/api/v1", warmTransferRoutes)
 app.route("/api/v1", litigationCheckRoutes)
 app.route("/api/v1", programExpectationsRoutes)
+app.route("/api/v1", activeSettlementsRoutes)
 app.route("/api/v1", statusRoutes)
 
 app.onError((err, c) => {

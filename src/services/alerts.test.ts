@@ -7,6 +7,8 @@ import { VIOLATION_TYPES, MODULE_NAMES } from "../modules/constants"
 import violationFixture from "../../test/fixtures/responses/full-qa-violation.json"
 import budgetViolationFixture from "../../test/fixtures/responses/budget-inputs-violation.json"
 import warmViolationFixture from "../../test/fixtures/responses/warm-transfer-violation.json"
+import activeSettlementsDetected from "../../test/fixtures/responses/active-settlements-detected.json"
+import activeSettlementsCompetitor from "../../test/fixtures/responses/active-settlements-with-competitor.json"
 
 const mockSingle = vi.fn()
 const mockEq = vi.fn(() => ({ single: mockSingle }))
@@ -387,6 +389,75 @@ describe("buildSlackPayload", () => {
     const notCollectedIdx = payload.detail.indexOf("❌ Not Collected")
     const collectedIdx = payload.detail.indexOf("✅ Collected")
     expect(notCollectedIdx).toBeLessThan(collectedIdx)
+  })
+})
+
+describe("buildSlackPayload — active_settlements", () => {
+  it("surfaces enrolled_with_competitor and cancellation_confirmed at top level", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACTIVE_SETTLEMENTS,
+      violation_type: VIOLATION_TYPES.ACTIVE_SETTLEMENTS,
+      result: activeSettlementsCompetitor,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.enrolled_with_competitor).toBe("yes")
+    expect(payload.cancellation_confirmed).toBe("yes")
+  })
+
+  it("populates secondary fields from detected fixture (no competitor)", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACTIVE_SETTLEMENTS,
+      violation_type: VIOLATION_TYPES.ACTIVE_SETTLEMENTS,
+      result: activeSettlementsDetected,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.enrolled_with_competitor).toBe("no")
+    expect(payload.cancellation_confirmed).toBe("n/a")
+  })
+
+  it("leaves secondary fields empty for non-active_settlements alerts", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      result: budgetViolationFixture,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.enrolled_with_competitor).toBe("")
+    expect(payload.cancellation_confirmed).toBe("")
+  })
+
+  it("includes mentions, agent response, and secondary checks in detail", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACTIVE_SETTLEMENTS,
+      violation_type: VIOLATION_TYPES.ACTIVE_SETTLEMENTS,
+      result: activeSettlementsCompetitor,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.detail).toContain("Settlement Mentions:")
+    expect(payload.detail).toContain("Beyond Finance")
+    expect(payload.detail).toContain("Agent Response:")
+    expect(payload.detail).toContain("Enrolled with competitor: yes")
+    expect(payload.detail).toContain("Cancellation confirmed: yes")
+  })
+
+  it("uses Active settlements label in summary", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACTIVE_SETTLEMENTS,
+      violation_type: VIOLATION_TYPES.ACTIVE_SETTLEMENTS,
+      result: activeSettlementsDetected,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.summary).toContain("Active settlements violation")
+  })
+
+  it("uses key_evidence_quote as evidence", () => {
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACTIVE_SETTLEMENTS,
+      violation_type: VIOLATION_TYPES.ACTIVE_SETTLEMENTS,
+      result: activeSettlementsDetected,
+    })
+    const payload = buildSlackPayload(alert)
+    expect(payload.evidence).toBe(activeSettlementsDetected.key_evidence_quote)
   })
 })
 

@@ -1,0 +1,13 @@
+{
+  "active_settlements_detected": false,
+  "mentions": [],
+  "agent_acknowledged": false,
+  "agent_response_quote": "",
+  "enrolled_with_competitor": "no",
+  "competitor_evidence_quote": "",
+  "cancellation_confirmed": "n/a",
+  "cancellation_evidence_quote": "",
+  "violation": false,
+  "violation_reason": "Client mentioned receiving a settlement offer from Citi but said they ignored it and have no intention of pursuing it. No ongoing engagement.",
+  "key_evidence_quote": ""
+}

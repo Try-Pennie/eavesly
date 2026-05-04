@@ -4,6 +4,7 @@ export const MODULE_NAMES = {
   WARM_TRANSFER: "warm_transfer",
   LITIGATION_CHECK: "litigation_check",
   PROGRAM_EXPECTATIONS: "program_expectations",
+  ACTIVE_SETTLEMENTS: "active_settlements",
 } as const
 
 export const VIOLATION_TYPES = {
@@ -12,6 +13,7 @@ export const VIOLATION_TYPES = {
   WARM_TRANSFER: "warm_transfer",
   LITIGATION_CHECK: "litigation_check",
   PROGRAM_EXPECTATIONS: "program_expectations",
+  ACTIVE_SETTLEMENTS: "active_settlements",
 } as const
 
 type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]

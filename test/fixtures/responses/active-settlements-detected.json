@@ -1,0 +1,20 @@
+{
+  "active_settlements_detected": true,
+  "mentions": [
+    {
+      "term_used": "negotiating",
+      "speaker": "contact",
+      "quote": "I'm actually negotiating with Discover right now — they offered me a settlement at 60% and I'm considering it.",
+      "context": "Client describes an active in-flight settlement offer they're weighing."
+    }
+  ],
+  "agent_acknowledged": false,
+  "agent_response_quote": "",
+  "enrolled_with_competitor": "no",
+  "competitor_evidence_quote": "",
+  "cancellation_confirmed": "n/a",
+  "cancellation_evidence_quote": "",
+  "violation": true,
+  "violation_reason": "Client described an active settlement negotiation with Discover but the agent did not acknowledge it or address whether the account should be enrolled.",
+  "key_evidence_quote": "I'm actually negotiating with Discover right now — they offered me a settlement at 60% and I'm considering it."
+}
