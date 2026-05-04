@@ -105,6 +105,27 @@
       "Agent leverages prior conversation history for relationship continuity."
     ]
   },
+  "program_expectations_scorecard": {
+    "enrollment_completed": false,
+    "enrollment_evidence_quote": "",
+    "phase_impact_covered": false,
+    "phase_impact_evidence": "",
+    "phase_stabilization_covered": false,
+    "phase_stabilization_evidence": "",
+    "phase_recovery_covered": false,
+    "phase_recovery_evidence": "",
+    "phase_rebuild_covered": false,
+    "phase_rebuild_evidence": "",
+    "payments_point_covered": false,
+    "payments_point_evidence": "",
+    "creditor_calls_point_covered": false,
+    "creditor_calls_point_evidence": "",
+    "legal_action_point_covered": false,
+    "legal_action_point_evidence": "",
+    "missing_elements": [],
+    "section_status": "not_applicable",
+    "section_summary": "No enrollment on this call; program expectations coverage not evaluated."
+  },
   "transfer_agent_assessment": {
     "transfer_occurred": false,
     "transfer_agent_tone": "not_applicable",

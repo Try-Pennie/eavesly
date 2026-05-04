@@ -142,6 +142,32 @@
       "Warm transfer was executed as required."
     ]
   },
+  "program_expectations_scorecard": {
+    "enrollment_completed": true,
+    "enrollment_evidence_quote": "So if you click in the screen, you should be able to put the last 4 of your social.",
+    "phase_impact_covered": true,
+    "phase_impact_evidence": "In the first couple of months your score may dip as we stop payments to the enrolled creditors — that's expected.",
+    "phase_stabilization_covered": true,
+    "phase_stabilization_evidence": "Around month 4 through 8 things quiet down while we negotiate.",
+    "phase_recovery_covered": false,
+    "phase_recovery_evidence": "",
+    "phase_rebuild_covered": false,
+    "phase_rebuild_evidence": "",
+    "payments_point_covered": true,
+    "payments_point_evidence": "Your funds go into a dedicated savings account in your name that you can monitor.",
+    "creditor_calls_point_covered": false,
+    "creditor_calls_point_evidence": "",
+    "legal_action_point_covered": false,
+    "legal_action_point_evidence": "",
+    "missing_elements": [
+      "Phase 3: Recovery (Months 10–48)",
+      "Phase 4: Rebuild (Month 48+)",
+      "Discussion point: creditor calls",
+      "Discussion point: legal action"
+    ],
+    "section_status": "fail",
+    "section_summary": "Agent walked through Phases 1–2 and the payments discussion point, but missed Phases 3–4 and both the creditor-calls and legal-action discussion points on an enrolled call."
+  },
   "transfer_agent_assessment": {
     "transfer_occurred": true,
     "transfer_agent_tone": "professional",

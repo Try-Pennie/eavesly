@@ -81,6 +81,28 @@ export const FullQASchema = z.object({
     key_process_moments: z.array(z.string()),
   }),
 
+  program_expectations_scorecard: z.object({
+    enrollment_completed: z.boolean(),
+    enrollment_evidence_quote: z.string(),
+    phase_impact_covered: z.boolean(),
+    phase_impact_evidence: z.string(),
+    phase_stabilization_covered: z.boolean(),
+    phase_stabilization_evidence: z.string(),
+    phase_recovery_covered: z.boolean(),
+    phase_recovery_evidence: z.string(),
+    phase_rebuild_covered: z.boolean(),
+    phase_rebuild_evidence: z.string(),
+    payments_point_covered: z.boolean(),
+    payments_point_evidence: z.string(),
+    creditor_calls_point_covered: z.boolean(),
+    creditor_calls_point_evidence: z.string(),
+    legal_action_point_covered: z.boolean(),
+    legal_action_point_evidence: z.string(),
+    missing_elements: z.array(z.string()),
+    section_status: PassFailNA,
+    section_summary: z.string(),
+  }),
+
   transfer_agent_assessment: z.object({
     transfer_occurred: z.boolean(),
     transfer_agent_tone: z.enum(["professional", "unprofessional", "not_applicable"]),
