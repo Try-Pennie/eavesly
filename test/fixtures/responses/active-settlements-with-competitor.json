@@ -1,0 +1,20 @@
+{
+  "active_settlements_detected": true,
+  "mentions": [
+    {
+      "term_used": "working out a payoff",
+      "speaker": "contact",
+      "quote": "Beyond Finance is working out a payoff with my Capital One card right now.",
+      "context": "Client describes another debt-resolution provider currently negotiating a payoff on their behalf."
+    }
+  ],
+  "agent_acknowledged": true,
+  "agent_response_quote": "Got it — let me leave that Capital One account out of our enrollment then.",
+  "enrolled_with_competitor": "yes",
+  "competitor_evidence_quote": "I'm with Beyond Finance — I've been paying them about $400 a month for the last six months.",
+  "cancellation_confirmed": "yes",
+  "cancellation_evidence_quote": "You'll want to call Beyond Finance today and let them know you're cancelling — I'll send you their cancellation number.",
+  "violation": true,
+  "violation_reason": "Client is enrolled with Beyond Finance and has an active settlement negotiation with Capital One via that program. Agent acknowledged and confirmed cancellation with Beyond Finance.",
+  "key_evidence_quote": "Beyond Finance is working out a payoff with my Capital One card right now."
+}

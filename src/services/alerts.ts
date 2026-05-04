@@ -5,6 +5,7 @@ import type { BudgetInputsResult } from "../schemas/budget-inputs"
 import type { WarmTransferResult } from "../schemas/warm-transfer"
 import type { LitigationCheckResult } from "../schemas/litigation-check"
 import type { ProgramExpectationsResult } from "../schemas/program-expectations"
+import type { ActiveSettlementsResult } from "../schemas/active-settlements"
 import { VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 import { createClient } from "@supabase/supabase-js"
@@ -113,6 +114,8 @@ interface SlackPayload {
   sfdc_lead_id: string
   call_duration: string
   review_url: string
+  enrolled_with_competitor: string
+  cancellation_confirmed: string
 }
 
 interface FullQASlackPayload {
@@ -181,6 +184,12 @@ export function buildSlackPayload(
   managerEmail = "",
   reviewUrl = "",
 ): SlackPayload {
+  const isActiveSettlements =
+    alert.violation_type === VIOLATION_TYPES.ACTIVE_SETTLEMENTS
+  const settlementResult = isActiveSettlements
+    ? (alert.result as ActiveSettlementsResult | undefined)
+    : undefined
+
   return {
     call_id: alert.call_id,
     violation_type: alert.violation_type,
@@ -197,6 +206,8 @@ export function buildSlackPayload(
     sfdc_lead_id: alert.sfdc_lead_id ?? "",
     call_duration: formatDuration(alert.call_duration),
     review_url: reviewUrl,
+    enrolled_with_competitor: settlementResult?.enrolled_with_competitor ?? "",
+    cancellation_confirmed: settlementResult?.cancellation_confirmed ?? "",
   }
 }
 
@@ -218,6 +229,8 @@ function formatViolationType(type: string): string {
       return "Litigation check"
     case VIOLATION_TYPES.PROGRAM_EXPECTATIONS:
       return "Program expectations"
+    case VIOLATION_TYPES.ACTIVE_SETTLEMENTS:
+      return "Active settlements"
     default:
       return type
   }
@@ -241,6 +254,9 @@ function extractViolationReason(alert: Alert): string {
     }
     case VIOLATION_TYPES.PROGRAM_EXPECTATIONS: {
       return (result as ProgramExpectationsResult)?.violation_reason || "Program expectations not reviewed"
+    }
+    case VIOLATION_TYPES.ACTIVE_SETTLEMENTS: {
+      return (result as ActiveSettlementsResult)?.violation_reason || "Active settlement negotiation detected"
     }
     default:
       return ""
@@ -266,6 +282,9 @@ function extractEvidence(alert: Alert): string {
     }
     case VIOLATION_TYPES.PROGRAM_EXPECTATIONS: {
       return (result as ProgramExpectationsResult)?.key_evidence_quote || ""
+    }
+    case VIOLATION_TYPES.ACTIVE_SETTLEMENTS: {
+      return (result as ActiveSettlementsResult)?.key_evidence_quote || ""
     }
     default:
       return ""
@@ -365,6 +384,30 @@ function extractDetail(alert: Alert): string {
         lines.push(`Enrollment confirmed: "${r.enrollment_evidence_quote}"`)
       }
       return lines.join("\n") || "Program expectations not reviewed"
+    }
+    case VIOLATION_TYPES.ACTIVE_SETTLEMENTS: {
+      const r = result as ActiveSettlementsResult
+      const lines: string[] = []
+      if (r?.mentions?.length > 0) {
+        lines.push("Settlement Mentions:")
+        for (const m of r.mentions) {
+          lines.push(`- "${m.quote}" (${m.term_used}, ${m.speaker})`)
+        }
+      }
+      if (r?.agent_response_quote) {
+        lines.push("")
+        lines.push(`Agent Response: "${r.agent_response_quote}"`)
+      }
+      lines.push("")
+      lines.push(`Enrolled with competitor: ${r?.enrolled_with_competitor ?? "unclear"}`)
+      if (r?.competitor_evidence_quote) {
+        lines.push(`  Evidence: "${r.competitor_evidence_quote}"`)
+      }
+      lines.push(`Cancellation confirmed: ${r?.cancellation_confirmed ?? "n/a"}`)
+      if (r?.cancellation_evidence_quote) {
+        lines.push(`  Evidence: "${r.cancellation_evidence_quote}"`)
+      }
+      return lines.join("\n") || "Active settlement negotiation detected"
     }
     default:
       return ""

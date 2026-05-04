@@ -18,7 +18,7 @@ export const litigationCheckModule: EvalModule = {
     const start = Date.now()
 
     const userPrompt = buildUserPrompt(
-      "Please evaluate the following call transcript for litigation or active settlement negotiation compliance:",
+      "Please evaluate the following call transcript for litigation compliance (lawsuits, judgments, garnishments, court action). Active settlement negotiations are evaluated separately and must NOT be flagged here:",
       transcript,
       callHistory,
     )
