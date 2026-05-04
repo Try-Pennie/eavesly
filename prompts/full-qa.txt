@@ -41,6 +41,14 @@
             <action>Assess use of required tools and data collection</action>
             <action>Review transition techniques between steps</action>
         </step>
+        <step name="program_expectations_evaluation">
+            <action>Determine whether enrollment was completed on this call using the enrollment_gating rules in program_expectations.</action>
+            <action>If enrollment_completed=false, set section_status="not_applicable", leave coverage booleans honest-but-informational, and skip the rest of this section.</action>
+            <action>For each of the four phases (activation, traction, momentum, graduation), mark covered true/false and capture a direct evidence quote from the handling agent if covered.</action>
+            <action>For each of the four required downsides (credit_score_decline, payments_withheld, accounts_may_close, adjustment_period_upfront), mark covered true/false with an evidence quote. Do NOT credit a downside that only appears inside a boilerplate ACDR/GOTA compliance read-through.</action>
+            <action>Build missing_elements as human-readable strings naming each missing phase or downside.</action>
+            <action>Set section_status="pass" only if all four phases and all four downsides are covered; otherwise "fail". Never let this section alone flip manager_review_required.</action>
+        </step>
     </process>
 
     <evaluation_criteria>
@@ -94,6 +102,45 @@
         <transfer_agent_quality name="freedom_debt_relief_transfer">
             <criterion>If transferred to Freedom Debt Relief, assess the transfer agent's tone and professionalism</criterion>
         </transfer_agent_quality>
+
+        <program_expectations priority="high">
+            <!--
+              Source of truth: prompts/program-expectations.txt <program_expectations_page>.
+              Keep the four phases and four required downsides below in sync with that file.
+            -->
+            <purpose>On enrollment calls, the handling agent must walk the client through the Skyfall "Program Expectations" page — all four phases and all four required downsides — before completing enrollment. This section evaluates that coverage as part of the master scorecard. The standalone program_expectations module owns Slack alerting; do NOT escalate to manager review here on the basis of a missed phase or downside alone.</purpose>
+
+            <enrollment_gating>This section is only evaluated when an enrollment is COMPLETED on this call. An enrollment is "completed" when the client agrees to the program AND any of: DocuSign enrollment agreement signed on this call; Beyond Finance / Accredited account set up with payment method; or the agent walks through Schedule A creditor list, program fee, program length, and the ACDR compliance disclosures. If the client declines, asks to think about it, or the call ends before these steps, mark enrollment_completed=false and section_status="not_applicable".</enrollment_gating>
+
+            <phases>
+                <phase name="activation">Phase 1 — Activation, Months 1–3. Foundation set, first settlement offer expected, credit may decline as payments stop, immediate cash flow relief.</phase>
+                <phase name="traction">Phase 2 — Traction, Months 4–9. Negotiations begin, additional settlement offers, savings being unlocked.</phase>
+                <phase name="momentum">Phase 3 — Momentum, Months 10–60. Heart of the program, accounts resolved to $0, enrolled debt actively shrinking.</phase>
+                <phase name="graduation">Phase 4 — Graduation, Months 60+. Enrolled debts resolved, program complete, clean slate.</phase>
+            </phases>
+
+            <required_downsides>
+                <downside name="credit_score_decline">Credit score may decline as payments stop (initial adverse-effect / temporary dip in Phase 1). "Temporary dip", "score will go down at first", "extreme adverse effect", or equivalent in the context of Phase 1 / early program counts.</downside>
+                <downside name="payments_withheld">Payments to enrolled creditors are withheld; client funds a dedicated savings/escrow account instead. "You're going to stop paying the enrolled creditors", "payments are withheld", or equivalent counts.</downside>
+                <downside name="accounts_may_close">Enrolled accounts may (and typically will) be closed by the creditors. "The creditors will likely close these accounts", "these accounts will close", or equivalent counts. Generic "creditors might contact you" does NOT count.</downside>
+                <downside name="adjustment_period_upfront">There is an adjustment period at the beginning of the program — framed as normal/expected. "Adjustment period upfront", "the first few months are an adjustment", "initial dip is a normal part of the process" counts. A bare "your score will dip" without normal/expected framing does NOT count (that's credit_score_decline).</downside>
+            </required_downsides>
+
+            <coverage_rules>
+                <rule>Only the handling agent's statements count. Statements from a transfer/welcome agent do NOT count.</rule>
+                <rule>Substance matters, not exact wording. The agent does not need to say "Phase 1" or "activation" — describing months 1–3 setup work covers it.</rule>
+                <rule>A passing reference like "there are 4 phases" without walking through each phase's content does NOT cover the phases.</rule>
+                <rule>A downside communicated ONLY inside the agent's ACDR/GOTA compliance script read-through does NOT count as covered. It must appear in the client-friendly pitch.</rule>
+                <rule>If the content was delivered earlier in the call by the handling agent, it counts even if the agent didn't reopen the Program Expectations page right before DocuSign.</rule>
+            </coverage_rules>
+
+            <section_status_rules>
+                <rule>If enrollment_completed = false → section_status = "not_applicable".</rule>
+                <rule>If enrollment_completed = true AND all four phases AND all four downsides are covered → section_status = "pass".</rule>
+                <rule>If enrollment_completed = true AND any phase or downside is missing → section_status = "fail". Populate missing_elements with human-readable strings (e.g., "Phase 2: Traction (Months 4–9)", "Downside: accounts may close").</rule>
+                <rule>section_status = "fail" here MUST NOT by itself trigger manager_review_required. The standalone program_expectations module dispatches its own coaching alert.</rule>
+            </section_status_rules>
+        </program_expectations>
     </evaluation_criteria>
 
     <scoring_guidelines>
@@ -209,8 +256,32 @@ Respond with a valid JSON object using exactly these top-level keys:
 - "compliance_scorecard": Pass/fail compliance checks with evidence arrays
 - "customer_experience_scorecard": 4-point scale ratings (excellent/good/fair/poor) for each CX criterion
 - "sales_process_scorecard": 6-step sales process adherence — step completion, locations, gaps
+- "program_expectations_scorecard": Program-expectations coverage on enrolled calls (phases + downsides) — see schema below
 - "transfer_agent_assessment": Transfer agent evaluation (occurred, tone, quality)
 - "coaching_recommendations": Strengths, areas for improvement, coaching points, training recommendations
 - "overall_call_rating": Final summary ratings — compliance, sales effectiveness, customer satisfaction, overall score
+
+The "program_expectations_scorecard" object MUST contain exactly these keys:
+- "enrollment_completed" (boolean)
+- "enrollment_evidence_quote" (string; empty if not enrolled)
+- "phase_activation_covered" (boolean)
+- "phase_activation_evidence" (string; empty if not covered)
+- "phase_traction_covered" (boolean)
+- "phase_traction_evidence" (string)
+- "phase_momentum_covered" (boolean)
+- "phase_momentum_evidence" (string)
+- "phase_graduation_covered" (boolean)
+- "phase_graduation_evidence" (string)
+- "credit_impact_downside_covered" (boolean)
+- "credit_impact_evidence" (string)
+- "payments_withheld_downside_covered" (boolean)
+- "payments_withheld_evidence" (string)
+- "accounts_may_close_downside_covered" (boolean)
+- "accounts_may_close_evidence" (string)
+- "adjustment_period_downside_covered" (boolean)
+- "adjustment_period_evidence" (string)
+- "missing_elements" (array of human-readable strings; empty array if section_status != "fail")
+- "section_status" ("pass" | "fail" | "not_applicable")
+- "section_summary" (string; one-sentence summary of coverage for the scorecard)
 
 Do not include any text outside the JSON.

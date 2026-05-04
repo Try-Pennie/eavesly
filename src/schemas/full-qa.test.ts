@@ -49,6 +49,24 @@ describe("FullQASchema", () => {
     expect(FullQASchema.safeParse(rest).success).toBe(false)
   })
 
+  it("rejects missing program_expectations_scorecard", () => {
+    const { program_expectations_scorecard, ...rest } = excellentFixture
+    expect(FullQASchema.safeParse(rest).success).toBe(false)
+  })
+
+  it("excellent fixture marks program expectations not_applicable when no enrollment", () => {
+    const result = FullQASchema.parse(excellentFixture)
+    expect(result.program_expectations_scorecard.enrollment_completed).toBe(false)
+    expect(result.program_expectations_scorecard.section_status).toBe("not_applicable")
+  })
+
+  it("violation fixture marks program expectations fail with missing_elements", () => {
+    const result = FullQASchema.parse(violationFixture)
+    expect(result.program_expectations_scorecard.enrollment_completed).toBe(true)
+    expect(result.program_expectations_scorecard.section_status).toBe("fail")
+    expect(result.program_expectations_scorecard.missing_elements.length).toBeGreaterThan(0)
+  })
+
   it("rejects invalid overall_score enum value", () => {
     const modified = {
       ...excellentFixture,
