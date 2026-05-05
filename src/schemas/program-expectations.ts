@@ -13,14 +13,10 @@ export const ProgramExpectationsSchema = z.object({
   phase_graduation_covered: z.boolean(),
   phase_graduation_evidence: z.string(),
 
-  credit_impact_downside_covered: z.boolean(),
-  credit_impact_evidence: z.string(),
-  payments_withheld_downside_covered: z.boolean(),
-  payments_withheld_evidence: z.string(),
-  accounts_may_close_downside_covered: z.boolean(),
-  accounts_may_close_evidence: z.string(),
-  adjustment_period_downside_covered: z.boolean(),
-  adjustment_period_evidence: z.string(),
+  payments_mechanics_point_covered: z.boolean(),
+  payments_mechanics_point_evidence: z.string(),
+  payments_withheld_point_covered: z.boolean(),
+  payments_withheld_point_evidence: z.string(),
 
   missing_elements: z.array(z.string()),
 

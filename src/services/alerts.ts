@@ -370,10 +370,8 @@ function extractDetail(alert: Alert): string {
       if (r?.phase_traction_covered) covered.push("Phase 2: Traction")
       if (r?.phase_momentum_covered) covered.push("Phase 3: Momentum")
       if (r?.phase_graduation_covered) covered.push("Phase 4: Graduation")
-      if (r?.credit_impact_downside_covered) covered.push("Downside: credit score decline")
-      if (r?.payments_withheld_downside_covered) covered.push("Downside: payments withheld")
-      if (r?.accounts_may_close_downside_covered) covered.push("Downside: accounts may close")
-      if (r?.adjustment_period_downside_covered) covered.push("Downside: adjustment period")
+      if (r?.payments_mechanics_point_covered) covered.push("Discussion point: how payments work / late fees")
+      if (r?.payments_withheld_point_covered) covered.push("Discussion point: why payments are withheld / account closures")
       if (covered.length > 0) {
         if (lines.length > 0) lines.push("")
         lines.push("Covered on call:")

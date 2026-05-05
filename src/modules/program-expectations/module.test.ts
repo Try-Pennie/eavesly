@@ -61,8 +61,8 @@ describe("programExpectationsModule", () => {
       expect(result.violation_type).toBeNull()
     })
 
-    it("server-side recount flips LLM violation=false to true when any downside was missed", async () => {
-      // partialFixture has enrollment_completed=true, all phases covered, two downsides NOT covered,
+    it("server-side recount flips LLM violation=false to true when any discussion point was missed", async () => {
+      // partialFixture has enrollment_completed=true, all phases covered, both discussion points NOT covered,
       // but the LLM response incorrectly set violation=false. The module must override.
       const llm = createMockLLM(partialFixture)
       const request = createEvaluateRequest()
@@ -85,12 +85,12 @@ describe("programExpectationsModule", () => {
       )
       const r = result.result as any
       expect(r.missing_elements).toEqual([
-        "Downside: payments are withheld",
-        "Downside: accounts may close",
+        "Discussion point: how payments work / late fees",
+        "Discussion point: why payments are withheld / account closures",
       ])
     })
 
-    it("server-side recount lists all 8 missing elements when nothing covered", async () => {
+    it("server-side recount lists all 6 missing elements when nothing covered", async () => {
       const llm = createMockLLM(violationFixture)
       const request = createEvaluateRequest()
       const result = await programExpectationsModule.evaluate(
@@ -99,9 +99,9 @@ describe("programExpectationsModule", () => {
         llm as any,
       )
       const r = result.result as any
-      expect(r.missing_elements).toHaveLength(8)
+      expect(r.missing_elements).toHaveLength(6)
       expect(r.missing_elements).toContain("Phase 1: Activation (Months 1–3)")
-      expect(r.missing_elements).toContain("Downside: credit score may decline")
+      expect(r.missing_elements).toContain("Discussion point: how payments work / late fees")
     })
 
     it("passes correct schema name to LLM", async () => {
