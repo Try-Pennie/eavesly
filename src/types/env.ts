@@ -9,6 +9,8 @@ export interface Bindings {
   CF_AIG_TOKEN: string
   SLACK_WEBHOOK_URL?: string
   SLACK_WEBHOOK_URL_FULL_QA?: string
+  SLACK_WEBHOOK_URL_JOEL_NELSON?: string
+  SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON?: string
   DASHBOARD_BASE_URL?: string
   EVALUATION_WORKFLOW: Workflow
 }

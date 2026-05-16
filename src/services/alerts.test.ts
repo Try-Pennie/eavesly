@@ -300,6 +300,153 @@ describe("dispatchAlerts", () => {
   })
 })
 
+describe("dispatchAlerts — Joel Nelson mirror", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK", text: () => Promise.resolve("ok") }),
+    )
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "manager@example.com" },
+      error: null,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("mirrors non-full_qa alerts for jnelson@trypennie.com to SLACK_WEBHOOK_URL_JOEL_NELSON", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "jnelson@trypennie.com",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const urls = (fetch as any).mock.calls.map((c: any[]) => c[0])
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL)
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
+    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON)
+  })
+
+  it("mirrors full_qa alerts for jnelson@trypennie.com to SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      agent_email: "jnelson@trypennie.com",
+      result: violationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const urls = (fetch as any).mock.calls.map((c: any[]) => c[0])
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL_FULL_QA)
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON)
+    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
+  })
+
+  it("matches Joel Nelson case-insensitively", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "JNelson@TryPennie.com",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const urls = (fetch as any).mock.calls.map((c: any[]) => c[0])
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
+  })
+
+  it("does NOT mirror alerts for other agents", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "someone-else@trypennie.com",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const urls = (fetch as any).mock.calls.map((c: any[]) => c[0])
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL)
+    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
+    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON)
+  })
+
+  it("skips mirror but still sends primary when SLACK_WEBHOOK_URL_JOEL_NELSON is unset", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv({ SLACK_WEBHOOK_URL_JOEL_NELSON: undefined })
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "jnelson@trypennie.com",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith(
+      env.SLACK_WEBHOOK_URL,
+      expect.objectContaining({ method: "POST" }),
+    )
+  })
+
+  it("primary send still succeeds when mirror send fails", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("joel-nelson")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+          text: () => Promise.resolve("mirror failed"),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: () => Promise.resolve("ok"),
+      })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.BUDGET_INPUTS,
+      violation_type: VIOLATION_TYPES.BUDGET_COMPLIANCE,
+      agent_email: "jnelson@trypennie.com",
+      result: budgetViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    // Should not throw — mirror error is swallowed
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    const urls = fetchMock.mock.calls.map((c: any[]) => c[0])
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL)
+    expect(urls).toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
+  })
+})
+
 describe("buildSlackPayload", () => {
   it("includes all required fields", () => {
     const alert = createAlert({

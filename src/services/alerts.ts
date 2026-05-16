@@ -12,6 +12,8 @@ import { createClient } from "@supabase/supabase-js"
 
 const INVALID_MANAGER_VALUES = ["no longer at pennie", "none"]
 
+const JOEL_NELSON_EMAIL = "jnelson@trypennie.com"
+
 export async function dispatchAlerts(
   alerts: Alert[],
   ctx: ExecutionContext,
@@ -65,7 +67,31 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
     webhookUrlTail: webhookUrl.slice(-8),
   })
 
-  await sendSlackWebhook(webhookUrl, payload)
+  const mirrorWebhookUrl =
+    alert.agent_email?.toLowerCase() === JOEL_NELSON_EMAIL
+      ? isFullQA
+        ? env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON
+        : env.SLACK_WEBHOOK_URL_JOEL_NELSON
+      : undefined
+
+  const sends: Promise<void>[] = [sendSlackWebhook(webhookUrl, payload)]
+
+  if (mirrorWebhookUrl) {
+    log("info", "Sending Slack mirror webhook for Joel Nelson", {
+      callId: alert.call_id,
+      webhookUrlTail: mirrorWebhookUrl.slice(-8),
+    })
+    sends.push(
+      sendSlackWebhook(mirrorWebhookUrl, payload).catch((error) => {
+        log("error", "Joel Nelson mirror Slack webhook failed", {
+          callId: alert.call_id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }),
+    )
+  }
+
+  await Promise.all(sends)
 }
 
 export async function lookupManagerEmail(
