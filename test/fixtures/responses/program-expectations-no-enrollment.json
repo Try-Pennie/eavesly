@@ -18,6 +18,8 @@
   "adjustment_period_downside_covered": false,
   "adjustment_period_evidence": "",
   "missing_elements": [],
+  "prior_call_program_expectations_covered": false,
+  "prior_call_evidence_quote": "",
   "violation": false,
   "violation_reason": "Client did not enroll on this call — wanted to think about it and call back. No violation since the expectations page is only required when enrollment completes.",
   "key_evidence_quote": ""

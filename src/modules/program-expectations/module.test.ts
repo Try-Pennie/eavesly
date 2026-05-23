@@ -104,6 +104,26 @@ describe("programExpectationsModule", () => {
       expect(r.missing_elements).toContain("Downside: credit score may decline")
     })
 
+    it("suppresses violation when prior_call_program_expectations_covered is true even if this call missed everything", async () => {
+      const priorCallCoveredFixture = {
+        ...violationFixture,
+        prior_call_program_expectations_covered: true,
+        prior_call_evidence_quote: "Customer enrolled in a debt resolution program with payment setup and expectations reviewed",
+      }
+      const llm = createMockLLM(priorCallCoveredFixture)
+      const request = createEvaluateRequest()
+      const result = await programExpectationsModule.evaluate(
+        request.transcript.transcript,
+        request,
+        llm as any,
+      )
+      expect(result.has_violation).toBe(false)
+      expect(result.violation_type).toBeNull()
+      // missing_elements still records what this call missed — useful for diagnostics
+      const r = result.result as any
+      expect(r.missing_elements).toHaveLength(8)
+    })
+
     it("passes correct schema name to LLM", async () => {
       const llm = createMockLLM(noViolationFixture)
       const request = createEvaluateRequest()
