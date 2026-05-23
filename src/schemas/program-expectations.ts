@@ -24,6 +24,9 @@ export const ProgramExpectationsSchema = z.object({
 
   missing_elements: z.array(z.string()),
 
+  prior_call_program_expectations_covered: z.boolean(),
+  prior_call_evidence_quote: z.string(),
+
   violation: z.boolean(),
   violation_reason: z.string(),
   key_evidence_quote: z.string(),

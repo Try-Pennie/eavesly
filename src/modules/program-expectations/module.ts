@@ -59,7 +59,10 @@ export const programExpectationsModule: EvalModule = {
     if (!result.accounts_may_close_downside_covered) missing.push(DOWNSIDE_LABELS.accounts_may_close)
     if (!result.adjustment_period_downside_covered) missing.push(DOWNSIDE_LABELS.adjustment_period)
 
-    const actualViolation = result.enrollment_completed && missing.length > 0
+    const actualViolation =
+      result.enrollment_completed &&
+      missing.length > 0 &&
+      !result.prior_call_program_expectations_covered
 
     result.missing_elements = missing
     result.violation = actualViolation

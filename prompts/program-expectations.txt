@@ -69,12 +69,19 @@
             <action>The downside must be communicated DURING THE PITCH / enrollment conversation — not only buried inside the agent reading the GOTA/ACDR compliance script at the very end. If the downside appears both in normal pitch language AND in the ACDR script, count it as covered. If it appears ONLY as part of the boilerplate ACDR compliance read-through, count it as NOT covered — the point of the expectations page is a client-friendly walkthrough, not a boilerplate recitation.</action>
             <action>Record a direct quote as evidence for each downside that is covered. Leave the evidence empty string if not covered.</action>
         </step>
+        <step name="evaluate_prior_call_coverage">
+            <action>If a &lt;prior_call_history&gt; block is present, determine whether it provides evidence that program expectations were already covered with this lead on a prior call, OR that the lead was already enrolled in the program on a prior call. Use the criteria in &lt;prior_call_context&gt;.</action>
+            <action>Set prior_call_program_expectations_covered = true when there is reasonable evidence; otherwise false.</action>
+            <action>When true, populate prior_call_evidence_quote with the specific text from the prior_call_history that supports the determination. When false, leave the quote empty.</action>
+            <action>Do NOT let this determination change the per-phase or per-downside coverage flags for THIS call — those still reflect only what the handling agent did on THIS call.</action>
+        </step>
         <step name="determine_violation">
-            <action>A violation occurs ONLY when: enrollment_completed = true AND (at least one phase is not covered OR at least one required downside is not covered).</action>
+            <action>A violation occurs ONLY when: enrollment_completed = true AND (at least one phase is not covered OR at least one required downside is not covered) AND prior_call_program_expectations_covered = false.</action>
             <action>If enrollment_completed = false, violation = false. Full stop.</action>
+            <action>If prior_call_program_expectations_covered = true, violation = false — the lead already heard the expectations content on a prior call.</action>
             <action>If enrollment_completed = true and all four phases are covered and all four downsides are covered, violation = false.</action>
-            <action>Build missing_elements as a list of human-readable strings naming each missing phase or downside (e.g., "Phase 2: Traction (Months 4–9)", "Downside: accounts may close").</action>
-            <action>Write a concise violation_reason explaining what was missing.</action>
+            <action>Build missing_elements as a list of human-readable strings naming each missing phase or downside (e.g., "Phase 2: Traction (Months 4–9)", "Downside: accounts may close"). Populate this list based on this call's coverage even when prior_call_program_expectations_covered = true — it is useful diagnostic data even when the alert is suppressed.</action>
+            <action>Write a concise violation_reason explaining what was missing or, when the violation is suppressed by prior-call coverage, state that program expectations were already covered with this lead on a prior call.</action>
             <action>Select the most useful quote as key_evidence_quote — if there is a violation, this should illustrate what the agent said (or didn't say) at the moment they should have been walking through program expectations. If no violation, it can be empty.</action>
         </step>
     </process>
@@ -85,6 +92,7 @@
             <case>Call ended before the agent got to the pitch / program expectations stage, and no enrollment happened — enrollment_completed=false, violation=false.</case>
             <case>All four phases are covered and all four required downsides are covered (wording variations are fine) — violation=false.</case>
             <case>Agent covered the phases and downsides earlier in the call even if they did not re-open the Program Expectations page right before DocuSign — if the content was all delivered somewhere on the call by the handling agent, it counts.</case>
+            <case>The &lt;prior_call_history&gt; shows program expectations were already covered with this lead on an earlier call (or that the lead was already enrolled from a prior call) — prior_call_program_expectations_covered=true, violation=false. Continue to record phase/downside coverage flags for this call honestly.</case>
         </no_violation_cases>
 
         <violation_cases>
@@ -98,17 +106,26 @@
         2. Identify the handling agent. Only their statements count for coverage. Ignore "what to expect" or similar phrasing coming from a transfer/welcome agent after enrollment.
         3. For each phase (activation, traction, momentum, graduation): mark covered true/false and include a direct evidence quote from the handling agent when covered. Wording variations are acceptable — substance is what matters.
         4. For each required downside: mark covered true/false with an evidence quote. A downside communicated only inside the agent's ACDR/compliance script read-through does NOT count as covered.
-        5. Set violation = true ONLY when enrollment_completed = true AND any phase or required downside is not covered.
-        6. Populate missing_elements with a human-readable list of what was missing (phase names prefixed with "Phase", downside names prefixed with "Downside") — used for Slack coaching alerts. Keep it empty if there is no violation.
-        7. Write violation_reason as one or two sentences describing what was missing. If no violation, briefly state why (e.g., "No enrollment on this call" or "Agent covered all four phases and all required downsides").
-        8. Set key_evidence_quote to the most useful single quote. Empty string if none.
-        9. Be objective. Do not penalize the agent for wording variations. Do not require the exact phrase "program expectations." Do require the substance of each phase and each downside.
+        5. If a &lt;prior_call_history&gt; block is present, evaluate whether program expectations were already covered with this lead on a prior call (or whether the lead was already enrolled from a prior call). Set prior_call_program_expectations_covered and prior_call_evidence_quote accordingly. Apply this evaluation independently of the per-phase / per-downside flags for THIS call.
+        6. Set violation = true ONLY when enrollment_completed = true AND any phase or required downside is not covered AND prior_call_program_expectations_covered = false.
+        7. Populate missing_elements with a human-readable list of what was missing on THIS call (phase names prefixed with "Phase", downside names prefixed with "Downside") — used for Slack coaching alerts and analytics. Populate this list based on this call's coverage even when prior_call_program_expectations_covered = true.
+        8. Write violation_reason as one or two sentences describing what was missing. If no violation, briefly state why (e.g., "No enrollment on this call", "Agent covered all four phases and all required downsides", or "Program expectations were covered on a prior call with this lead").
+        9. Set key_evidence_quote to the most useful single quote. Empty string if none.
+        10. Be objective. Do not penalize the agent for wording variations. Do not require the exact phrase "program expectations." Do require the substance of each phase and each downside.
     </instructions>
 
     <prior_call_context>
         <note>The user prompt may include a &lt;prior_call_history&gt; block before the transcript. This contains summaries of previous calls with the same lead.</note>
-        <note>Program expectations must be walked through on the call where enrollment is being completed. If enrollment completes on THIS call, the handling agent needs to cover the phases and downsides on THIS call, even if they were covered on a prior call.</note>
         <note>If no &lt;prior_call_history&gt; block is present, evaluate the call as a standalone interaction.</note>
+        <note>Multi-call enrollments are common at Pennie. When a lead has prior calls, program expectations may have been covered on an earlier call rather than this one. In that case, the handling agent on THIS call should not be penalized for not re-walking the entire page.</note>
+        <note>Set prior_call_program_expectations_covered = true when the &lt;prior_call_history&gt; provides reasonable evidence that program expectations were already covered with this lead, including any of:
+            - A prior call summary that explicitly mentions program expectations, "expectations reviewed", a walkthrough of the four phases, or the required downsides.
+            - A prior call summary indicating enrollment was already completed on an earlier call (e.g., "enrollment completed," "enrolled in [program]," "DocuSign signed," "payment account set up"). If the lead is already enrolled from a prior call, program expectations must have been covered then.
+            - A prior call summary describing a substantive sales pitch / program walkthrough with this lead (a full presentation of the Pennie program) followed by an immediate follow-up enrollment on THIS call. This covers the "2-call close" pattern.</note>
+        <note>Conservative signals that do NOT meet the bar: voicemails, abandoned calls, transfers without content, calls where the customer declined and did not engage with the program details, or calls whose summaries do not describe program content or enrollment progress.</note>
+        <note>When in doubt, prefer to set prior_call_program_expectations_covered = true if any prior call summary plausibly indicates the lead already heard the expectations content. Managers consistently treat multi-call enrollments where PE was done previously as non-violations; the cost of a false positive (alerting a coached agent unnecessarily) is high.</note>
+        <note>Always populate prior_call_evidence_quote with the specific phrase from the prior_call_history that supports prior_call_program_expectations_covered = true. Leave it empty when prior_call_program_expectations_covered = false.</note>
+        <note>You still must evaluate phase and downside coverage on THIS call honestly — set phase_*_covered and *_downside_covered based only on what the handling agent did on THIS call. The system will use prior_call_program_expectations_covered to decide whether to suppress an alert; do not let prior-call coverage cause you to mark this call's phase or downside flags as true.</note>
     </prior_call_context>
 </prompt>
 
@@ -133,7 +150,9 @@ Respond with a valid JSON object using exactly these top-level keys:
 - "adjustment_period_downside_covered": Whether the upfront-adjustment-period downside was communicated (boolean)
 - "adjustment_period_evidence": Direct quote (empty string if not covered)
 - "missing_elements": Array of human-readable strings naming each missing phase or downside (empty array if none missing)
-- "violation": Whether this is a violation — enrollment_completed=true AND at least one phase or downside is not covered (boolean)
+- "prior_call_program_expectations_covered": Whether the &lt;prior_call_history&gt; provides evidence that program expectations were already covered with this lead on an earlier call (or that the lead was already enrolled from a prior call). False when there is no prior_call_history or when the prior calls do not provide such evidence. (boolean)
+- "prior_call_evidence_quote": The specific phrase from the prior_call_history that supports prior_call_program_expectations_covered = true (empty string when false)
+- "violation": Whether this is a violation — enrollment_completed=true AND at least one phase or downside is not covered AND prior_call_program_expectations_covered=false (boolean)
 - "violation_reason": Human-readable explanation of the violation or why there is no violation
 - "key_evidence_quote": Most relevant single quote for alerts (empty string if not applicable)
 
