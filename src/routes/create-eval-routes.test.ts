@@ -169,4 +169,55 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
       expect(res.status).toBe(401)
     })
   })
+
+  describe(`POST /evaluate/${endpoint}/from-recording`, () => {
+    const validRecordingBody = {
+      call_id: "rec-call-1",
+      agent_id: "agent-456",
+      recording_url: "https://api.twilio.com/REC123",
+      metadata: { timestamp: "2025-01-01T00:00:00Z" },
+    }
+
+    it("returns 401 without auth", async () => {
+      const app = createApp(endpoint, moduleName)
+      const res = await app.request(`/api/v1/evaluate/${endpoint}/from-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validRecordingBody),
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(401)
+    })
+
+    it("returns 400 without recording_url", async () => {
+      const app = createApp(endpoint, moduleName)
+      const res = await app.request(`/api/v1/evaluate/${endpoint}/from-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TEST_API_KEY}` },
+        body: JSON.stringify({ call_id: "x", agent_id: "y", metadata: { timestamp: "t" } }),
+      }, createEnvWithWorkflow())
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 202 and passes the recording param to the workflow", async () => {
+      const app = createApp(endpoint, moduleName)
+      const res = await app.request(`/api/v1/evaluate/${endpoint}/from-recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TEST_API_KEY}` },
+        body: JSON.stringify(validRecordingBody),
+      }, createEnvWithWorkflow())
+
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
+      expect(body.module).toBe(moduleName)
+      expect(body.status).toBe("queued")
+      expect(body.call_id).toBe("rec-call-1")
+      expect(body.workflow_instance_id).toBe("test-instance-id")
+
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe(`rec-call-1-${moduleName}`)
+      expect(createArgs.params.recording).toEqual({ url: "https://api.twilio.com/REC123", source: "twilio" })
+      expect(createArgs.params.callData.transcript.transcript).toBe("")
+      expect(createArgs.params.callData.recording_link).toBe("https://api.twilio.com/REC123")
+    })
+  })
 })
