@@ -33,3 +33,27 @@ export const BatchEvaluateRequestSchema = z.object({
 })
 
 type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>
+
+const FromRecordingMetadataSchema = z.object({
+  timestamp: z.string(),
+  duration: z.coerce.number().nonnegative().optional(),
+  talk_time: z.coerce.number().nonnegative().optional(),
+  disposition: z.string().optional(),
+  campaign_name: z.string().optional(),
+})
+
+export const EvaluateFromRecordingRequestSchema = z.object({
+  call_id: z.string().min(1),
+  agent_id: z.string(),
+  recording_url: z.string().url(),
+  recording_source: z.literal("twilio").default("twilio"),
+  metadata: FromRecordingMetadataSchema,
+  agent_email: z.string().optional(),
+  contact_name: z.string().optional(),
+  contact_phone: z.string().optional(),
+  call_summary: z.string().optional(),
+  transcript_url: z.string().optional(),
+  sfdc_lead_id: z.string().optional(),
+})
+
+export type EvaluateFromRecordingRequest = z.infer<typeof EvaluateFromRecordingRequestSchema>

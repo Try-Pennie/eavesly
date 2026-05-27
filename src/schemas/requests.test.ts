@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
+  EvaluateFromRecordingRequestSchema,
 } from "./requests"
 
 const validRequest = {
@@ -125,5 +126,29 @@ describe("EvaluateRequestSchema optional Regal fields", () => {
       expect(result.data.agent_email).toBe("agent@example.com")
       expect(result.data.contact_name).toBeUndefined()
     }
+  })
+})
+
+describe("EvaluateFromRecordingRequestSchema", () => {
+  const valid = {
+    call_id: "rec-1",
+    agent_id: "agent-1",
+    recording_url: "https://api.twilio.com/REC123",
+    metadata: { timestamp: "2025-01-01T00:00:00Z" },
+  }
+
+  it("accepts a minimal valid body and defaults recording_source", () => {
+    const parsed = EvaluateFromRecordingRequestSchema.parse(valid)
+    expect(parsed.recording_source).toBe("twilio")
+    expect(parsed.metadata.duration).toBeUndefined()
+  })
+
+  it("rejects a body missing recording_url", () => {
+    const { recording_url, ...rest } = valid
+    expect(EvaluateFromRecordingRequestSchema.safeParse(rest).success).toBe(false)
+  })
+
+  it("rejects a non-URL recording_url", () => {
+    expect(EvaluateFromRecordingRequestSchema.safeParse({ ...valid, recording_url: "not-a-url" }).success).toBe(false)
   })
 })
