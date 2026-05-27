@@ -12,6 +12,10 @@ export interface Bindings {
   SLACK_WEBHOOK_URL_JOEL_NELSON?: string
   SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON?: string
   DASHBOARD_BASE_URL?: string
+  DEEPGRAM_API_KEY?: string
+  DEEPGRAM_MODEL?: string
+  TWILIO_ACCOUNT_SID?: string
+  TWILIO_AUTH_TOKEN?: string
   EVALUATION_WORKFLOW: Workflow
 }
 
