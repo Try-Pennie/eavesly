@@ -3,6 +3,7 @@ import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import { getModule } from "./module-registry"
 import { createLLMClient } from "../services/llm-client"
+import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
 import { MODULE_NAMES } from "../modules/constants"
@@ -12,12 +13,29 @@ type EvaluationParams = {
   moduleName: string
   callData: EvaluateRequest
   correlationId: string
+  recording?: { url: string; source: "twilio" }
 }
 
 export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationParams> {
   async run(event: WorkflowEvent<EvaluationParams>, step: WorkflowStep) {
-    const { moduleName, callData, correlationId } = event.payload
+    const { moduleName, callData, correlationId, recording } = event.payload
     const mod = getModule(moduleName)
+
+    // Step 0a: Transcribe recording (Twilio path only). The Regal path already
+    // supplies a transcript, so this is skipped there.
+    if (needsTranscription(callData, recording)) {
+      const transcribed = await step.do("transcribe-recording", {
+        retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
+        timeout: "5 minutes",
+      }, async () => {
+        return await transcribeRecording(this.env, recording!.url)
+      })
+
+      callData.transcript = {
+        transcript: transcribed.transcript,
+        metadata: { ...callData.transcript.metadata, duration: transcribed.durationSec },
+      }
+    }
 
     // Step 0: Fetch prior call context (if sfdc_lead_id available)
     const callHistory = await step.do("fetch-call-history", {
