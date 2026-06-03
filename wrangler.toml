@@ -6,6 +6,7 @@ account_id = "3e7f907a9c19e51417873e2cce4fbc5c"
 [vars]
 ENVIRONMENT = "development"
 OPENROUTER_MODEL = "openai/gpt-4.1"
+DEEPGRAM_MODEL = "nova-3"
 
 # Secrets (set via `wrangler secret put`):
 # INTERNAL_API_KEY
@@ -19,6 +20,9 @@ OPENROUTER_MODEL = "openai/gpt-4.1"
 # SLACK_WEBHOOK_URL_JOEL_NELSON         (mirror of SLACK_WEBHOOK_URL for jnelson@trypennie.com)
 # SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON (mirror of SLACK_WEBHOOK_URL_FULL_QA for jnelson@trypennie.com)
 # DASHBOARD_BASE_URL  (e.g. https://eavesly.com — used to build review_url in Slack alerts)
+# DEEPGRAM_API_KEY
+# TWILIO_ACCOUNT_SID
+# TWILIO_AUTH_TOKEN
 
 [[rules]]
 type = "Text"
@@ -37,7 +41,7 @@ invocation_logs = true
 
 [env.staging]
 name = "eavesly-staging"
-vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1" }
+vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1", DEEPGRAM_MODEL = "nova-3" }
 
 [[env.staging.workflows]]
 name = "eavesly-evaluation-staging"
@@ -46,7 +50,7 @@ class_name = "EvaluationWorkflow"
 
 [env.production]
 name = "eavesly-production"
-vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1" }
+vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DEEPGRAM_MODEL = "nova-3" }
 
 [[env.production.workflows]]
 name = "eavesly-evaluation-production"

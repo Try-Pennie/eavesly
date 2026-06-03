@@ -37,6 +37,12 @@ All tables use the `eavesly_` prefix to ensure clear separation from other produ
 - `transcript_url` (TEXT) - Transcript URL from Regal
 - `sfdc_lead_id` (TEXT) - Salesforce Lead ID from Regal
 
+> These metadata fields are normally supplied by Regal. For the from-recording
+> (Twilio) path (`POST /api/v1/evaluate/{module}/from-recording`), `recording_link`
+> holds the submitted Twilio recording URL, the transcript is produced in-house by
+> Deepgram (so `transcript_url` is typically empty), and the remaining fields come
+> from the request body. The stored shape is identical either way.
+
 **Unique constraint**: `(call_id, module_name)` - prevents duplicate evaluations per call per module. Upsert operations use this constraint.
 
 **Used by**: `DatabaseService.storeModuleResult()` in `src/services/database.ts`
@@ -58,9 +64,13 @@ All tables use the `eavesly_` prefix to ensure clear separation from other produ
 ## Data Flow
 
 ```
-API Request -> Module Evaluation -> storeModuleResult() -> eavesly_module_results
-                                 -> storeQAResult()     -> eavesly_transcription_qa (full_qa only)
+API Request -> [transcribe recording (from-recording path only)] -> Module Evaluation
+            -> storeModuleResult() -> eavesly_module_results
+            -> storeQAResult()     -> eavesly_transcription_qa (full_qa only)
 ```
+
+The transcription step only runs on the from-recording (Twilio) path; the
+transcript-based endpoints skip straight to Module Evaluation.
 
 ## Security
 

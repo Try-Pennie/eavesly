@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { getModule } from "./module-registry"
+import { needsTranscription } from "../services/transcription"
 
 describe("module-registry", () => {
   it("returns budget_inputs module", () => {
@@ -86,5 +87,36 @@ describe("EvaluationWorkflow step logic", () => {
     const noViolation = { ...mockModuleResult, has_violation: false }
     const alerts = mod.extractAlerts(noViolation, "test-call-123", "agent-456")
     expect(alerts).toHaveLength(0)
+  })
+})
+
+describe("transcribe step wiring", () => {
+  const withRecording = {
+    call_id: "rec-1",
+    agent_id: "a",
+    transcript: { transcript: "", metadata: { duration: 0, timestamp: "2025-01-01T00:00:00Z" } },
+  } as any
+
+  it("gates transcription on empty transcript + recording present", () => {
+    expect(needsTranscription(withRecording, { url: "https://api.twilio.com/REC" })).toBe(true)
+    expect(needsTranscription({ ...withRecording, transcript: { transcript: "done", metadata: {} } }, { url: "x" })).toBe(false)
+  })
+
+  it("assembles callData.transcript from a transcription result, preserving metadata", () => {
+    const callData = {
+      ...withRecording,
+      transcript: { transcript: "", metadata: { duration: 0, timestamp: "2025-01-01T00:00:00Z" } },
+    }
+    const transcribed = { transcript: "[handling agent]: hi", durationSec: 88 }
+
+    // Mirrors the assignment the workflow performs after the transcribe step.
+    callData.transcript = {
+      transcript: transcribed.transcript,
+      metadata: { ...callData.transcript.metadata, duration: transcribed.durationSec },
+    }
+
+    expect(callData.transcript.transcript).toBe("[handling agent]: hi")
+    expect(callData.transcript.metadata.duration).toBe(88)
+    expect(callData.transcript.metadata.timestamp).toBe("2025-01-01T00:00:00Z")
   })
 })

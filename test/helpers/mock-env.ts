@@ -16,6 +16,10 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     SLACK_WEBHOOK_URL_FULL_QA: "https://hooks.slack.com/workflows/test-full-qa",
     SLACK_WEBHOOK_URL_JOEL_NELSON: "https://hooks.slack.com/workflows/test-joel-nelson",
     SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON: "https://hooks.slack.com/workflows/test-full-qa-joel-nelson",
+    DEEPGRAM_API_KEY: "test-deepgram-key",
+    DEEPGRAM_MODEL: "nova-3",
+    TWILIO_ACCOUNT_SID: "ACtest",
+    TWILIO_AUTH_TOKEN: "test-twilio-token",
     EVALUATION_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
     ...overrides,
   }

@@ -41,6 +41,16 @@ npx wrangler secret put CF_GATEWAY_ID
 npx wrangler secret put CF_AIG_TOKEN
 ```
 
+For the Twilio transcription path (see "Transcribing from a recording" below), also set:
+
+```bash
+npx wrangler secret put DEEPGRAM_API_KEY
+npx wrangler secret put TWILIO_ACCOUNT_SID
+npx wrangler secret put TWILIO_AUTH_TOKEN
+```
+
+`DEEPGRAM_MODEL` is a plain var in `wrangler.toml` (default `nova-3`) and needs no secret.
+
 ## Project Structure
 
 ```
@@ -66,7 +76,46 @@ src/
 |--------|------|-------------|
 | `POST` | `/api/v1/evaluate` | Evaluate a single call |
 | `POST` | `/api/v1/batch` | Batch evaluate multiple calls |
+| `POST` | `/api/v1/evaluate/{module}/from-recording` | Transcribe a call recording, then evaluate |
 | `GET` | `/health` | Health check |
+
+### Transcribing from a recording (Twilio)
+
+Eavesly normally receives an already-transcribed call (e.g. from Regal). The
+`from-recording` variant instead accepts a **recording URL**, transcribes it with
+Deepgram, and runs the same evaluation pipeline. This is additive — the existing
+transcript-based endpoints are unchanged.
+
+```
+POST /api/v1/evaluate/{module}/from-recording
+Authorization: Bearer <INTERNAL_API_KEY>
+Content-Type: application/json
+
+{
+  "call_id": "CA123...",
+  "agent_id": "agent-1",
+  "recording_url": "https://api.twilio.com/2010-04-01/Accounts/AC.../Recordings/RE...",
+  "recording_source": "twilio",        // optional, defaults to "twilio"
+  "metadata": { "timestamp": "2026-05-27T00:00:00Z" },  // duration optional; filled from Deepgram
+  "agent_email": "...",                  // optional, same optional fields as the transcript endpoint
+  "sfdc_lead_id": "..."
+}
+```
+
+How it works:
+
+1. The Worker downloads the recording from Twilio with HTTP Basic Auth
+   (`TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN`); the `.mp3` representation is fetched.
+2. The audio is sent to Deepgram (`/v1/listen`, `model=DEEPGRAM_MODEL`, with
+   diarization + multichannel) and formatted into a speaker-labeled transcript
+   (`[handling agent]:` / `[contact]:` / `[transfer agent]:`). Dual-channel recordings
+   map roles by channel; mono recordings use a first-speaker heuristic.
+3. The transcript flows into the normal evaluation workflow for the chosen module.
+
+Returns `202` with a `workflow_instance_id` (or `409` if that `call_id` + module was
+already submitted), same as the transcript endpoint. Note: one transcription is
+performed per call; evaluating the same `call_id` against multiple modules
+re-transcribes (transcript caching is a possible future optimization).
 
 ## Scripts
 
