@@ -86,10 +86,11 @@ These phrases are **factually incorrect or misrepresent Pennie's program**. They
 |--------|-------------|
 | "This program eliminates your interest" | Interest is not eliminated; it may continue to accrue during the program |
 | "Zero percent interest" | Interest is not reduced to zero; it may continue to accrue during the program |
-| "Paid as agreed" | Settled accounts are not reported as "paid as agreed"; they are reported as settled for less than full balance |
 | "Doesn't blacklist you with creditors" | Creditors may still report negative information; the program does not prevent this |
 | "This isn't debt relief" | The program is a form of debt relief; denying this misrepresents the service |
 | "This isn't debt settlement" | The program involves debt settlement; denying this misrepresents the service |
+
+> **Credit-reporting carve-out:** Explaining how a settled account may appear on credit using the approved program-expectations framing — e.g., *"it may appear on your credit as paid, paid as agreed, or settled as agreed"* — is **compliant**. This is the exact language on Pennie's program-expectations slide. Only flag if the agent claims settled accounts **will** be reported as "paid as agreed" as a guaranteed/sole outcome.
 
 ---
 
