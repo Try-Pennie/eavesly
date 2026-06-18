@@ -131,6 +131,7 @@ const MODULE_NAME_MAP: Record<string, string> = {
   "litigation-check": "litigation_check",
   "program-expectations": "program_expectations",
   "active-settlements": "active_settlements",
+  "disposition-review": "disposition_review",
 }
 
 async function verifyDbResult(
@@ -199,6 +200,7 @@ const MODULES = [
   "litigation-check",
   "program-expectations",
   "active-settlements",
+  "disposition-review",
 ] as const
 
 async function runTest(

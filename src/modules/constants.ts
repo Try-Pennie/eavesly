@@ -5,6 +5,7 @@ export const MODULE_NAMES = {
   LITIGATION_CHECK: "litigation_check",
   PROGRAM_EXPECTATIONS: "program_expectations",
   ACTIVE_SETTLEMENTS: "active_settlements",
+  DISPOSITION_REVIEW: "disposition_review",
 } as const
 
 export const VIOLATION_TYPES = {
@@ -14,6 +15,7 @@ export const VIOLATION_TYPES = {
   LITIGATION_CHECK: "litigation_check",
   PROGRAM_EXPECTATIONS: "program_expectations",
   ACTIVE_SETTLEMENTS: "active_settlements",
+  MIS_DISPOSITION: "mis_disposition",
 } as const
 
 type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]

@@ -1,0 +1,15 @@
+{
+  "suggested_disposition": "Not Interested",
+  "disposition_matches_transcript": true,
+  "confidence": 0.92,
+  "conversation_happened": "yes",
+  "evidence": [
+    {
+      "speaker": "contact",
+      "quote": "No thanks, I'm really not interested in any of this.",
+      "rationale": "Contact explicitly declined the offer."
+    }
+  ],
+  "reasoning_summary": "The contact clearly declined and the call is dispositioned Not Interested, which matches the transcript.",
+  "alternative_candidates": []
+}
