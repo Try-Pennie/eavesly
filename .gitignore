@@ -156,3 +156,6 @@ test_results.log
 
 # Python virtual environments
 .venv/
+
+# Eval harness output
+scripts/eval-output/
