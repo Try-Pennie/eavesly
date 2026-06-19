@@ -369,7 +369,7 @@ describe("dispatchAlerts — Joel Nelson mirror", () => {
     expect(urls).toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
   })
 
-  it("does NOT mirror disposition-review alerts for Joel Nelson while production testing", async () => {
+  it("mutes disposition-review Slack alerts for Joel Nelson while production testing", async () => {
     const ctx = createMockCtx()
     const env = createEnv()
     const alert = createAlert({
@@ -385,10 +385,7 @@ describe("dispatchAlerts — Joel Nelson mirror", () => {
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
 
-    const urls = (fetch as any).mock.calls.map((c: any[]) => c[0])
-    expect(urls).toEqual([env.SLACK_WEBHOOK_URL])
-    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_JOEL_NELSON)
-    expect(urls).not.toContain(env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON)
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it("does NOT mirror alerts for other agents", async () => {

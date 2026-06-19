@@ -14,13 +14,19 @@ const INVALID_MANAGER_VALUES = ["no longer at pennie", "none"]
 
 const JOEL_NELSON_EMAIL = "jnelson@trypennie.com"
 
+function isDispositionReviewAlert(alert: Alert): boolean {
+  return (
+    alert.module_name === MODULE_NAMES.DISPOSITION_REVIEW ||
+    alert.violation_type === VIOLATION_TYPES.MIS_DISPOSITION
+  )
+}
+
 function shouldMirrorToJoel(alert: Alert): boolean {
   if (alert.agent_email?.toLowerCase() !== JOEL_NELSON_EMAIL) return false
 
   // TEMPORARY: disposition-review is being tested in production and is hidden
   // from manager-facing surfaces. Keep Joel's mirror muted for this module too.
-  if (alert.module_name === MODULE_NAMES.DISPOSITION_REVIEW) return false
-  if (alert.violation_type === VIOLATION_TYPES.MIS_DISPOSITION) return false
+  if (isDispositionReviewAlert(alert)) return false
 
   return true
 }
@@ -49,6 +55,17 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
     violationType: alert.violation_type,
     callId: alert.call_id,
   })
+
+  // TEMPORARY: disposition-review is under production test and hidden from the
+  // manager UI. Keep Slack/webhook notifications muted too, while still letting
+  // the workflow store the module result for internal review.
+  if (isDispositionReviewAlert(alert)) {
+    log("info", "Disposition-review Slack alert muted", {
+      callId: alert.call_id,
+      agentEmail: alert.agent_email,
+    })
+    return
+  }
 
   const isFullQA = alert.violation_type === VIOLATION_TYPES.MANAGER_ESCALATION
   const webhookUrl = isFullQA ? env.SLACK_WEBHOOK_URL_FULL_QA : env.SLACK_WEBHOOK_URL
