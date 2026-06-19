@@ -3,6 +3,7 @@ import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import { getModule } from "./module-registry"
 import { createLLMClient } from "../services/llm-client"
+import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
@@ -52,7 +53,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
-      const llm = createLLMClient(this.env)
+      const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
       return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory)
     })
 

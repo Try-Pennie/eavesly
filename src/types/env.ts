@@ -1,6 +1,8 @@
 export interface Bindings {
   ENVIRONMENT: string
   OPENROUTER_MODEL: string
+  /** Optional per-module override; disposition-review uses this when set, else OPENROUTER_MODEL. */
+  DISPOSITION_REVIEW_MODEL?: string
   INTERNAL_API_KEY: string
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
