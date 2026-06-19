@@ -240,4 +240,36 @@ describe("DatabaseService", () => {
       expect(mockFrom).toHaveBeenCalledWith("eavesly_module_results")
     })
   })
+
+  describe("getCallContext()", () => {
+    function mockCallRow(row: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: row, error }),
+          }),
+        }),
+      })
+    }
+
+    it("looks up eavesly_calls and returns disposition + sfdc_lead_id", async () => {
+      mockCallRow({ disposition: "Not Interested", sfdc_lead_id: "00Q123" })
+      const db = new DatabaseService(createEnv())
+      const ctx = await db.getCallContext("call-1")
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_calls")
+      expect(ctx).toEqual({ disposition: "Not Interested", sfdc_lead_id: "00Q123" })
+    })
+
+    it("returns null when the call is not found", async () => {
+      mockCallRow(null)
+      const db = new DatabaseService(createEnv())
+      expect(await db.getCallContext("missing")).toBeNull()
+    })
+
+    it("returns null (does not throw) on query error", async () => {
+      mockCallRow(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      expect(await db.getCallContext("call-1")).toBeNull()
+    })
+  })
 })

@@ -38,6 +38,30 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       }
     }
 
+    // Step 0a2: Disposition-review only. The CRM disposition isn't on the Regal
+    // event — it lives in eavesly_calls — so look it up by call_id and inject it
+    // as the authoritative current disposition. Also backfills sfdc_lead_id so
+    // the history step below can load prior-call context.
+    if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW) {
+      const ctx = await step.do("fetch-call-disposition", {
+        retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+        timeout: "30 seconds",
+      }, async () => {
+        const db = new DatabaseService(this.env)
+        return await db.getCallContext(callData.call_id)
+      })
+
+      if (ctx) {
+        callData.transcript.metadata = {
+          ...callData.transcript.metadata,
+          disposition: ctx.disposition ?? callData.transcript.metadata.disposition,
+        }
+        if (!callData.sfdc_lead_id && ctx.sfdc_lead_id) {
+          callData.sfdc_lead_id = ctx.sfdc_lead_id
+        }
+      }
+    }
+
     // Step 0: Fetch prior call context (if sfdc_lead_id available)
     const callHistory = await step.do("fetch-call-history", {
       retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
