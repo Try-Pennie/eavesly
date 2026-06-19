@@ -106,6 +106,33 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * Fetch the current call's CRM disposition and lead id from Supabase by
+   * call_id. Disposition-review needs this because the Regal event does not
+   * carry the disposition — it lives in eavesly_calls. Returns null if the call
+   * isn't found yet (advisory flow degrades to "no current disposition").
+   */
+  async getCallContext(
+    callId: string,
+  ): Promise<{ disposition: string | null; sfdc_lead_id: string | null } | null> {
+    const { data, error } = await this.client
+      .from("eavesly_calls")
+      .select("disposition, sfdc_lead_id")
+      .eq("call_id", callId)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      log("warn", "Failed to fetch call context", { callId, error: error.message })
+      return null
+    }
+    if (!data) return null
+    return {
+      disposition: data.disposition ?? null,
+      sfdc_lead_id: data.sfdc_lead_id ?? null,
+    }
+  }
+
   async getPriorCallContext(
     sfdcLeadId: string,
     currentCallId: string,
