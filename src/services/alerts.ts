@@ -6,13 +6,24 @@ import type { WarmTransferResult } from "../schemas/warm-transfer"
 import type { LitigationCheckResult } from "../schemas/litigation-check"
 import type { ProgramExpectationsResult } from "../schemas/program-expectations"
 import type { ActiveSettlementsResult } from "../schemas/active-settlements"
-import { VIOLATION_TYPES } from "../modules/constants"
+import { MODULE_NAMES, VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 import { createClient } from "@supabase/supabase-js"
 
 const INVALID_MANAGER_VALUES = ["no longer at pennie", "none"]
 
 const JOEL_NELSON_EMAIL = "jnelson@trypennie.com"
+
+function shouldMirrorToJoel(alert: Alert): boolean {
+  if (alert.agent_email?.toLowerCase() !== JOEL_NELSON_EMAIL) return false
+
+  // TEMPORARY: disposition-review is being tested in production and is hidden
+  // from manager-facing surfaces. Keep Joel's mirror muted for this module too.
+  if (alert.module_name === MODULE_NAMES.DISPOSITION_REVIEW) return false
+  if (alert.violation_type === VIOLATION_TYPES.MIS_DISPOSITION) return false
+
+  return true
+}
 
 export async function dispatchAlerts(
   alerts: Alert[],
@@ -68,7 +79,7 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   })
 
   const mirrorWebhookUrl =
-    alert.agent_email?.toLowerCase() === JOEL_NELSON_EMAIL
+    shouldMirrorToJoel(alert)
       ? isFullQA
         ? env.SLACK_WEBHOOK_URL_FULL_QA_JOEL_NELSON
         : env.SLACK_WEBHOOK_URL_JOEL_NELSON
