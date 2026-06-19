@@ -129,4 +129,19 @@ describe("createLLMClient", () => {
       expect.objectContaining({ model: "custom-model" }),
     )
   })
+
+  it("uses modelOverride when provided, ignoring the env model", async () => {
+    const data = { score: 1, message: "ok" }
+    mockLLMResponse(JSON.stringify(data))
+
+    const llm = createLLMClient(
+      createEnv({ OPENROUTER_MODEL: "env-model" }),
+      "override-model",
+    )
+    await llm.getStructuredResponse("sys", "user", TestSchema, "test")
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "override-model" }),
+    )
+  })
 })

@@ -7,7 +7,8 @@ import { log } from "../utils/logger"
 
 export type LLMClient = ReturnType<typeof createLLMClient>
 
-export function createLLMClient(env: Bindings) {
+export function createLLMClient(env: Bindings, modelOverride?: string) {
+  const model = modelOverride ?? env.OPENROUTER_MODEL
   const client = new OpenAI({
     apiKey: env.CF_AIG_TOKEN,
     baseURL: `https://gateway.ai.cloudflare.com/v1/${env.CF_ACCOUNT_ID}/${env.CF_GATEWAY_ID}/openrouter`,
@@ -28,7 +29,7 @@ export function createLLMClient(env: Bindings) {
 
     return withRetry(async () => {
       const response = await client.chat.completions.create({
-        model: env.OPENROUTER_MODEL,
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -38,7 +39,7 @@ export function createLLMClient(env: Bindings) {
       })
 
       log("info", "LLM call completed", {
-        model: env.OPENROUTER_MODEL,
+        model,
         promptTokens: response.usage?.prompt_tokens,
         completionTokens: response.usage?.completion_tokens,
         totalTokens: response.usage?.total_tokens,

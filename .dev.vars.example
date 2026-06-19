@@ -5,6 +5,11 @@ CF_ACCOUNT_ID=your_cloudflare_account_id
 CF_GATEWAY_ID=your_gateway_id
 CF_AIG_TOKEN=your_aig_token
 
+# Optional per-module model override. Defaults live in wrangler.toml
+# (DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat"); set here only to override
+# locally. Unset → disposition-review falls back to OPENROUTER_MODEL.
+# DISPOSITION_REVIEW_MODEL=deepseek/deepseek-chat
+
 # Twilio transcription path (POST /api/v1/evaluate/{module}/from-recording).
 # Only needed if you exercise the from-recording endpoint; the transcript-based
 # endpoints work without these. DEEPGRAM_MODEL has a default (nova-3) in wrangler.toml.

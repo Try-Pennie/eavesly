@@ -89,6 +89,15 @@ describe("E2E app tests", () => {
       }, createEnv())
       expect(res.status).toBe(401)
     })
+
+    it("rejects unauthenticated disposition-review request", async () => {
+      const res = await app.request("/api/v1/evaluate/disposition-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validBody),
+      }, createEnv())
+      expect(res.status).toBe(401)
+    })
   })
 
   describe("CORS headers", () => {
@@ -230,6 +239,34 @@ describe("E2E app tests", () => {
       const createArgs = mockWorkflowCreate.mock.calls[0][0]
       expect(createArgs.id).toBe("e2e-call-123-litigation_check")
       expect(createArgs.params.moduleName).toBe("litigation_check")
+      expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
+    })
+  })
+
+  describe("disposition-review workflow dispatch", () => {
+    it("returns 202 with workflow_instance_id", async () => {
+      const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "wf-instance-123" })
+      const env = createEnv({
+        EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
+      })
+      const res = await app.request("/api/v1/evaluate/disposition-review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify(validBody),
+      }, env)
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
+      expect(body.module).toBe("disposition_review")
+      expect(body.workflow_instance_id).toBe("wf-instance-123")
+      expect(body.status).toBe("queued")
+
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      const createArgs = mockWorkflowCreate.mock.calls[0][0]
+      expect(createArgs.id).toBe("e2e-call-123-disposition_review")
+      expect(createArgs.params.moduleName).toBe("disposition_review")
       expect(createArgs.params.callData.call_id).toBe("e2e-call-123")
     })
   })

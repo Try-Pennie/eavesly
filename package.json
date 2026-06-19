@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke-test": "tsx scripts/smoke-test.ts",
+    "eval:disposition": "tsx scripts/eval-disposition-models.ts",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

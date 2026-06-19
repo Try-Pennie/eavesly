@@ -6,6 +6,8 @@ account_id = "3e7f907a9c19e51417873e2cce4fbc5c"
 [vars]
 ENVIRONMENT = "development"
 OPENROUTER_MODEL = "openai/gpt-4.1"
+# Advisory disposition-review runs on a cheaper model; omit to fall back to OPENROUTER_MODEL.
+DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat"
 DEEPGRAM_MODEL = "nova-3"
 
 # Secrets (set via `wrangler secret put`):
@@ -41,7 +43,7 @@ invocation_logs = true
 
 [env.staging]
 name = "eavesly-staging"
-vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1", DEEPGRAM_MODEL = "nova-3" }
+vars = { ENVIRONMENT = "staging", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
 
 [[env.staging.workflows]]
 name = "eavesly-evaluation-staging"
@@ -50,7 +52,7 @@ class_name = "EvaluationWorkflow"
 
 [env.production]
 name = "eavesly-production"
-vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DEEPGRAM_MODEL = "nova-3" }
+vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
 
 [[env.production.workflows]]
 name = "eavesly-evaluation-production"

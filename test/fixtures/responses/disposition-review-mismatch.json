@@ -1,0 +1,26 @@
+{
+  "suggested_disposition": "Not Interested",
+  "disposition_matches_transcript": false,
+  "confidence": 0.91,
+  "conversation_happened": "yes",
+  "evidence": [
+    {
+      "speaker": "contact",
+      "quote": "I already told you, please stop calling, I don't want this.",
+      "rationale": "Contact firmly declined, contradicting an 'Interested' disposition."
+    },
+    {
+      "speaker": "agent",
+      "quote": "Okay, understood, I'll note that down.",
+      "rationale": "Agent acknowledged the decline without scheduling anything."
+    }
+  ],
+  "reasoning_summary": "The call is dispositioned Interested, but the contact firmly declined and asked the agent to stop calling. Not Interested is the accurate disposition.",
+  "alternative_candidates": [
+    {
+      "disposition": "Do Not Contact",
+      "confidence": 0.4,
+      "rationale": "Contact asked the agent to stop calling, which could warrant Do Not Contact."
+    }
+  ]
+}
