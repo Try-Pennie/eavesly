@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
-import type { ModuleResult, CallHistoryContext, PriorCall } from "../modules/types"
+import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
 import { log } from "../utils/logger"
 
@@ -131,6 +131,33 @@ export class DatabaseService {
       disposition: data.disposition ?? null,
       sfdc_lead_id: data.sfdc_lead_id ?? null,
     }
+  }
+
+  /**
+   * Load the live CRM disposition catalog (active rows only). Drives the
+   * disposition-review taxonomy so it never drifts from the Dispositions admin
+   * screen. Returns [] (never throws) on error so the review degrades to a
+   * catalog-less prompt rather than failing.
+   */
+  async getActiveDispositions(): Promise<Disposition[]> {
+    const { data, error } = await this.client
+      .from("eavesly_dispositions")
+      .select("name, description, visibility, conversation_happened, ai_only")
+      .eq("active", true)
+      .order("name")
+
+    if (error) {
+      log("warn", "Failed to fetch dispositions", { error: error.message })
+      return []
+    }
+
+    return (data ?? []).map((row: any) => ({
+      name: row.name,
+      description: row.description ?? null,
+      visibility: row.visibility ?? null,
+      conversation_happened: row.conversation_happened ?? null,
+      ai_only: row.ai_only ?? false,
+    }))
   }
 
   async getPriorCallContext(

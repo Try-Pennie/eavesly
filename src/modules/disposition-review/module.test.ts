@@ -61,6 +61,36 @@ describe("dispositionReviewModule", () => {
     expect((result.result as any).recommended_action).toBe("eligible_for_future_auto_update")
   })
 
+  it("accepts a live disposition catalog and still evaluates", async () => {
+    const base = createEvaluateRequest()
+    const request = createEvaluateRequest({
+      transcript: {
+        ...base.transcript,
+        metadata: { ...base.transcript.metadata, disposition: "Interested" },
+      },
+    })
+    const llm = createMockLLM(matchFixture)
+
+    const result = await dispositionReviewModule.evaluate(
+      request.transcript.transcript,
+      request,
+      llm as any,
+      null,
+      [
+        {
+          name: "1.2 - Interested > No Call Scheduled",
+          description: "Lead interested, no future call scheduled.",
+          visibility: "All Users",
+          conversation_happened: "yes",
+          ai_only: false,
+        },
+      ],
+    )
+
+    expect(result.module_name).toBe(MODULE_NAMES.DISPOSITION_REVIEW)
+    expect(llm.getStructuredResponse).toHaveBeenCalledTimes(1)
+  })
+
   it("passes the disposition-review schema name to the LLM", async () => {
     const base = createEvaluateRequest()
     const request = createEvaluateRequest({

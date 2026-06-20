@@ -12,30 +12,7 @@
         <note>Judge the disposition against THIS call's transcript. Use prior call history only as context for what the agent and contact reference.</note>
     </input>
 
-    <disposition_taxonomy>
-        <note>Suggest a disposition using values from this taxonomy. Prefer an AI-eligible value when one fits. Only suggest a manager/team-restricted or END CAMPAIGNS value when the transcript clearly calls for it — a human will review those.</note>
-        <ai_eligible>
-            <value>Do Not Contact</value>
-            <value>Interested</value>
-            <value>No Action</value>
-            <value>Not Interested</value>
-            <value>Reminder</value>
-            <value>Reminder Confirmation - No Action</value>
-            <value>Scheduling</value>
-            <value>Transfer to Agent</value>
-        </ai_eligible>
-        <manager_restricted>
-            <value>1.1 - Keep In Automation</value>
-            <value>1.1B - Redistribute</value>
-            <value>1.9 - (manager/team-specific)</value>
-            <value>2.0 - Nurture Lead</value>
-            <value>Close - No Action</value>
-        </manager_restricted>
-        <end_campaigns>
-            <value>1.4 - Converted/Won &gt; END CAMPAIGNS</value>
-            <value>1.5 - Not Interested &gt; END CAMPAIGNS</value>
-        </end_campaigns>
-    </disposition_taxonomy>
+    {{DISPOSITION_TAXONOMY}}
 
     <process>
         <step name="determine_if_conversation_happened">

@@ -1,11 +1,12 @@
-import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
+import type { EvalModule, ModuleResult, CallHistoryContext, Disposition } from "../types"
 import { extractAlerts, buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { DispositionAnalysisSchema } from "../../schemas/disposition-review"
 import { buildDispositionReview } from "./logic"
+import { renderSystemPrompt } from "./taxonomy"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
-import systemPrompt from "../../../prompts/disposition-review.txt"
+import promptTemplate from "../../../prompts/disposition-review.txt"
 
 export const dispositionReviewModule: EvalModule = {
   name: MODULE_NAMES.DISPOSITION_REVIEW,
@@ -15,11 +16,16 @@ export const dispositionReviewModule: EvalModule = {
     callData: EvaluateRequest,
     llm: LLMClient,
     callHistory?: CallHistoryContext | null,
+    dispositions?: Disposition[],
   ): Promise<ModuleResult> {
     const start = Date.now()
 
     // Authoritative current disposition comes from call metadata, never the LLM.
     const currentDisposition = callData.transcript.metadata.disposition ?? null
+
+    // Inject the live CRM disposition catalog so the suggestable taxonomy never
+    // drifts from the Dispositions admin screen.
+    const systemPrompt = renderSystemPrompt(promptTemplate, dispositions ?? [])
 
     const userPrompt = buildUserPrompt(
       `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}".\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
