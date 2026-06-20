@@ -20,6 +20,14 @@ export interface CallHistoryContext {
   prior_calls: PriorCall[]
 }
 
+export interface Disposition {
+  name: string
+  description: string | null
+  visibility: string | null
+  conversation_happened: string | null
+  ai_only: boolean
+}
+
 export interface ModuleResult {
   module_name: string
   result: unknown
@@ -49,6 +57,7 @@ export interface EvalModule {
     callData: EvaluateRequest,
     llm: LLMClient,
     callHistory?: CallHistoryContext | null,
+    dispositions?: Disposition[],
   ): Promise<ModuleResult>
   extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[]
 }

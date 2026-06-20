@@ -72,13 +72,25 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       return await db.getPriorCallContext(callData.sfdc_lead_id, callData.call_id)
     })
 
+    // Step 0c: Disposition-review only. Load the live CRM disposition catalog so
+    // the suggestable taxonomy mirrors the Dispositions admin screen at eval time.
+    const dispositions = moduleName === MODULE_NAMES.DISPOSITION_REVIEW
+      ? await step.do("fetch-dispositions", {
+          retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+          timeout: "30 seconds",
+        }, async () => {
+          const db = new DatabaseService(this.env)
+          return await db.getActiveDispositions()
+        })
+      : []
+
     // Step 1: LLM evaluation (the expensive step)
     const result = await step.do("evaluate-llm", {
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
       const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
-      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory)
+      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions)
     })
 
     // Step 2: Store result in Supabase

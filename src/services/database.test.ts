@@ -272,4 +272,45 @@ describe("DatabaseService", () => {
       expect(await db.getCallContext("call-1")).toBeNull()
     })
   })
+
+  describe("getActiveDispositions()", () => {
+    function mockDispositions(data: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({ data, error }),
+        }),
+      })
+    }
+
+    it("queries eavesly_dispositions for active rows and maps them", async () => {
+      mockDispositions([
+        {
+          name: "1.2 - Interested > No Call Scheduled",
+          description: "Lead interested.",
+          visibility: "All Users",
+          conversation_happened: "yes",
+          ai_only: false,
+        },
+      ])
+      const db = new DatabaseService(createEnv())
+      const result = await db.getActiveDispositions()
+
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_dispositions")
+      expect(result).toEqual([
+        {
+          name: "1.2 - Interested > No Call Scheduled",
+          description: "Lead interested.",
+          visibility: "All Users",
+          conversation_happened: "yes",
+          ai_only: false,
+        },
+      ])
+    })
+
+    it("returns an empty array (does not throw) on query error", async () => {
+      mockDispositions(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      expect(await db.getActiveDispositions()).toEqual([])
+    })
+  })
 })
