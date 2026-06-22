@@ -13,6 +13,7 @@ import { activeSettlementsRoutes } from "./routes/active-settlements"
 import { dispositionReviewRoutes } from "./routes/disposition-review"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
+import { salesFloorInsightsRoutes } from "./routes/sales-floor-insights"
 
 const app = new Hono<AppEnv>()
 
@@ -32,6 +33,7 @@ app.route("/api/v1", programExpectationsRoutes)
 app.route("/api/v1", activeSettlementsRoutes)
 app.route("/api/v1", dispositionReviewRoutes)
 app.route("/api/v1", statusRoutes)
+app.route("/api/v1", salesFloorInsightsRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {

@@ -218,6 +218,50 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getSalesFloorRows()", () => {
+    function windowChain(data: unknown[] | null, error: unknown = null) {
+      const range = vi.fn().mockResolvedValue({ data, error })
+      const order = vi.fn().mockReturnValue({ range })
+      const lt = vi.fn().mockReturnValue({ order })
+      const gte = vi.fn().mockReturnValue({ lt })
+      const select = vi.fn().mockReturnValue({ gte })
+      return { select, range }
+    }
+
+    it("fetches only aggregate-safe columns and omits raw customer data", async () => {
+      const calls = windowChain([], null)
+      const qa = windowChain([], null)
+      const modules = windowChain([], null)
+      mockFrom
+        .mockReturnValueOnce({ select: calls.select })
+        .mockReturnValueOnce({ select: qa.select })
+        .mockReturnValueOnce({ select: modules.select })
+
+      const db = new DatabaseService(createEnv())
+      await db.getSalesFloorRows("2026-06-01T00:00:00.000Z", "2026-06-08T00:00:00.000Z")
+
+      expect(mockFrom).toHaveBeenNthCalledWith(1, "eavesly_calls")
+      expect(calls.select).toHaveBeenCalledWith("started_at, agent_email, talk_time, disposition")
+      expect(qa.select).toHaveBeenCalledWith("created_at, agent_email, manager_email, overall_score, compliance_rating, customer_satisfaction_likely, manager_escalation")
+      expect(modules.select).toHaveBeenCalledWith("created_at, module_name, has_violation, agent_email")
+    })
+
+    it("fails loudly instead of returning false-zero report data on query errors", async () => {
+      const calls = windowChain(null, { message: "missing column" })
+      const qa = windowChain([], null)
+      const modules = windowChain([], null)
+      mockFrom
+        .mockReturnValueOnce({ select: calls.select })
+        .mockReturnValueOnce({ select: qa.select })
+        .mockReturnValueOnce({ select: modules.select })
+
+      const db = new DatabaseService(createEnv())
+      await expect(db.getSalesFloorRows("2026-06-01T00:00:00.000Z", "2026-06-08T00:00:00.000Z")).rejects.toThrow(
+        "Failed to fetch sales-floor rows from eavesly_calls",
+      )
+    })
+  })
+
   describe("healthCheck()", () => {
     it("returns true when database is reachable", async () => {
       const db = new DatabaseService(createEnv())

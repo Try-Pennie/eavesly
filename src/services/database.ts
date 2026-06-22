@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
+import type { SalesFloorRows } from "./sales-floor-insights"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -236,6 +237,60 @@ export class DatabaseService {
       total_prior_calls: totalPriorCalls || priorCalls.length,
       prior_calls: priorCalls,
     }
+  }
+
+  /**
+   * Fetch redacted rows for the Sales Floor Insights report over [startIso,
+   * endIso). Selects ONLY aggregate-safe columns — no transcripts, names,
+   * phones, summaries, or recording links reach the report. Each table is
+   * windowed by its own timestamp (calls.started_at, qa/module.created_at);
+   * weekly boundary mismatches between a call and its later QA row are
+   * explicitly called out in the report documentation.
+   * Note: paginates at 1000/page (Supabase's hard cap); fine for weekly +
+   * 28-day baseline volume. If this ever needs months of data, push the
+   * aggregation into a Postgres view/RPC instead of pulling rows into the Worker.
+   */
+  async getSalesFloorRows(startIso: string, endIso: string): Promise<SalesFloorRows> {
+    const [calls, qa, modules] = await Promise.all([
+      this.fetchWindow("eavesly_calls", "started_at, agent_email, talk_time, disposition", "started_at", startIso, endIso),
+      this.fetchWindow(
+        "eavesly_transcription_qa",
+        "created_at, agent_email, manager_email, overall_score, compliance_rating, customer_satisfaction_likely, manager_escalation",
+        "created_at",
+        startIso,
+        endIso,
+      ),
+      this.fetchWindow("eavesly_module_results", "created_at, module_name, has_violation, agent_email", "created_at", startIso, endIso),
+    ])
+    return { calls, qa, modules } as SalesFloorRows
+  }
+
+  private async fetchWindow(
+    table: string,
+    columns: string,
+    tsColumn: string,
+    startIso: string,
+    endIso: string,
+  ): Promise<any[]> {
+    const pageSize = 1000
+    const out: any[] = []
+    for (let from = 0; from < 200_000; from += pageSize) {
+      const { data, error } = await this.client
+        .from(table)
+        .select(columns)
+        .gte(tsColumn, startIso)
+        .lt(tsColumn, endIso)
+        .order(tsColumn, { ascending: true })
+        .range(from, from + pageSize - 1)
+      if (error) {
+        log("error", "Failed to fetch sales-floor rows", { table, error: error.message })
+        throw new Error(`Failed to fetch sales-floor rows from ${table}`)
+      }
+      if (!data?.length) break
+      out.push(...data)
+      if (data.length < pageSize) break
+    }
+    return out
   }
 
   async healthCheck(): Promise<boolean> {
