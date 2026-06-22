@@ -261,3 +261,4 @@ order by created_at desc;
 | Date (UTC) | Window | Evals | Flag % | Avg conf | conv=no/false | conv=yes/false | Silent drops | Notes |
 |---|---|---|---|---|---|---|---|---|
 | 2026-06-20 02:00 | first ~13h | 1,542 | 61.7% | ~0.95 | 413 | 541 | 9 (~0.6%) | Baseline. Alerts muted same day due to volume. No ground-truth labels yet. |
+| 2026-06-22 | full 06-19→06-21 | 2,562 | ~59% | ~0.96 | 727 | 835 | ~0.6% | Live-taxonomy fix deployed 06-20 06:38 UTC. AI-only re-disposition suggestions dropped 94.9%→4.9% (mechanism fixed), but headline flag % held (~62%→56%, 06-21 sample only 73). Root cause now = empty taxonomy descriptions: 23 of 38 active `eavesly_dispositions` rows still blank; described values flag ~8% (Pre-recorded Voicemail) vs 76–93% for blank ones. `eavesly_dispositions` untouched since deploy. 0 errors, no reliability regression. |

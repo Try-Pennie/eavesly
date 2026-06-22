@@ -42,6 +42,9 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     // event — it lives in eavesly_calls — so look it up by call_id and inject it
     // as the authoritative current disposition. Also backfills sfdc_lead_id so
     // the history step below can load prior-call context.
+    // Who dispositioned the call decides which disposition vocabulary the model
+    // suggests from: AI-agent (Zoe) calls come from @regal.ai, humans from elsewhere.
+    let audience: "human" | "ai" = "human"
     if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW) {
       const ctx = await step.do("fetch-call-disposition", {
         retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
@@ -58,6 +61,9 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
         }
         if (!callData.sfdc_lead_id && ctx.sfdc_lead_id) {
           callData.sfdc_lead_id = ctx.sfdc_lead_id
+        }
+        if (ctx.agent_email?.toLowerCase().endsWith("@regal.ai")) {
+          audience = "ai"
         }
       }
     }
@@ -90,7 +96,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       timeout: "5 minutes",
     }, async () => {
       const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
-      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions)
+      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions, audience)
     })
 
     // Step 2: Store result in Supabase

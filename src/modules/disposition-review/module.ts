@@ -4,7 +4,7 @@ import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { DispositionAnalysisSchema } from "../../schemas/disposition-review"
 import { buildDispositionReview } from "./logic"
-import { renderSystemPrompt } from "./taxonomy"
+import { renderSystemPrompt, type DispositionAudience } from "./taxonomy"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import promptTemplate from "../../../prompts/disposition-review.txt"
 
@@ -17,15 +17,22 @@ export const dispositionReviewModule: EvalModule = {
     llm: LLMClient,
     callHistory?: CallHistoryContext | null,
     dispositions?: Disposition[],
+    audience: DispositionAudience = "human",
   ): Promise<ModuleResult> {
     const start = Date.now()
 
     // Authoritative current disposition comes from call metadata, never the LLM.
     const currentDisposition = callData.transcript.metadata.disposition ?? null
+    const catalog = dispositions ?? []
+
+    // Canonical conversation_happened of the human's current disposition — drives
+    // the high-precision objective gate in buildDispositionReview.
+    const currentCanonicalConv =
+      catalog.find((d) => d.name === currentDisposition)?.conversation_happened ?? null
 
     // Inject the live CRM disposition catalog so the suggestable taxonomy never
-    // drifts from the Dispositions admin screen.
-    const systemPrompt = renderSystemPrompt(promptTemplate, dispositions ?? [])
+    // drifts from the Dispositions admin screen, scoped to who dispositioned the call.
+    const systemPrompt = renderSystemPrompt(promptTemplate, catalog, audience)
 
     const userPrompt = buildUserPrompt(
       `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}".\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
@@ -42,7 +49,7 @@ export const dispositionReviewModule: EvalModule = {
 
     // Server assembles the full contract: permission category, the always-false
     // auto-update rule, and the recommended action are all derived here.
-    const result = buildDispositionReview(analysis, currentDisposition)
+    const result = buildDispositionReview(analysis, currentDisposition, currentCanonicalConv)
 
     // A mis-disposition needing human attention is exactly the case where the
     // assembled contract requires human review.
