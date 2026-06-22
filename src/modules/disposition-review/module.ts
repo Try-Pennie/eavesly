@@ -4,7 +4,7 @@ import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { DispositionAnalysisSchema } from "../../schemas/disposition-review"
 import { buildDispositionReview } from "./logic"
-import { renderSystemPrompt } from "./taxonomy"
+import { renderSystemPrompt, type DispositionAudience } from "./taxonomy"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import promptTemplate from "../../../prompts/disposition-review.txt"
 
@@ -17,18 +17,28 @@ export const dispositionReviewModule: EvalModule = {
     llm: LLMClient,
     callHistory?: CallHistoryContext | null,
     dispositions?: Disposition[],
+    audience: DispositionAudience = "human",
   ): Promise<ModuleResult> {
     const start = Date.now()
 
     // Authoritative current disposition comes from call metadata, never the LLM.
     const currentDisposition = callData.transcript.metadata.disposition ?? null
+    const catalog = dispositions ?? []
 
     // Inject the live CRM disposition catalog so the suggestable taxonomy never
-    // drifts from the Dispositions admin screen.
-    const systemPrompt = renderSystemPrompt(promptTemplate, dispositions ?? [])
+    // drifts from the Dispositions admin screen, scoped to who dispositioned the call.
+    const systemPrompt = renderSystemPrompt(promptTemplate, catalog, audience)
+
+    // Call timing is a strong signal for whether a real conversation happened —
+    // near-zero talk time means voicemail/no-answer regardless of the disposition.
+    const meta = callData.transcript.metadata
+    const timing =
+      `Call duration: ${Math.round(meta.duration)}s` +
+      (meta.talk_time != null ? `, talk time: ${Math.round(meta.talk_time)}s` : "") +
+      "."
 
     const userPrompt = buildUserPrompt(
-      `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}".\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
+      `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}". ${timing}\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Treat the call duration and talk time as evidence — a very short call or near-zero talk time means no real conversation took place, whatever the disposition says. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
       transcript,
       callHistory,
     )

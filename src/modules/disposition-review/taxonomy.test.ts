@@ -47,6 +47,12 @@ describe("buildDispositionTaxonomy", () => {
     expect(xml).not.toContain('name="No Action"')
   })
 
+  it("offers only AI-Agent dispositions when the audience is ai", () => {
+    const xml = buildDispositionTaxonomy([humanVisible, aiOnly], "ai")
+    expect(xml).toContain('name="No Action"')
+    expect(xml).not.toContain('name="1.2 - Interested > No Call Scheduled"')
+  })
+
   it("marks Manager/Team visibility so restricted values are identifiable", () => {
     const xml = buildDispositionTaxonomy([managerRestricted])
     expect(xml).toContain('visibility="Manager"')

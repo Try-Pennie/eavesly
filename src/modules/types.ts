@@ -58,6 +58,7 @@ export interface EvalModule {
     llm: LLMClient,
     callHistory?: CallHistoryContext | null,
     dispositions?: Disposition[],
+    audience?: "human" | "ai",
   ): Promise<ModuleResult>
   extractAlerts(result: ModuleResult, callId: string, agentId: string, callData?: EvaluateRequest): Alert[]
 }
