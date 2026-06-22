@@ -58,6 +58,9 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
         callData.transcript.metadata = {
           ...callData.transcript.metadata,
           disposition: ctx.disposition ?? callData.transcript.metadata.disposition,
+          // Backfill talk time from eavesly_calls so the model sees actual
+          // conversation seconds, not just the Regal event's (often absent) value.
+          talk_time: callData.transcript.metadata.talk_time ?? ctx.talk_time ?? undefined,
         }
         if (!callData.sfdc_lead_id && ctx.sfdc_lead_id) {
           callData.sfdc_lead_id = ctx.sfdc_lead_id

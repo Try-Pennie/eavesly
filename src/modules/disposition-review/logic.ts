@@ -79,33 +79,17 @@ function buildReason(
  * Assemble the full disposition-review contract from the LLM analysis plus the
  * authoritative current disposition (from call metadata, not the LLM).
  *
- * `currentCanonicalConv` is the canonical conversation_happened ("yes"/"no") of
- * the disposition the human applied, read from the live catalog. It drives the
- * high-precision objective gate (see deriveRecommendedAction); null when the
- * current disposition isn't in the catalog or has no canonical value.
- *
  * Hard rule for this slice: `can_auto_update` is ALWAYS false.
  */
 export function buildDispositionReview(
   analysis: DispositionAnalysis,
   currentDisposition: string | null,
-  currentCanonicalConv: string | null = null,
 ): DispositionReviewResult {
   const category = categorizeDisposition(
     analysis.suggested_disposition ?? currentDisposition,
   )
 
-  // Objective signal: the model's read of whether a conversation happened
-  // contradicts the canonical conversation_happened of the human's disposition
-  // (e.g. a voicemail/no-answer tagged as a completed/interested call). This is
-  // cheap and high-precision, unlike the model's subjective "I'd relabel this
-  // conversation" disagreements, which are noisy and held back from alerting.
-  const conversationMismatch =
-    currentCanonicalConv != null &&
-    analysis.conversation_happened !== "unclear" &&
-    analysis.conversation_happened !== currentCanonicalConv
-
-  const action = deriveRecommendedAction(analysis, category, conversationMismatch)
+  const action = deriveRecommendedAction(analysis, category)
   const hasViolation =
     action === "surface_for_review" || action === "eligible_for_future_auto_update"
 
@@ -131,7 +115,6 @@ export function buildDispositionReview(
 function deriveRecommendedAction(
   analysis: DispositionAnalysis,
   category: DispositionCategory,
-  conversationMismatch: boolean,
 ): RecommendedAction {
   // Too weak to act on: unclear conversation or low confidence.
   if (
@@ -142,12 +125,6 @@ function deriveRecommendedAction(
   }
 
   if (analysis.disposition_matches_transcript) return "no_change"
-
-  // High-precision gate: only surface a mismatch when the model's
-  // conversation_happened contradicts the disposition's canonical value. A
-  // subjective re-label of a call where the conversation status agrees is
-  // retained in the result but not surfaced (it is the noisy ~60% bucket).
-  if (!conversationMismatch) return "no_change"
 
   // Mismatch but nothing concrete to suggest.
   if (!analysis.suggested_disposition) return "insufficient_evidence"

@@ -25,17 +25,20 @@ export const dispositionReviewModule: EvalModule = {
     const currentDisposition = callData.transcript.metadata.disposition ?? null
     const catalog = dispositions ?? []
 
-    // Canonical conversation_happened of the human's current disposition — drives
-    // the high-precision objective gate in buildDispositionReview.
-    const currentCanonicalConv =
-      catalog.find((d) => d.name === currentDisposition)?.conversation_happened ?? null
-
     // Inject the live CRM disposition catalog so the suggestable taxonomy never
     // drifts from the Dispositions admin screen, scoped to who dispositioned the call.
     const systemPrompt = renderSystemPrompt(promptTemplate, catalog, audience)
 
+    // Call timing is a strong signal for whether a real conversation happened —
+    // near-zero talk time means voicemail/no-answer regardless of the disposition.
+    const meta = callData.transcript.metadata
+    const timing =
+      `Call duration: ${Math.round(meta.duration)}s` +
+      (meta.talk_time != null ? `, talk time: ${Math.round(meta.talk_time)}s` : "") +
+      "."
+
     const userPrompt = buildUserPrompt(
-      `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}".\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
+      `The CRM currently has this call dispositioned as: "${currentDisposition ?? "(none / unknown)"}". ${timing}\n\nReview the following call transcript and determine whether that disposition accurately reflects what happened. Treat the call duration and talk time as evidence — a very short call or near-zero talk time means no real conversation took place, whatever the disposition says. Suggest the most accurate disposition from the taxonomy in your instructions, cite evidence, and assess your confidence:`,
       transcript,
       callHistory,
     )
@@ -49,7 +52,7 @@ export const dispositionReviewModule: EvalModule = {
 
     // Server assembles the full contract: permission category, the always-false
     // auto-update rule, and the recommended action are all derived here.
-    const result = buildDispositionReview(analysis, currentDisposition, currentCanonicalConv)
+    const result = buildDispositionReview(analysis, currentDisposition)
 
     // A mis-disposition needing human attention is exactly the case where the
     // assembled contract requires human review.

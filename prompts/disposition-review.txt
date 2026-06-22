@@ -18,6 +18,7 @@
         <step name="determine_if_conversation_happened">
             <action>Decide whether a real two-way conversation with the intended contact took place.</action>
             <action>Set conversation_happened to "yes" when the contact engaged, "no" when there was no meaningful conversation (voicemail, no answer, immediate hang-up, wrong number), or "unclear" when the transcript is too short, garbled, or ambiguous to tell.</action>
+            <action>Weigh the call duration and talk time stated in the user prompt: a very short call or near-zero talk time is strong evidence that no real conversation happened, even if the disposition implies one.</action>
         </step>
         <step name="assess_current_disposition">
             <action>Compare the CRM's current disposition against what the transcript shows.</action>

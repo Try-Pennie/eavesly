@@ -252,12 +252,12 @@ describe("DatabaseService", () => {
       })
     }
 
-    it("looks up eavesly_calls and returns disposition + sfdc_lead_id + agent_email", async () => {
-      mockCallRow({ disposition: "Not Interested", sfdc_lead_id: "00Q123", agent_email: "agent_pennie-mgmt_10@regal.ai" })
+    it("looks up eavesly_calls and returns disposition + sfdc_lead_id + agent_email + talk_time", async () => {
+      mockCallRow({ disposition: "Not Interested", sfdc_lead_id: "00Q123", agent_email: "agent_pennie-mgmt_10@regal.ai", talk_time: 0 })
       const db = new DatabaseService(createEnv())
       const ctx = await db.getCallContext("call-1")
       expect(mockFrom).toHaveBeenCalledWith("eavesly_calls")
-      expect(ctx).toEqual({ disposition: "Not Interested", sfdc_lead_id: "00Q123", agent_email: "agent_pennie-mgmt_10@regal.ai" })
+      expect(ctx).toEqual({ disposition: "Not Interested", sfdc_lead_id: "00Q123", agent_email: "agent_pennie-mgmt_10@regal.ai", talk_time: 0 })
     })
 
     it("returns null when the call is not found", async () => {

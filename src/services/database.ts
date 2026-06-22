@@ -114,10 +114,10 @@ export class DatabaseService {
    */
   async getCallContext(
     callId: string,
-  ): Promise<{ disposition: string | null; sfdc_lead_id: string | null; agent_email: string | null } | null> {
+  ): Promise<{ disposition: string | null; sfdc_lead_id: string | null; agent_email: string | null; talk_time: number | null } | null> {
     const { data, error } = await this.client
       .from("eavesly_calls")
-      .select("disposition, sfdc_lead_id, agent_email")
+      .select("disposition, sfdc_lead_id, agent_email, talk_time")
       .eq("call_id", callId)
       .limit(1)
       .maybeSingle()
@@ -131,6 +131,7 @@ export class DatabaseService {
       disposition: data.disposition ?? null,
       sfdc_lead_id: data.sfdc_lead_id ?? null,
       agent_email: data.agent_email ?? null,
+      talk_time: data.talk_time ?? null,
     }
   }
 

@@ -73,14 +73,10 @@ describe("buildDispositionReview", () => {
     expect(result.permission.requires_human_review).toBe(false)
   })
 
-  // The objective gate fires when the model's conversation_happened ("yes" by
-  // default in this helper) contradicts the current disposition's canonical
-  // value (passed as the 3rd arg).
   it("surfaces manager-restricted mismatches for human review with a violation", () => {
     const result = buildDispositionReview(
       analysis({ suggested_disposition: "2.0 - Nurture Lead" }),
       "Interested",
-      "no",
     )
     expect(result.recommended_action).toBe("surface_for_review")
     expect(result.permission.category).toBe("manager_restricted")
@@ -91,7 +87,6 @@ describe("buildDispositionReview", () => {
     const result = buildDispositionReview(
       analysis({ suggested_disposition: "1.5 - Not Interested > END CAMPAIGNS" }),
       "Interested",
-      "no",
     )
     expect(result.recommended_action).toBe("surface_for_review")
     expect(result.permission.requires_human_review).toBe(true)
@@ -102,7 +97,6 @@ describe("buildDispositionReview", () => {
     const result = buildDispositionReview(
       analysis({ suggested_disposition: "Not Interested", confidence: 0.95 }),
       "Interested",
-      "no",
     )
     expect(result.recommended_action).toBe("eligible_for_future_auto_update")
     expect(result.permission.requires_human_review).toBe(true)
@@ -114,32 +108,9 @@ describe("buildDispositionReview", () => {
     const result = buildDispositionReview(
       analysis({ suggested_disposition: "Not Interested", confidence: 0.6 }),
       "Interested",
-      "no",
     )
     expect(result.recommended_action).toBe("surface_for_review")
     expect(result.permission.requires_human_review).toBe(true)
-  })
-
-  it("does NOT flag a subjective relabel when the conversation status agrees (the noisy bucket)", () => {
-    // Model would relabel a real conversation, but agrees a conversation happened
-    // — canonical "yes" matches model "yes", so no objective conflict.
-    const result = buildDispositionReview(
-      analysis({ suggested_disposition: "Not Interested", confidence: 0.95 }),
-      "Interested",
-      "yes",
-    )
-    expect(result.recommended_action).toBe("no_change")
-    expect(result.permission.requires_human_review).toBe(false)
-  })
-
-  it("does NOT flag when the current disposition has no canonical conversation value", () => {
-    const result = buildDispositionReview(
-      analysis({ suggested_disposition: "Not Interested", confidence: 0.95 }),
-      "Interested",
-      null,
-    )
-    expect(result.recommended_action).toBe("no_change")
-    expect(result.permission.requires_human_review).toBe(false)
   })
 
   it("returns insufficient_evidence when the conversation is unclear", () => {
@@ -160,11 +131,10 @@ describe("buildDispositionReview", () => {
     expect(result.permission.requires_human_review).toBe(false)
   })
 
-  it("returns insufficient_evidence when an objective mismatch has no suggested disposition", () => {
+  it("returns insufficient_evidence when a mismatch has no suggested disposition", () => {
     const result = buildDispositionReview(
       analysis({ suggested_disposition: null, confidence: 0.9 }),
       "Interested",
-      "no",
     )
     expect(result.recommended_action).toBe("insufficient_evidence")
     expect(result.permission.requires_human_review).toBe(false)

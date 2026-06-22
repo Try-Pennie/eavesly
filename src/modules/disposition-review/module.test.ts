@@ -35,71 +35,30 @@ describe("dispositionReviewModule", () => {
     expect((result.result as any).recommended_action).toBe("no_change")
   })
 
-  // Objective gate: the human tagged a conversation-implying disposition, but the
-  // model found no conversation happened — a high-precision mis-disposition.
-  const objectiveMismatch = {
-    suggested_disposition: "Pre-recorded Voicemail",
-    disposition_matches_transcript: false,
-    confidence: 0.95,
-    conversation_happened: "no",
-    evidence: [{ speaker: "system", quote: "[voicemail tone]", rationale: "No live contact." }],
-    reasoning_summary: "Call went to voicemail; the Converted/Won disposition implies a completed conversation.",
-    alternative_candidates: [],
-  }
-  const catalog = [{
-    name: "1.4 - Converted/Won > END CAMPAIGNS",
-    description: "Deal won.",
-    visibility: "All Users",
-    conversation_happened: "yes",
-    ai_only: false,
-  }]
-
-  it("flags an objective conversation mismatch for human review", async () => {
+  it("flags high-confidence AI-eligible mismatch for human review only", async () => {
     const base = createEvaluateRequest()
     const request = createEvaluateRequest({
       transcript: {
         ...base.transcript,
-        metadata: { ...base.transcript.metadata, disposition: "1.4 - Converted/Won > END CAMPAIGNS" },
+        metadata: { ...base.transcript.metadata, disposition: "Interested" },
       },
     })
-    const llm = createMockLLM(objectiveMismatch)
-
-    const result = await dispositionReviewModule.evaluate(
-      request.transcript.transcript,
-      request,
-      llm as any,
-      null,
-      catalog,
-    )
-
-    expect(result.has_violation).toBe(true)
-    expect(result.violation_type).toBe(VIOLATION_TYPES.MIS_DISPOSITION)
-    expect((result.result as any).recommended_action).toBe("surface_for_review")
-    expect((result.result as any).permission.requires_human_review).toBe(true)
-    expect((result.result as any).permission.can_auto_update).toBe(false)
-  })
-
-  it("does NOT flag a subjective relabel where the conversation status agrees", async () => {
-    const base = createEvaluateRequest()
-    const request = createEvaluateRequest({
-      transcript: {
-        ...base.transcript,
-        metadata: { ...base.transcript.metadata, disposition: "1.2 - Interested > No Call Scheduled" },
-      },
-    })
-    // mismatchFixture: real conversation, model would relabel — the noisy bucket.
     const llm = createMockLLM(mismatchFixture)
 
     const result = await dispositionReviewModule.evaluate(
       request.transcript.transcript,
       request,
       llm as any,
-      null,
-      [{ name: "1.2 - Interested > No Call Scheduled", description: null, visibility: "All Users", conversation_happened: "yes", ai_only: false }],
     )
 
-    expect(result.has_violation).toBe(false)
-    expect((result.result as any).recommended_action).toBe("no_change")
+    expect(result.has_violation).toBe(true)
+    expect(result.violation_type).toBe(VIOLATION_TYPES.MIS_DISPOSITION)
+    expect((result.result as any).current_disposition).toBe("Interested")
+    expect((result.result as any).suggested_disposition).toBe("Not Interested")
+    expect((result.result as any).permission.category).toBe("ai_eligible")
+    expect((result.result as any).permission.can_auto_update).toBe(false)
+    expect((result.result as any).permission.requires_human_review).toBe(true)
+    expect((result.result as any).recommended_action).toBe("eligible_for_future_auto_update")
   })
 
   it("accepts a live disposition catalog and still evaluates", async () => {
