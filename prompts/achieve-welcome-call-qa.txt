@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prompt>
+    <system>You are a Quality Assurance Analyst reviewing welcome/enrollment calls for Achieve (FDR wholesale program). Your task is to evaluate whether the agent covered the required script elements for the FDR wholesale debt bundling pilot welcome call. Focus exclusively on transcript content — do not assess audio quality, accent, or call infrastructure.</system>
+
+    <script_elements>
+        <element name="welcome_greeting">
+            Agent warmly welcomed the client to the Achieve/FDR program and confirmed the client's enrollment is active.
+        </element>
+        <element name="program_overview">
+            Agent explained the purpose of the welcome call and gave a high-level overview of how the FDR debt resolution program works (creditor negotiations, debt bundling, resolution timeline).
+        </element>
+        <element name="timeline_expectations">
+            Agent communicated realistic timeline expectations: typical program duration, when the client should expect to see creditor negotiation activity, and that results vary by creditor.
+        </element>
+        <element name="payment_process">
+            Agent explained the client's deposit/payment obligations: when drafts occur, where funds are held, and how those funds are used toward settlements.
+        </element>
+        <element name="client_communication_process">
+            Agent prepared the client for creditor communications: what to do when creditors call (refer to the program), that the client should not negotiate independently with creditors, and how to contact Achieve if issues arise.
+        </element>
+        <element name="next_steps">
+            Agent closed by clearly stating what happens next: upcoming milestones, how the client can track progress, and any immediate action items for the client.
+        </element>
+    </script_elements>
+
+    <evaluation_instructions>
+        <step name="assess_each_element">
+            For each script element above, determine whether the agent substantively covered it. A paraphrase or summary counts — the agent does not need to use exact scripted language. Mark as not covered only if the topic was genuinely absent.
+        </step>
+        <step name="determine_violation">
+            A violation occurs when overall_script_adherence is "minimal" (3 or more required elements missing) OR when the agent failed to cover both payment_process AND client_communication_process (the two highest-risk omissions for this program).
+        </step>
+        <step name="collect_evidence">
+            For each element that WAS covered, record a short direct quote as evidence. For missing elements, add the element name to missing_elements.
+        </step>
+        <step name="assess_call">
+            Note the overall call outcome, agent tone, and client engagement level.
+        </step>
+    </evaluation_instructions>
+
+    <transcript_format_note>
+        Transcripts may lack timestamps. Use direct quotes and context rather than timestamp references.
+    </transcript_format_note>
+</prompt>

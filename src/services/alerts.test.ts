@@ -858,3 +858,51 @@ describe("formatDuration", () => {
     expect(formatDuration(120)).toBe("2m 0s")
   })
 })
+
+describe("Achieve module alert suppression", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK", text: () => Promise.resolve("ok") }),
+    )
+    mockSingle.mockResolvedValue({
+      data: { manager_email: "manager@example.com" },
+      error: null,
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("mutes Slack alerts for achieve_welcome_call_qa module — no manager routing", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      violation_type: VIOLATION_TYPES.ACHIEVE_WELCOME_CALL,
+      agent_email: "agent@achieve.com",
+      result: { partner_id: "achieve", script_version: "fdr_wholesale_db_pilot_v0" },
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it("mutes by violation_type alone (achieve_welcome_call)", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: "some_other_name",
+      violation_type: VIOLATION_TYPES.ACHIEVE_WELCOME_CALL,
+      result: {},
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})

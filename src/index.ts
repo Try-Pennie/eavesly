@@ -11,6 +11,7 @@ import { litigationCheckRoutes } from "./routes/litigation-check"
 import { programExpectationsRoutes } from "./routes/program-expectations"
 import { activeSettlementsRoutes } from "./routes/active-settlements"
 import { dispositionReviewRoutes } from "./routes/disposition-review"
+import { achieveWelcomeCallQARoutes } from "./routes/achieve-welcome-call-qa"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
 
@@ -31,6 +32,7 @@ app.route("/api/v1", litigationCheckRoutes)
 app.route("/api/v1", programExpectationsRoutes)
 app.route("/api/v1", activeSettlementsRoutes)
 app.route("/api/v1", dispositionReviewRoutes)
+app.route("/api/v1", achieveWelcomeCallQARoutes)
 app.route("/api/v1", statusRoutes)
 
 app.onError((err, c) => {
