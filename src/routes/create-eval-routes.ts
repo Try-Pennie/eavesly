@@ -13,9 +13,13 @@ import { auth } from "../middleware/auth"
 interface EvalRouteConfig {
   endpoint: string
   moduleName: string
+  // When set, requests with a partner_id field that doesn't match are rejected 400.
+  // partner_id is not a DB column; it lives in result_json — this validates the
+  // incoming payload for partner-scoped endpoints (e.g. achieve-welcome-call-qa).
+  requiredPartnerId?: string
 }
 
-export function createEvalRoutes({ endpoint, moduleName }: EvalRouteConfig): Hono<AppEnv> {
+export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: EvalRouteConfig): Hono<AppEnv> {
   const routes = new Hono<AppEnv>()
 
   routes.use("*", auth)
@@ -51,6 +55,21 @@ export function createEvalRoutes({ endpoint, moduleName }: EvalRouteConfig): Hon
         correlationId,
       })
       return c.json({ error: "Invalid JSON" }, 400)
+    }
+
+    if (requiredPartnerId) {
+      const incomingPartnerId = (parsed as any)?.partner_id
+      if (incomingPartnerId !== undefined && incomingPartnerId !== requiredPartnerId) {
+        await db.logRequest({
+          endpoint,
+          callId: (parsed as any)?.call_id,
+          status: "partner_id_mismatch",
+          statusCode: 400,
+          errorMessage: `partner_id must be '${requiredPartnerId}'`,
+          correlationId,
+        })
+        return c.json({ error: `partner_id must be '${requiredPartnerId}'` }, 400)
+      }
     }
 
     const validation = EvaluateRequestSchema.safeParse(parsed)
@@ -165,6 +184,21 @@ export function createEvalRoutes({ endpoint, moduleName }: EvalRouteConfig): Hon
         correlationId,
       })
       return c.json({ error: "Invalid JSON" }, 400)
+    }
+
+    if (requiredPartnerId) {
+      const incomingPartnerId = (parsed as any)?.partner_id
+      if (incomingPartnerId !== undefined && incomingPartnerId !== requiredPartnerId) {
+        await db.logRequest({
+          endpoint,
+          callId: (parsed as any)?.call_id,
+          status: "partner_id_mismatch",
+          statusCode: 400,
+          errorMessage: `partner_id must be '${requiredPartnerId}'`,
+          correlationId,
+        })
+        return c.json({ error: `partner_id must be '${requiredPartnerId}'` }, 400)
+      }
     }
 
     const validation = EvaluateFromRecordingRequestSchema.safeParse(parsed)

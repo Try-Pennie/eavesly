@@ -42,6 +42,7 @@ const modules = [
   { endpoint: "budget-inputs", moduleName: MODULE_NAMES.BUDGET_INPUTS },
   { endpoint: "warm-transfer", moduleName: MODULE_NAMES.WARM_TRANSFER },
   { endpoint: "litigation-check", moduleName: MODULE_NAMES.LITIGATION_CHECK },
+  { endpoint: "achieve-welcome-call-qa", moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA },
 ] as const
 
 describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
@@ -219,5 +220,74 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
       expect(createArgs.params.callData.transcript.transcript).toBe("")
       expect(createArgs.params.callData.recording_link).toBe("https://api.twilio.com/REC123")
     })
+  })
+})
+
+describe("requiredPartnerId validation", () => {
+  beforeEach(() => {
+    mockWorkflowCreate.mockClear()
+    mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
+  })
+
+  it("returns 400 when partner_id in body does not match requiredPartnerId", async () => {
+    const app = new Hono<AppEnv>()
+    app.route("/api/v1", createEvalRoutes({
+      endpoint: "achieve-welcome-call-qa",
+      moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      requiredPartnerId: "achieve",
+    }))
+
+    const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({ ...validBody, partner_id: "wrong-partner" }),
+    }, createEnvWithWorkflow())
+
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as any
+    expect(body.error).toContain("achieve")
+  })
+
+  it("returns 202 when partner_id matches requiredPartnerId", async () => {
+    const app = new Hono<AppEnv>()
+    app.route("/api/v1", createEvalRoutes({
+      endpoint: "achieve-welcome-call-qa",
+      moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      requiredPartnerId: "achieve",
+    }))
+
+    const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({ ...validBody, partner_id: "achieve" }),
+    }, createEnvWithWorkflow())
+
+    expect(res.status).toBe(202)
+  })
+
+  it("returns 202 when partner_id is absent (no enforcement on missing)", async () => {
+    const app = new Hono<AppEnv>()
+    app.route("/api/v1", createEvalRoutes({
+      endpoint: "achieve-welcome-call-qa",
+      moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      requiredPartnerId: "achieve",
+    }))
+
+    const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify(validBody),
+    }, createEnvWithWorkflow())
+
+    expect(res.status).toBe(202)
   })
 })

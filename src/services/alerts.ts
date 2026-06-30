@@ -21,6 +21,15 @@ function isDispositionReviewAlert(alert: Alert): boolean {
   )
 }
 
+// Achieve is an external partner module. Alerts must never reach Pennie managers —
+// only super-admin/internal surfaces should see violations from this module.
+function isAchieveAlert(alert: Alert): boolean {
+  return (
+    alert.module_name === MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA ||
+    alert.violation_type === VIOLATION_TYPES.ACHIEVE_WELCOME_CALL
+  )
+}
+
 function shouldMirrorToJoel(alert: Alert): boolean {
   if (alert.agent_email?.toLowerCase() !== JOEL_NELSON_EMAIL) return false
 
@@ -61,6 +70,16 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   // the workflow store the module result for internal review.
   if (isDispositionReviewAlert(alert)) {
     log("info", "Disposition-review Slack alert muted", {
+      callId: alert.call_id,
+      agentEmail: alert.agent_email,
+    })
+    return
+  }
+
+  // Achieve is an external partner module. Alerts must never route to Pennie
+  // managers. Storage and evaluation proceed normally — only Slack is suppressed.
+  if (isAchieveAlert(alert)) {
+    log("info", "Achieve welcome-call-qa Slack alert muted (external partner module)", {
       callId: alert.call_id,
       agentEmail: alert.agent_email,
     })
