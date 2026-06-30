@@ -29,6 +29,26 @@ export const AchieveWelcomeCallQASchema = z.object({
     client_engagement: z.enum(["engaged", "neutral", "disengaged"]),
     notes: z.string(),
   }),
+
+  // How confident the LLM is in its own assessment of the extracted segment.
+  // Lowered when the segment is ambiguous, too short, speaker attribution is
+  // unclear, or required elements could only be inferred from outside the segment.
+  assessment_confidence: z.object({
+    score: z.number().min(0).max(1),
+    level: z.enum(["high", "medium", "low"]),
+    rationale: z.string(),
+    limitations: z.array(z.string()),
+  }),
+
+  // Deterministic segmentation metadata, stamped by the module (not the LLM).
+  transcript_segment: z.object({
+    segment_type: z.string(),
+    start_line: z.number(),
+    marker: z.string().nullable(),
+    segmentation_confidence: z.enum(["high", "medium", "low"]),
+    segmentation_score: z.number().min(0).max(1),
+    used_full_transcript_fallback: z.boolean(),
+  }),
 })
 
 export type AchieveWelcomeCallQAResult = z.infer<typeof AchieveWelcomeCallQASchema>

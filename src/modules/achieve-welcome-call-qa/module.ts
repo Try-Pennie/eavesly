@@ -5,17 +5,21 @@ import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { AchieveWelcomeCallQASchema } from "../../schemas/achieve-welcome-call-qa"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
+import { segmentWelcomeCall } from "./segment"
 import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 
 // partner_id and script_version are not columns in eavesly_module_results;
 // they live in result_json so they are preserved and queryable without a migration.
 const PARTNER_ID = "achieve" as const
 const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v0" as const
+const SEGMENT_TYPE = "fdr_welcome_call_coordinator" as const
 
-// Allow model to omit partner_id/script_version; we stamp them unconditionally after.
+// partner_id/script_version/transcript_segment are stamped deterministically by the
+// module after the call, so the model is allowed to omit them.
 const EvalSchema = AchieveWelcomeCallQASchema.extend({
   partner_id: z.string().optional(),
   script_version: z.string().optional(),
+  transcript_segment: AchieveWelcomeCallQASchema.shape.transcript_segment.optional(),
 })
 
 export const achieveWelcomeCallQAModule: EvalModule = {
@@ -29,11 +33,22 @@ export const achieveWelcomeCallQAModule: EvalModule = {
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    const userPrompt = buildUserPrompt(
-      "Please evaluate the following Achieve/FDR welcome call transcript for script adherence:",
-      transcript,
-      callHistory,
-    )
+    // Grade only the actual FDR welcome-call coordinator segment (post-handoff).
+    const seg = segmentWelcomeCall(transcript)
+
+    const preamble = [
+      "You are grading ONLY the extracted FDR welcome-call coordinator segment below",
+      "(the portion of the call after the welcome-call coordinator / client success advocate joins).",
+      "Do NOT give credit for, and do NOT infer required elements from, any earlier Pennie",
+      "sales, enrollment, or disclosure content — that content is intentionally excluded here.",
+      seg.used_full_transcript_fallback
+        ? "NOTE: no welcome-call handoff marker was found, so the FULL transcript is shown as a fallback. Lower your assessment_confidence accordingly."
+        : `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
+      "",
+      "Please evaluate the following welcome-call coordinator segment for script adherence:",
+    ].join(" ")
+
+    const userPrompt = buildUserPrompt(preamble, seg.segment, callHistory)
 
     const result = await llm.getStructuredResponse(
       systemPrompt,
@@ -42,8 +57,21 @@ export const achieveWelcomeCallQAModule: EvalModule = {
       "achieve_welcome_call_qa_evaluation",
     )
 
-    // Always stamp partner_id and script_version regardless of what the model returns
-    const stamped = { ...result, partner_id: PARTNER_ID, script_version: SCRIPT_VERSION }
+    // Stamp partner_id/script_version and deterministic segmentation metadata,
+    // regardless of what the model returns.
+    const stamped = {
+      ...result,
+      partner_id: PARTNER_ID,
+      script_version: SCRIPT_VERSION,
+      transcript_segment: {
+        segment_type: SEGMENT_TYPE,
+        start_line: seg.start_line,
+        marker: seg.marker,
+        segmentation_confidence: seg.segmentation_confidence,
+        segmentation_score: seg.segmentation_score,
+        used_full_transcript_fallback: seg.used_full_transcript_fallback,
+      },
+    }
     const hasViolation = stamped.script_adherence.violation
 
     return {
