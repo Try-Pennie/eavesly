@@ -1,8 +1,8 @@
 // Deterministic segmentation for Achieve/FDR welcome-call QA.
 //
 // A full transcript may include Pennie enrollment/disclosure before the actual
-// FDR welcome-call coordinator (client success advocate) joins. We only want to
-// grade the post-handoff coordinator segment, so we locate the handoff using
+// FDR disclosure/welcome-call flow begins. We only want to grade the post-handoff
+// Achieve/FDR segment, so we locate the handoff using
 // robust textual markers and return everything from that line onward.
 //
 // ponytail: line-by-line regex scan, earliest-matching line wins. Good enough for
@@ -20,6 +20,11 @@ export interface WelcomeCallSegment {
 }
 
 const MARKERS: { pattern: RegExp; label: string; confidence: "high" | "medium"; score: number }[] = [
+  // The Achieve/FDR segment can begin with the automated Freedom disclosure line
+  // before the live welcome-call coordinator comes on. This marker appears in the
+  // example transcript at 31:49 when the flow calls +14808803129.
+  { pattern: /thank you for calling the freedom debt relief disclosure line/i, label: "fdr_disclosure_line_start", confidence: "high", score: 0.95 },
+  { pattern: /please enter the client'?s 10 digit phone number/i, label: "fdr_disclosure_phone_prompt", confidence: "high", score: 0.9 },
   { pattern: /thank you for calling[^\n]{0,40}welcome call/i, label: "welcome_call_greeting", confidence: "high", score: 0.95 },
   { pattern: /freedom debt relief client dashboard app/i, label: "fdr_dashboard_app", confidence: "high", score: 0.9 },
   { pattern: /log\s?in to your client dashboard/i, label: "client_dashboard_login", confidence: "high", score: 0.9 },

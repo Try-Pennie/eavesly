@@ -12,7 +12,7 @@ import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 // they live in result_json so they are preserved and queryable without a migration.
 const PARTNER_ID = "achieve" as const
 const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v0" as const
-const SEGMENT_TYPE = "fdr_welcome_call_coordinator" as const
+const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
 
 // partner_id/script_version/transcript_segment are stamped deterministically by the
 // module after the call, so the model is allowed to omit them.
@@ -33,19 +33,20 @@ export const achieveWelcomeCallQAModule: EvalModule = {
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    // Grade only the actual FDR welcome-call coordinator segment (post-handoff).
+    // Grade only the actual Achieve/FDR segment (post-handoff), beginning with the
+    // Freedom disclosure line when present and continuing through the live welcome call.
     const seg = segmentWelcomeCall(transcript)
 
     const preamble = [
-      "You are grading ONLY the extracted FDR welcome-call coordinator segment below",
-      "(the portion of the call after the welcome-call coordinator / client success advocate joins).",
+      "You are grading ONLY the extracted Achieve/FDR disclosure and welcome-call segment below",
+      "(the portion of the call after the Pennie enrollment handoff; it may begin with the automated Freedom disclosure line before the live client success advocate joins).",
       "Do NOT give credit for, and do NOT infer required elements from, any earlier Pennie",
       "sales, enrollment, or disclosure content — that content is intentionally excluded here.",
       seg.used_full_transcript_fallback
         ? "NOTE: no welcome-call handoff marker was found, so the FULL transcript is shown as a fallback. Lower your assessment_confidence accordingly."
         : `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
       "",
-      "Please evaluate the following welcome-call coordinator segment for script adherence:",
+      "Please evaluate the following Achieve/FDR segment for script adherence:",
     ].join(" ")
 
     const userPrompt = buildUserPrompt(preamble, seg.segment, callHistory)
