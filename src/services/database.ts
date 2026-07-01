@@ -352,6 +352,11 @@ export class DatabaseService {
    * evals). Returns only names/ids — no transcript, contact, or payload data — so
    * the admin route response stays PII-free. `missing_modules` is the per-task set
    * of triggered modules still missing a result; tasks with none are omitted.
+   *
+   * Only returns tasks that have a `transcript_available` event: without one,
+   * callData can't be rebuilt, so the task is unprocessable and would otherwise
+   * stall the batch. Candidates are ordered deterministically by
+   * (computed_at, regal_task_id) so batch progress is stable across runs.
    */
   async getBackfillCandidates(
     start: string,
@@ -359,7 +364,7 @@ export class DatabaseService {
   ): Promise<Array<{ regal_task_id: string; triggered_modules: string[]; missing_modules: string[] }>> {
     const { data: plans, error: planErr } = await this.client
       .from("eavesly_regal_resolver_plans")
-      .select("regal_task_id, triggered_modules")
+      .select("regal_task_id, triggered_modules, computed_at")
       .gte("computed_at", start)
       .lt("computed_at", end)
 
@@ -384,6 +389,20 @@ export class DatabaseService {
       throw resErr
     }
 
+    // Only tasks with a stored transcript are processable — the rest can't build
+    // callData and must be excluded so they don't stall the batch.
+    const { data: transcripts, error: txErr } = await this.client
+      .from("eavesly_regal_call_events")
+      .select("regal_task_id")
+      .eq("event_type", "transcript_available")
+      .in("regal_task_id", ids)
+
+    if (txErr) {
+      log("error", "Failed to fetch transcript events for backfill", { error: txErr.message })
+      throw txErr
+    }
+    const haveTranscript = new Set((transcripts ?? []).map((r: any) => r.regal_task_id))
+
     const existing = new Map<string, Set<string>>()
     for (const row of results ?? []) {
       const set = existing.get(row.call_id) ?? new Set<string>()
@@ -391,8 +410,14 @@ export class DatabaseService {
       existing.set(row.call_id, set)
     }
 
-    const candidates: Array<{ regal_task_id: string; triggered_modules: string[]; missing_modules: string[] }> = []
+    const candidates: Array<{
+      regal_task_id: string
+      triggered_modules: string[]
+      missing_modules: string[]
+      computed_at?: string
+    }> = []
     for (const p of withTriggers) {
+      if (!haveTranscript.has(p.regal_task_id)) continue
       const have = existing.get(p.regal_task_id) ?? new Set<string>()
       const missing = p.triggered_modules.filter((m: string) => !have.has(m))
       if (missing.length > 0) {
@@ -400,10 +425,18 @@ export class DatabaseService {
           regal_task_id: p.regal_task_id,
           triggered_modules: p.triggered_modules,
           missing_modules: missing,
+          computed_at: p.computed_at,
         })
       }
     }
-    return candidates
+
+    // Deterministic order: computed_at, then regal_task_id as tiebreak.
+    candidates.sort(
+      (a, b) =>
+        String(a.computed_at ?? "").localeCompare(String(b.computed_at ?? "")) ||
+        a.regal_task_id.localeCompare(b.regal_task_id),
+    )
+    return candidates.map(({ computed_at, ...c }) => c)
   }
 
   /**

@@ -152,6 +152,32 @@ describe("Regal admin backfill route", () => {
     expect(json.remaining_estimate).toBe(3)
   })
 
+  it("does not get stuck on a missing-transcript candidate before a valid one", async () => {
+    getBackfillCandidates.mockResolvedValue([
+      { regal_task_id: "task-1", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
+      { regal_task_id: "task-2", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
+    ])
+    // task-1 unexpectedly has no stored transcript; task-2 does.
+    getRegalCallEvents.mockImplementation((id: string) =>
+      id === "task-1"
+        ? Promise.resolve({})
+        : Promise.resolve({ transcript: { ...transcriptBody, regal_task_id: "task-2" }, completed: completedBody }),
+    )
+    const env = createEnv()
+    const create = env.EVALUATION_WORKFLOW.create as any
+
+    const res = await post({ dry_run: false, limit: 1 }, env)
+    const json = (await res.json()) as any
+
+    expect(json.skipped_unprocessable).toBe(1)
+    expect(json.processed_tasks).toBe(1)
+    expect(json.launched).toBe(1)
+    // The valid task-2 drained despite unprocessable task-1 being first.
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create.mock.calls[0][0].id).toBe("task-2-full_qa")
+    expect(json.sample).toEqual([{ regal_task_id: "task-2", missing_modules: ["full_qa"] }])
+  })
+
   it("never leaks transcript/contact/payload data in the response", async () => {
     getBackfillCandidates.mockResolvedValue([
       { regal_task_id: "task-1", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
