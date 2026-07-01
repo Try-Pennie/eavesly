@@ -121,4 +121,27 @@ describe("transcriptEventToCallData", () => {
     expect(data.transcript.metadata.duration).toBe(900)
     expect(data.transcript.metadata.timestamp).toBe("2026-01-01T00:00:00Z")
   })
+
+  it("enriches callData with task-scoped completed-event metadata when present", () => {
+    const data = transcriptEventToCallData(
+      transcript({ agent_email: undefined, recording_duration: undefined }),
+      completed({
+        agent_email: "completed-agent@trypennie.com",
+        contact_phone: "+155****1111",
+        recording_duration: 1501,
+        talk_time: 1300,
+        disposition: "1.4 - Converted/Won > END CAMPAIGNS",
+        campaign_name: "End Campaigns",
+        originalTimestamp: "2026-01-02T00:00:00Z",
+      }),
+    )
+
+    expect(data.agent_id).toBe("completed-agent@trypennie.com")
+    expect(data.contact_phone).toBe("+155****1111")
+    expect(data.transcript.metadata.duration).toBe(1501)
+    expect(data.transcript.metadata.talk_time).toBe(1300)
+    expect(data.transcript.metadata.disposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
+    expect(data.transcript.metadata.campaign_name).toBe("End Campaigns")
+    expect(data.transcript.metadata.timestamp).toBe("2026-01-02T00:00:00Z")
+  })
 })
