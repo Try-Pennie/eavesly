@@ -273,6 +273,38 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getAgentRegalAssignment()", () => {
+    function mockAssignmentRow(row: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: row, error }),
+          }),
+        }),
+      })
+    }
+
+    it("looks up agent_regal_assignments and returns partner_assignment + assignment_status", async () => {
+      mockAssignmentRow({ partner_assignment: "achieve", assignment_status: "resolved" })
+      const db = new DatabaseService(createEnv())
+      const result = await db.getAgentRegalAssignment("agent@achieve.com")
+      expect(mockFrom).toHaveBeenCalledWith("agent_regal_assignments")
+      expect(result).toEqual({ partner_assignment: "achieve", assignment_status: "resolved" })
+    })
+
+    it("returns null when the agent is not found", async () => {
+      mockAssignmentRow(null)
+      const db = new DatabaseService(createEnv())
+      expect(await db.getAgentRegalAssignment("missing@example.com")).toBeNull()
+    })
+
+    it("returns null (does not throw) on query error", async () => {
+      mockAssignmentRow(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      expect(await db.getAgentRegalAssignment("agent@achieve.com")).toBeNull()
+    })
+  })
+
   describe("getActiveDispositions()", () => {
     function mockDispositions(data: unknown, error: unknown = null) {
       mockSelect.mockReturnValue({

@@ -136,6 +136,33 @@ export class DatabaseService {
   }
 
   /**
+   * Look up an agent's Regal partner assignment by email. Source of truth for
+   * warm-transfer → achieve_welcome_call_qa routing. Populated hourly by a
+   * Pipedream cron. Returns null when the agent isn't in the table (advisory
+   * flow degrades to "not routed").
+   */
+  async getAgentRegalAssignment(
+    agentEmail: string,
+  ): Promise<{ partner_assignment: string | null; assignment_status: string | null } | null> {
+    const { data, error } = await this.client
+      .from("agent_regal_assignments")
+      .select("partner_assignment, assignment_status")
+      .eq("agent_email", agentEmail)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      log("warn", "Failed to fetch agent regal assignment", { agentEmail, error: error.message })
+      return null
+    }
+    if (!data) return null
+    return {
+      partner_assignment: data.partner_assignment ?? null,
+      assignment_status: data.assignment_status ?? null,
+    }
+  }
+
+  /**
    * Load the live CRM disposition catalog (active rows only). Drives the
    * disposition-review taxonomy so it never drifts from the Dispositions admin
    * screen. Returns [] (never throws) on error so the review degrades to a
