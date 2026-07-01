@@ -7,6 +7,7 @@ import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
+import { routeAchieveWelcomeCallQA } from "./achieve-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -112,6 +113,27 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       await db.storeModuleResult(callData.call_id, result, alerts.length > 0, callData)
       return alerts
     })
+
+    // Step 2c: Achieve routing (warm_transfer only). After the warm-transfer
+    // eval is stored, deterministically chain achieve_welcome_call_qa when the
+    // completing agent is resolved to Achieve in agent_regal_assignments.
+    // Best-effort: routing must never fail the warm_transfer workflow.
+    if (moduleName === MODULE_NAMES.WARM_TRANSFER) {
+      try {
+        await step.do("route-achieve-welcome-qa", {
+          retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+          timeout: "1 minute",
+        }, async () => {
+          const db = new DatabaseService(this.env)
+          await routeAchieveWelcomeCallQA(this.env, db, callData, correlationId)
+        })
+      } catch (err) {
+        log("error", "Achieve routing failed (non-fatal)", {
+          callId: callData.call_id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
 
     // Step 2b: Store QA result in legacy table (full_qa only)
     if (moduleName === MODULE_NAMES.FULL_QA) {
