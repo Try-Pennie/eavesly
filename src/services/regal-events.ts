@@ -52,24 +52,30 @@ export interface ModuleTriggerPlan {
 
 /**
  * Convert a transcript_available event into an EvaluateRequest-compatible call
- * data object (the shape the existing evaluate/* modules consume). Shadow-only in
- * this PR — nothing evaluates it yet.
+ * data object (the shape the existing evaluate/* modules consume). This is the
+ * callData the events endpoints pass to EVALUATION_WORKFLOW.create.
  */
-export function transcriptEventToCallData(e: TranscriptAvailableEvent): EvaluateRequest {
+export function transcriptEventToCallData(
+  e: TranscriptAvailableEvent,
+  completed?: CallCompletedEvent,
+): EvaluateRequest {
   return {
     call_id: e.regal_task_id,
     regal_task_id: e.regal_task_id,
-    agent_id: e.agent_email ?? "",
+    agent_id: e.agent_email ?? completed?.agent_email ?? "",
     transcript: {
       transcript: e.transcript ?? "",
       metadata: {
-        duration: e.recording_duration ?? 0,
-        timestamp: e.originalTimestamp ?? "",
+        duration: e.recording_duration ?? completed?.recording_duration ?? 0,
+        timestamp: e.originalTimestamp ?? completed?.originalTimestamp ?? "",
+        talk_time: completed?.talk_time,
+        disposition: completed?.disposition,
+        campaign_name: completed?.campaign_name,
       },
     },
-    agent_email: e.agent_email,
+    agent_email: e.agent_email ?? completed?.agent_email,
     contact_name: e.contact_name,
-    contact_phone: e.contact_phone,
+    contact_phone: e.contact_phone ?? completed?.contact_phone,
     recording_link: e.recording_link,
     call_summary: e.call_summary,
     transcript_url: e.transcript_url,
@@ -79,9 +85,9 @@ export function transcriptEventToCallData(e: TranscriptAvailableEvent): Evaluate
 /**
  * Deterministic resolver: joinedEvents + policy -> ModuleTriggerPlan.
  *
- * Shadow-only in this PR (no workflows are triggered). Records which QA modules
- * the backend *would* run so we can shadow-compare against the current Regal
- * journey before simplifying it.
+ * The events endpoints launch EVALUATION_WORKFLOW for every module in `triggered`
+ * (once a transcript is available). The plan is also stored for shadow comparison
+ * against the current Regal journey while the cutover is validated.
  */
 export function buildModuleTriggerPlan(
   joined: JoinedRegalEvents,

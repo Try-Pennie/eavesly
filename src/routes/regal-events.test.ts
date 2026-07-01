@@ -107,19 +107,95 @@ describe("Regal event routes", () => {
     expect(recordRegalCallEvent).toHaveBeenCalledOnce()
   })
 
-  it("does NOT trigger EVALUATION_WORKFLOW", async () => {
-    const env = createEnv()
-    const create = env.EVALUATION_WORKFLOW.create as any
-    await app().request(
-      "/api/v1/events/transcript-available",
+  function postWithEnv(path: string, body: unknown, env: ReturnType<typeof createEnv>) {
+    return app().request(
+      `/api/v1${path}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${TEST_API_KEY}` },
-        body: JSON.stringify(transcriptBody),
+        body: JSON.stringify(body),
       },
       env,
     )
+  }
+
+  it("launches a workflow per triggered module when a transcript is joined", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    const env = createEnv()
+    const create = env.EVALUATION_WORKFLOW.create as any
+
+    const res = await postWithEnv("/events/transcript-available", transcriptBody, env)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
+
+    // Fully-enrolled plan => all five modules queued via deterministic instance ids.
+    const modules = json.active_triggers.map((t: any) => t.module)
+    expect(new Set(modules)).toEqual(new Set(json.shadow_plan.triggered))
+    expect(json.active_triggers.every((t: any) => t.status === "queued")).toBe(true)
+    expect(create).toHaveBeenCalledTimes(json.shadow_plan.triggered.length)
+    for (const call of create.mock.calls) {
+      expect(call[0].id).toBe(`task-1-${call[0].params.moduleName}`)
+      expect(call[0].params.callData.call_id).toBe("task-1")
+      expect(call[0].params.callData.transcript.metadata.disposition).toBe(completedBody.disposition)
+      expect(call[0].params.callData.transcript.metadata.duration).toBe(transcriptBody.recording_duration)
+    }
+  })
+
+  it("launches gated modules when completed arrives after a stored transcript", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    const env = createEnv()
+    const create = env.EVALUATION_WORKFLOW.create as any
+
+    const res = await postWithEnv("/events/call-completed", completedBody, env)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
+
+    expect(json.shadow_plan.enrolled).toBe(true)
+    expect(json.active_triggers.map((t: any) => t.module)).toEqual(json.shadow_plan.triggered)
+    expect(create).toHaveBeenCalledTimes(json.shadow_plan.triggered.length)
+    expect(create.mock.calls.map((call: any[]) => call[0].id)).toContain("task-1-program_expectations")
+    expect(create.mock.calls.map((call: any[]) => call[0].id)).toContain("task-1-warm_transfer")
+    expect(create.mock.calls.map((call: any[]) => call[0].id)).toContain("task-1-litigation_check")
+  })
+
+  it("does NOT launch workflows for a call_completed-only plan (no transcript data)", async () => {
+    getRegalCallEvents.mockResolvedValue({ completed: completedBody })
+    const env = createEnv()
+    const create = env.EVALUATION_WORKFLOW.create as any
+
+    const res = await postWithEnv("/events/call-completed", completedBody, env)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
     expect(create).not.toHaveBeenCalled()
+    expect(json.active_triggers).toBeUndefined()
+    // Plan is still stored for the deferred launch when the transcript arrives.
+    expect(recordRegalResolverPlan).toHaveBeenCalledOnce()
+  })
+
+  it("treats 'already exists' workflow errors as skipped and still returns 202", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    const env = createEnv()
+    ;(env.EVALUATION_WORKFLOW.create as any).mockRejectedValue(
+      new Error("instance with id already exists"),
+    )
+
+    const res = await postWithEnv("/events/transcript-available", transcriptBody, env)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
+    expect(json.active_triggers.every((t: any) => t.status === "skipped")).toBe(true)
+  })
+
+  it("reports unexpected workflow errors but still records the event and returns 202", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    const env = createEnv()
+    ;(env.EVALUATION_WORKFLOW.create as any).mockRejectedValue(new Error("kaboom"))
+
+    const res = await postWithEnv("/events/transcript-available", transcriptBody, env)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
+    expect(json.status).toBe("recorded")
+    expect(json.active_triggers.every((t: any) => t.status === "error")).toBe(true)
+    expect(recordRegalCallEvent).toHaveBeenCalledOnce()
   })
 
   it("still returns 202 when the shadow plan write fails (best-effort)", async () => {
