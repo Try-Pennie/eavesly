@@ -7,7 +7,7 @@ import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
-import { routeAchieveWelcomeCallQA } from "./achieve-routing"
+import { routePartnerFollowup } from "./partner-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -114,24 +114,33 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       return alerts
     })
 
-    // Step 2c: Achieve routing (warm_transfer only). After the warm-transfer
-    // eval is stored, deterministically chain achieve_welcome_call_qa when the
-    // completing agent is resolved to Achieve in agent_regal_assignments.
-    // Best-effort: routing must never fail the warm_transfer workflow.
+    // Step 2c: Partner routing (warm_transfer only). After the warm-transfer eval
+    // is stored, deterministically chain partner-specific follow-ups when the
+    // completing agent is resolved to that partner in agent_regal_assignments:
+    // Achieve -> achieve_welcome_call_qa, Beyond -> budget_inputs. Each is
+    // best-effort: routing must never fail the warm_transfer workflow.
     if (moduleName === MODULE_NAMES.WARM_TRANSFER) {
-      try {
-        await step.do("route-achieve-welcome-qa", {
-          retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
-          timeout: "1 minute",
-        }, async () => {
-          const db = new DatabaseService(this.env)
-          await routeAchieveWelcomeCallQA(this.env, db, callData, correlationId)
-        })
-      } catch (err) {
-        log("error", "Achieve routing failed (non-fatal)", {
-          callId: callData.call_id,
-          error: err instanceof Error ? err.message : String(err),
-        })
+      const followups = [
+        { partner: "achieve", moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA },
+        { partner: "beyond", moduleName: MODULE_NAMES.BUDGET_INPUTS },
+      ]
+      for (const followup of followups) {
+        try {
+          await step.do(`route-${followup.moduleName}`, {
+            retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+            timeout: "1 minute",
+          }, async () => {
+            const db = new DatabaseService(this.env)
+            await routePartnerFollowup(this.env, db, callData, correlationId, followup)
+          })
+        } catch (err) {
+          log("error", "Partner routing failed (non-fatal)", {
+            callId: callData.call_id,
+            partner: followup.partner,
+            module: followup.moduleName,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
       }
     }
 
