@@ -12,6 +12,15 @@ import { z } from "zod"
  * the same Regal task ID — both are normalized to `regal_task_id`.
  */
 
+const RegalBooleanSchema = z.preprocess((value) => {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === "true") return true
+    if (normalized === "false") return false
+  }
+  return value
+}, z.boolean())
+
 const CustomPropertiesSchema = z
   .object({
     // Warm-transfer gate: LegalState === 'No'
@@ -32,7 +41,7 @@ export const TranscriptAvailableEventSchema = z.object({
   recording_link: z.string().optional(),
   recording_duration: z.coerce.number().nonnegative().optional(),
   transcript: z.string().max(200000).optional(),
-  transcript_is_truncated: z.boolean().optional(),
+  transcript_is_truncated: RegalBooleanSchema.optional(),
   transcript_url: z.string().optional(),
   customProperties: CustomPropertiesSchema.optional(),
   source_event_id: z.string().optional(),
@@ -50,7 +59,7 @@ export const CallCompletedEventSchema = z.object({
   disposition: z.string().optional(),
   campaign_name: z.string().optional(),
   campaign_friendly_id: z.string().optional(),
-  conversation_happened: z.boolean().optional(),
+  conversation_happened: RegalBooleanSchema.optional(),
   talk_time: z.coerce.number().nonnegative().optional(),
   wrapup_time: z.coerce.number().nonnegative().optional(),
   handle_time: z.coerce.number().nonnegative().optional(),
