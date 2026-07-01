@@ -296,6 +296,91 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getBackfillCandidates()", () => {
+    function mockTables(plans: unknown, planErr: unknown, results: unknown, resErr: unknown = null) {
+      mockFrom.mockImplementation((table: string) => {
+        if (table === "eavesly_regal_resolver_plans") {
+          return { select: () => ({ gte: () => ({ lt: () => Promise.resolve({ data: plans, error: planErr }) }) }) }
+        }
+        if (table === "eavesly_module_results") {
+          return { select: () => ({ in: () => Promise.resolve({ data: results, error: resErr }) }) }
+        }
+        return {}
+      })
+    }
+
+    it("returns only triggered modules missing a result", async () => {
+      mockTables(
+        [
+          { regal_task_id: "task-1", triggered_modules: ["full_qa", "litigation_check"] },
+          { regal_task_id: "task-2", triggered_modules: ["full_qa"] },
+          { regal_task_id: "task-3", triggered_modules: [] },
+        ],
+        null,
+        [{ call_id: "task-1", module_name: "full_qa" }], // task-1 has full_qa, missing litigation_check
+      )
+      const db = new DatabaseService(createEnv())
+      const candidates = await db.getBackfillCandidates("2026-07-01T20:08:00Z", "2026-07-01T20:49:51Z")
+      expect(candidates).toEqual([
+        { regal_task_id: "task-1", triggered_modules: ["full_qa", "litigation_check"], missing_modules: ["litigation_check"] },
+        { regal_task_id: "task-2", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
+      ])
+    })
+
+    it("returns [] when no plans have triggered modules", async () => {
+      mockTables([{ regal_task_id: "t", triggered_modules: [] }], null, [])
+      const db = new DatabaseService(createEnv())
+      expect(await db.getBackfillCandidates("a", "b")).toEqual([])
+    })
+
+    it("throws on resolver plan query error", async () => {
+      mockTables(null, { message: "boom" }, [])
+      const db = new DatabaseService(createEnv())
+      await expect(db.getBackfillCandidates("a", "b")).rejects.toEqual({ message: "boom" })
+    })
+  })
+
+  describe("getDuplicateAudit()", () => {
+    function mockDupTables(mr: unknown, ce: unknown, rp: unknown) {
+      mockFrom.mockImplementation((table: string) => {
+        const data =
+          table === "eavesly_module_results" ? mr : table === "eavesly_regal_call_events" ? ce : rp
+        return { select: () => ({ in: () => Promise.resolve({ data, error: null }) }) }
+      })
+    }
+
+    it("returns 0 counts for empty id list without querying", async () => {
+      const db = new DatabaseService(createEnv())
+      expect(await db.getDuplicateAudit([])).toEqual({
+        duplicate_module_results: 0,
+        duplicate_call_events: 0,
+        duplicate_resolver_plans: 0,
+      })
+      expect(mockFrom).not.toHaveBeenCalled()
+    })
+
+    it("counts rows beyond the first per key", async () => {
+      mockDupTables(
+        [
+          { call_id: "t1", module_name: "full_qa" },
+          { call_id: "t1", module_name: "full_qa" }, // dup
+          { call_id: "t1", module_name: "litigation_check" },
+        ],
+        [
+          { regal_task_id: "t1", event_type: "call_completed" },
+          { regal_task_id: "t1", event_type: "call_completed" }, // dup
+        ],
+        [{ regal_task_id: "t1" }],
+      )
+      const db = new DatabaseService(createEnv())
+      expect(await db.getDuplicateAudit(["t1"])).toEqual({
+        duplicate_module_results: 1,
+        duplicate_call_events: 1,
+        duplicate_resolver_plans: 0,
+      })
+    })
+  })
+
   describe("healthCheck()", () => {
     it("returns true when database is reachable", async () => {
       const db = new DatabaseService(createEnv())

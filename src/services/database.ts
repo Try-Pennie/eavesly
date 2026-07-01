@@ -346,6 +346,112 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * Backfill support: find resolver plans in [start,end) whose triggered modules
+   * have no eavesly_module_results yet (call_id == regal_task_id for Regal-driven
+   * evals). Returns only names/ids — no transcript, contact, or payload data — so
+   * the admin route response stays PII-free. `missing_modules` is the per-task set
+   * of triggered modules still missing a result; tasks with none are omitted.
+   */
+  async getBackfillCandidates(
+    start: string,
+    end: string,
+  ): Promise<Array<{ regal_task_id: string; triggered_modules: string[]; missing_modules: string[] }>> {
+    const { data: plans, error: planErr } = await this.client
+      .from("eavesly_regal_resolver_plans")
+      .select("regal_task_id, triggered_modules")
+      .gte("computed_at", start)
+      .lt("computed_at", end)
+
+    if (planErr) {
+      log("error", "Failed to fetch backfill resolver plans", { error: planErr.message })
+      throw planErr
+    }
+
+    const withTriggers = (plans ?? []).filter(
+      (p: any) => Array.isArray(p.triggered_modules) && p.triggered_modules.length > 0,
+    )
+    if (withTriggers.length === 0) return []
+
+    const ids = withTriggers.map((p: any) => p.regal_task_id)
+    const { data: results, error: resErr } = await this.client
+      .from("eavesly_module_results")
+      .select("call_id, module_name")
+      .in("call_id", ids)
+
+    if (resErr) {
+      log("error", "Failed to fetch existing module results for backfill", { error: resErr.message })
+      throw resErr
+    }
+
+    const existing = new Map<string, Set<string>>()
+    for (const row of results ?? []) {
+      const set = existing.get(row.call_id) ?? new Set<string>()
+      set.add(row.module_name)
+      existing.set(row.call_id, set)
+    }
+
+    const candidates: Array<{ regal_task_id: string; triggered_modules: string[]; missing_modules: string[] }> = []
+    for (const p of withTriggers) {
+      const have = existing.get(p.regal_task_id) ?? new Set<string>()
+      const missing = p.triggered_modules.filter((m: string) => !have.has(m))
+      if (missing.length > 0) {
+        candidates.push({
+          regal_task_id: p.regal_task_id,
+          triggered_modules: p.triggered_modules,
+          missing_modules: missing,
+        })
+      }
+    }
+    return candidates
+  }
+
+  /**
+   * Read-only duplicate audit scoped to a set of regal_task_ids (call_id ==
+   * regal_task_id). Counts rows that share a key beyond the first occurrence in
+   * three tables. Purely informational — all three tables use upsert onConflict
+   * constraints, so duplicates are not expected; this surfaces any that slipped
+   * in without deleting anything. Returns key/count only, no payloads.
+   */
+  async getDuplicateAudit(regalTaskIds: string[]): Promise<{
+    duplicate_module_results: number
+    duplicate_call_events: number
+    duplicate_resolver_plans: number
+  }> {
+    const empty = { duplicate_module_results: 0, duplicate_call_events: 0, duplicate_resolver_plans: 0 }
+    if (regalTaskIds.length === 0) return empty
+
+    const countDupes = (rows: any[], key: (r: any) => string): number => {
+      const seen = new Set<string>()
+      let dupes = 0
+      for (const r of rows) {
+        const k = key(r)
+        if (seen.has(k)) dupes++
+        else seen.add(k)
+      }
+      return dupes
+    }
+
+    const [mr, ce, rp] = await Promise.all([
+      this.client.from("eavesly_module_results").select("call_id, module_name").in("call_id", regalTaskIds),
+      this.client.from("eavesly_regal_call_events").select("regal_task_id, event_type").in("regal_task_id", regalTaskIds),
+      this.client.from("eavesly_regal_resolver_plans").select("regal_task_id").in("regal_task_id", regalTaskIds),
+    ])
+
+    if (mr.error || ce.error || rp.error) {
+      log("warn", "Duplicate audit query error", {
+        error: mr.error?.message ?? ce.error?.message ?? rp.error?.message,
+      })
+      return empty
+    }
+
+    return {
+      duplicate_module_results: countDupes(mr.data ?? [], (r) => `${r.call_id}|${r.module_name}`),
+      duplicate_call_events: countDupes(ce.data ?? [], (r) => `${r.regal_task_id}|${r.event_type}`),
+      duplicate_resolver_plans: countDupes(rp.data ?? [], (r) => r.regal_task_id),
+    }
+  }
+
   async healthCheck(): Promise<boolean> {
     const { error } = await this.client
       .from("eavesly_module_results")

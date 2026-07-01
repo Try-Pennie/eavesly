@@ -15,6 +15,7 @@ import { achieveWelcomeCallQARoutes } from "./routes/achieve-welcome-call-qa"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
 import { regalEventRoutes } from "./routes/regal-events"
+import { regalAdminRoutes } from "./routes/regal-admin"
 
 const app = new Hono<AppEnv>()
 
@@ -36,6 +37,7 @@ app.route("/api/v1", dispositionReviewRoutes)
 app.route("/api/v1", achieveWelcomeCallQARoutes)
 app.route("/api/v1", statusRoutes)
 app.route("/api/v1", regalEventRoutes)
+app.route("/api/v1", regalAdminRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {

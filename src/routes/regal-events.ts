@@ -12,7 +12,7 @@ import {
   DEFAULT_RESOLVER_POLICY,
   type RegalCallEvent,
 } from "../services/regal-events"
-import type { EvaluateRequest } from "../schemas/requests"
+import { launchModule, runRegalBackfillBatch, type ActiveTrigger } from "../services/regal-backfill"
 import { auth } from "../middleware/auth"
 import { log } from "../utils/logger"
 
@@ -26,40 +26,15 @@ import { log } from "../utils/logger"
  * `shadow_plan` is retained in the response for continued shadow comparison.
  */
 
-/** Per-module launch status surfaced in the response. Names + status only (no PII). */
-type ActiveTrigger = { module: string; status: "queued" | "skipped" | "error" }
+export { launchModule, type ActiveTrigger }
 
 /**
- * Launch one module's EVALUATION_WORKFLOW. Idempotent via the deterministic
- * instance id: an "already exists" error is treated as skipped, other errors are
- * logged and reported but never fail the ledger-write endpoint.
+ * Fixed missed-window incident (2026-07-01). Opportunistically drained from
+ * normal authenticated Regal event traffic since the admin route needs a
+ * production INTERNAL_API_KEY that isn't always available. Small best-effort
+ * batch — never fails the event endpoint.
  */
-async function launchModule(
-  env: AppEnv["Bindings"],
-  moduleName: string,
-  callData: EvaluateRequest,
-  correlationId: string | undefined,
-): Promise<ActiveTrigger> {
-  const instanceId = `${callData.call_id}-${moduleName}`
-  try {
-    await env.EVALUATION_WORKFLOW.create({
-      id: instanceId,
-      params: { moduleName, callData, correlationId },
-    })
-    return { module: moduleName, status: "queued" }
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("already exists")) {
-      return { module: moduleName, status: "skipped" }
-    }
-    log("error", "Regal active trigger failed", {
-      correlationId,
-      moduleName,
-      instanceId,
-      error: e instanceof Error ? e.message : String(e),
-    })
-    return { module: moduleName, status: "error" }
-  }
-}
+const MISSED_WINDOW = { start: "2026-07-01T20:08:00Z", end: "2026-07-01T20:49:51Z", limit: 5 }
 
 function createRegalEventRoute(
   routes: Hono<AppEnv>,
@@ -155,6 +130,26 @@ function createRegalEventRoute(
       status: "recorded",
       correlationId,
     })
+
+    // Opportunistically drain a small slice of the fixed missed-window backlog
+    // from this authenticated request. Best-effort: any failure is logged and
+    // never fails the event endpoint. Returns fast once the backlog is empty.
+    try {
+      await runRegalBackfillBatch({
+        db,
+        env: c.env,
+        start: MISSED_WINDOW.start,
+        end: MISSED_WINDOW.end,
+        limit: MISSED_WINDOW.limit,
+        dryRun: false,
+        correlationId,
+      })
+    } catch (e) {
+      log("warn", "Opportunistic Regal backfill failed", {
+        correlationId,
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
 
     return c.json(
       {

@@ -17,7 +17,15 @@ vi.mock("../services/database", () => ({
   },
 }))
 
+// Keep the real launchModule (workflow-launch assertions below rely on it); only
+// stub the opportunistic backfill helper so we can assert it is invoked / throws.
+vi.mock("../services/regal-backfill", async (importActual) => {
+  const actual = await importActual<typeof import("../services/regal-backfill")>()
+  return { ...actual, runRegalBackfillBatch: vi.fn().mockResolvedValue({ dry_run: false }) }
+})
+
 import { regalEventRoutes } from "./regal-events"
+import { runRegalBackfillBatch } from "../services/regal-backfill"
 
 function app() {
   const a = new Hono<AppEnv>()
@@ -61,6 +69,7 @@ describe("Regal event routes", () => {
     recordRegalResolverPlan.mockClear().mockResolvedValue(undefined)
     logRequest.mockClear()
     getRegalCallEvents.mockReset().mockResolvedValue({})
+    ;(runRegalBackfillBatch as any).mockReset().mockResolvedValue({ dry_run: false })
   })
 
   it("returns 401 without auth", async () => {
@@ -205,5 +214,30 @@ describe("Regal event routes", () => {
     const json = (await res.json()) as any
     expect(json.status).toBe("recorded")
     expect(json.shadow_plan).toBeUndefined()
+  })
+
+  it("runs the opportunistic missed-window backfill after a recorded event", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    const res = await post("/events/transcript-available", transcriptBody, true)
+    expect(res.status).toBe(202)
+    expect(runRegalBackfillBatch).toHaveBeenCalledOnce()
+    expect(runRegalBackfillBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        start: "2026-07-01T20:08:00Z",
+        end: "2026-07-01T20:49:51Z",
+        limit: 5,
+        dryRun: false,
+      }),
+    )
+  })
+
+  it("still returns 202 when the opportunistic backfill helper throws", async () => {
+    getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    ;(runRegalBackfillBatch as any).mockRejectedValue(new Error("backfill boom"))
+    const res = await post("/events/call-completed", completedBody, true)
+    expect(res.status).toBe(202)
+    const json = (await res.json()) as any
+    expect(json.status).toBe("recorded")
+    expect(runRegalBackfillBatch).toHaveBeenCalledOnce()
   })
 })
