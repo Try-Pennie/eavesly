@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
+import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan } from "./regal-events"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -264,6 +265,84 @@ export class DatabaseService {
     return {
       total_prior_calls: totalPriorCalls || priorCalls.length,
       prior_calls: priorCalls,
+    }
+  }
+
+  /**
+   * Idempotently record a canonical Regal journey event into the durable ledger,
+   * keyed on (regal_task_id, event_type). The full payload is stored as-is so the
+   * resolver can join transcript + completed events later. Primary write for the
+   * events endpoints — throws on error so the endpoint surfaces a real failure.
+   */
+  async recordRegalCallEvent(event: RegalCallEvent): Promise<void> {
+    const { error } = await this.client.from("eavesly_regal_call_events").upsert(
+      {
+        regal_task_id: event.regal_task_id,
+        event_type: event.event_type,
+        agent_email: event.agent_email ?? null,
+        source_event_id: event.source_event_id ?? null,
+        payload: event,
+        received_at: new Date().toISOString(),
+      },
+      { onConflict: "regal_task_id,event_type" },
+    )
+
+    if (error) {
+      log("error", "Failed to record Regal call event", {
+        regalTaskId: event.regal_task_id,
+        eventType: event.event_type,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Load the transcript/completed payloads recorded for a regal_task_id. Returns
+   * an empty object (never throws) so the resolver degrades to "not enough events
+   * yet" rather than failing the endpoint.
+   */
+  async getRegalCallEvents(regalTaskId: string): Promise<JoinedRegalEvents> {
+    const { data, error } = await this.client
+      .from("eavesly_regal_call_events")
+      .select("event_type, payload")
+      .eq("regal_task_id", regalTaskId)
+
+    if (error) {
+      log("warn", "Failed to fetch Regal call events", { regalTaskId, error: error.message })
+      return {}
+    }
+
+    const joined: JoinedRegalEvents = {}
+    for (const row of data ?? []) {
+      if (row.event_type === "transcript_available") joined.transcript = row.payload
+      else if (row.event_type === "call_completed") joined.completed = row.payload
+    }
+    return joined
+  }
+
+  /**
+   * Best-effort store of a shadow resolver plan, keyed on regal_task_id. Advisory
+   * (shadow-only) — logs a warning but never throws, so a plan-write failure can't
+   * break the events endpoint.
+   */
+  async recordRegalResolverPlan(plan: ModuleTriggerPlan): Promise<void> {
+    const { error } = await this.client.from("eavesly_regal_resolver_plans").upsert(
+      {
+        regal_task_id: plan.regal_task_id,
+        enrolled: plan.enrolled,
+        triggered_modules: plan.triggered,
+        plan_json: plan,
+        computed_at: new Date().toISOString(),
+      },
+      { onConflict: "regal_task_id" },
+    )
+
+    if (error) {
+      log("warn", "Failed to record Regal resolver plan", {
+        regalTaskId: plan.regal_task_id,
+        error: error.message,
+      })
     }
   }
 
