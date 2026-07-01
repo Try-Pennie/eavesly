@@ -12,13 +12,14 @@ describe("TranscriptAvailableEventSchema", () => {
     transcript: "Hello there.",
     recording_duration: "1500",
     recording_link: "https://example.com/rec.mp3",
-    transcript_is_truncated: false,
+    transcript_is_truncated: "false",
     customProperties: { LegalState: "No", collectionsBalance: "2.5" },
   }
 
   it("parses a valid payload and coerces numbers", () => {
     const r = TranscriptAvailableEventSchema.parse(valid)
     expect(r.recording_duration).toBe(1500)
+    expect(r.transcript_is_truncated).toBe(false)
     expect(r.customProperties?.collectionsBalance).toBe(2.5)
     expect(r.customProperties?.LegalState).toBe("No")
   })
@@ -52,6 +53,7 @@ describe("CallCompletedEventSchema", () => {
     campaign_name: "Q3 Outbound",
     campaign_friendly_id: "445",
     recording_duration: "1800",
+    conversation_happened: "true",
     talk_time: "1200",
     wrapup_time: "6",
     handle_time: "1206",
@@ -63,6 +65,7 @@ describe("CallCompletedEventSchema", () => {
   it("parses a valid payload and coerces numbers", () => {
     const r = CallCompletedEventSchema.parse(valid)
     expect(r.recording_duration).toBe(1800)
+    expect(r.conversation_happened).toBe(true)
     expect(r.talk_time).toBe(1200)
     expect(r.wrapup_time).toBe(6)
     expect(r.handle_time).toBe(1206)
