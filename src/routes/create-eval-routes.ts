@@ -219,6 +219,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
     const data = validation.data
     const callData: EvaluateRequest = {
       call_id: data.call_id,
+      regal_task_id: data.regal_task_id,
       agent_id: data.agent_id,
       transcript: {
         transcript: "",

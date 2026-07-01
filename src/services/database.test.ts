@@ -218,6 +218,84 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("recordRegalCallEvent()", () => {
+    it("upserts to eavesly_regal_call_events on (regal_task_id,event_type)", async () => {
+      const db = new DatabaseService(createEnv())
+      await db.recordRegalCallEvent({
+        event_type: "transcript_available",
+        regal_task_id: "task-1",
+        agent_email: "a@b.com",
+        source_event_id: "evt-1",
+      } as any)
+
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_regal_call_events")
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          regal_task_id: "task-1",
+          event_type: "transcript_available",
+          agent_email: "a@b.com",
+          source_event_id: "evt-1",
+        }),
+        { onConflict: "regal_task_id,event_type" },
+      )
+    })
+
+    it("throws on upsert error", async () => {
+      mockUpsert.mockResolvedValue({ error: { message: "boom" } })
+      const db = new DatabaseService(createEnv())
+      await expect(
+        db.recordRegalCallEvent({ event_type: "call_completed", regal_task_id: "t" } as any),
+      ).rejects.toEqual({ message: "boom" })
+    })
+  })
+
+  describe("getRegalCallEvents()", () => {
+    function mockRows(rows: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: rows, error }) })
+    }
+
+    it("splits rows into transcript/completed by event_type", async () => {
+      mockRows([
+        { event_type: "transcript_available", payload: { regal_task_id: "t", transcript: "hi" } },
+        { event_type: "call_completed", payload: { regal_task_id: "t", disposition: "x" } },
+      ])
+      const db = new DatabaseService(createEnv())
+      const joined = await db.getRegalCallEvents("t")
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_regal_call_events")
+      expect(joined.transcript).toEqual({ regal_task_id: "t", transcript: "hi" })
+      expect(joined.completed).toEqual({ regal_task_id: "t", disposition: "x" })
+    })
+
+    it("returns {} (does not throw) on error", async () => {
+      mockRows(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      expect(await db.getRegalCallEvents("t")).toEqual({})
+    })
+  })
+
+  describe("recordRegalResolverPlan()", () => {
+    it("upserts to eavesly_regal_resolver_plans on regal_task_id", async () => {
+      const db = new DatabaseService(createEnv())
+      await db.recordRegalResolverPlan({
+        regal_task_id: "task-1",
+        enrolled: true,
+        decisions: [],
+        triggered: ["full_qa"],
+      })
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_regal_resolver_plans")
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({ regal_task_id: "task-1", enrolled: true, triggered_modules: ["full_qa"] }),
+        { onConflict: "regal_task_id" },
+      )
+    })
+
+    it("does not throw on error (best-effort shadow write)", async () => {
+      mockUpsert.mockResolvedValue({ error: { message: "boom" } })
+      const db = new DatabaseService(createEnv())
+      await db.recordRegalResolverPlan({ regal_task_id: "t", enrolled: false, decisions: [], triggered: [] })
+    })
+  })
+
   describe("healthCheck()", () => {
     it("returns true when database is reachable", async () => {
       const db = new DatabaseService(createEnv())

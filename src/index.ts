@@ -14,6 +14,7 @@ import { dispositionReviewRoutes } from "./routes/disposition-review"
 import { achieveWelcomeCallQARoutes } from "./routes/achieve-welcome-call-qa"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
+import { regalEventRoutes } from "./routes/regal-events"
 
 const app = new Hono<AppEnv>()
 
@@ -34,6 +35,7 @@ app.route("/api/v1", activeSettlementsRoutes)
 app.route("/api/v1", dispositionReviewRoutes)
 app.route("/api/v1", achieveWelcomeCallQARoutes)
 app.route("/api/v1", statusRoutes)
+app.route("/api/v1", regalEventRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {

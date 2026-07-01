@@ -15,6 +15,7 @@ const TranscriptDataSchema = z.object({
 
 export const EvaluateRequestSchema = z.object({
   call_id: z.string().min(1),
+  regal_task_id: z.string().optional(),
   agent_id: z.string(),
   transcript: TranscriptDataSchema,
   agent_email: z.string().optional(),
@@ -44,6 +45,7 @@ const FromRecordingMetadataSchema = z.object({
 
 export const EvaluateFromRecordingRequestSchema = z.object({
   call_id: z.string().min(1),
+  regal_task_id: z.string().optional(),
   agent_id: z.string(),
   recording_url: z.string().url(),
   recording_source: z.literal("twilio").default("twilio"),
