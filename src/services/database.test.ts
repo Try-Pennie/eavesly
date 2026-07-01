@@ -297,13 +297,26 @@ describe("DatabaseService", () => {
   })
 
   describe("getBackfillCandidates()", () => {
-    function mockTables(plans: unknown, planErr: unknown, results: unknown, resErr: unknown = null) {
+    // transcripts defaults to `null` meaning "every queried id has a transcript",
+    // so tests that don't care about transcript filtering behave as before.
+    function mockTables(
+      plans: any[] | null,
+      planErr: unknown,
+      results: unknown,
+      resErr: unknown = null,
+      transcripts: string[] | null = null,
+    ) {
       mockFrom.mockImplementation((table: string) => {
         if (table === "eavesly_regal_resolver_plans") {
           return { select: () => ({ gte: () => ({ lt: () => Promise.resolve({ data: plans, error: planErr }) }) }) }
         }
         if (table === "eavesly_module_results") {
           return { select: () => ({ in: () => Promise.resolve({ data: results, error: resErr }) }) }
+        }
+        if (table === "eavesly_regal_call_events") {
+          const ids = transcripts ?? (plans ?? []).map((p) => p.regal_task_id)
+          const rows = ids.map((regal_task_id) => ({ regal_task_id }))
+          return { select: () => ({ eq: () => ({ in: () => Promise.resolve({ data: rows, error: null }) }) }) }
         }
         return {}
       })
@@ -325,6 +338,39 @@ describe("DatabaseService", () => {
         { regal_task_id: "task-1", triggered_modules: ["full_qa", "litigation_check"], missing_modules: ["litigation_check"] },
         { regal_task_id: "task-2", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
       ])
+    })
+
+    it("excludes candidates with no transcript_available event", async () => {
+      mockTables(
+        [
+          { regal_task_id: "task-1", triggered_modules: ["full_qa"] },
+          { regal_task_id: "task-2", triggered_modules: ["full_qa"] },
+        ],
+        null,
+        [],
+        null,
+        ["task-2"], // only task-2 has a transcript event
+      )
+      const db = new DatabaseService(createEnv())
+      const candidates = await db.getBackfillCandidates("a", "b")
+      expect(candidates).toEqual([
+        { regal_task_id: "task-2", triggered_modules: ["full_qa"], missing_modules: ["full_qa"] },
+      ])
+    })
+
+    it("orders candidates deterministically by computed_at then regal_task_id", async () => {
+      mockTables(
+        [
+          { regal_task_id: "task-b", triggered_modules: ["full_qa"], computed_at: "2026-07-01T20:30:00Z" },
+          { regal_task_id: "task-a", triggered_modules: ["full_qa"], computed_at: "2026-07-01T20:10:00Z" },
+          { regal_task_id: "task-c", triggered_modules: ["full_qa"], computed_at: "2026-07-01T20:10:00Z" },
+        ],
+        null,
+        [],
+      )
+      const db = new DatabaseService(createEnv())
+      const candidates = await db.getBackfillCandidates("a", "b")
+      expect(candidates.map((c) => c.regal_task_id)).toEqual(["task-a", "task-c", "task-b"])
     })
 
     it("returns [] when no plans have triggered modules", async () => {

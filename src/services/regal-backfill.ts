@@ -81,6 +81,7 @@ export type RegalBackfillResult =
       launched: number
       skipped_existing_result: number
       skipped_existing_workflow: number
+      skipped_unprocessable: number
       errors: number
       remaining_estimate: number
       sample: Array<{ regal_task_id: string; missing_modules: string[] }>
@@ -117,23 +118,33 @@ export async function runRegalBackfillBatch(args: RegalBackfillArgs): Promise<Re
     }
   }
 
-  // Live: process at most `limit` tasks. For each, rebuild callData + plan from
-  // the stored events (internal only) and launch just the still-missing
-  // triggered modules. launchModule dedupes via the deterministic instance id.
-  const batch = candidates.slice(0, limit)
+  // Live: process up to `limit` *processable* tasks. Candidate selection already
+  // requires a stored transcript, but if one is unexpectedly missing (race with
+  // event ingestion) count it as skipped_unprocessable and keep scanning so a
+  // valid task behind it still drains — never getting stuck at the front.
   let launched = 0
   let skipped_existing_result = 0
   let skipped_existing_workflow = 0
+  let skipped_unprocessable = 0
   let errors = 0
+  let processed = 0
+  let scanned = 0
+  const processedSample: Array<{ regal_task_id: string; missing_modules: string[] }> = []
 
-  for (const cand of batch) {
+  for (const cand of candidates) {
+    if (processed >= limit) break
+    scanned++
+
+    const joined = await db.getRegalCallEvents(cand.regal_task_id)
+    if (!joined.transcript) {
+      // Can't build callData without a transcript event — skip, don't consume the limit.
+      skipped_unprocessable++
+      continue
+    }
+
+    processed++
+    processedSample.push({ regal_task_id: cand.regal_task_id, missing_modules: cand.missing_modules })
     try {
-      const joined = await db.getRegalCallEvents(cand.regal_task_id)
-      if (!joined.transcript) {
-        // Can't build callData without a transcript event — count and move on.
-        errors++
-        continue
-      }
       const callData = transcriptEventToCallData(joined.transcript, joined.completed)
       const plan = buildModuleTriggerPlan(joined, DEFAULT_RESOLVER_POLICY)
 
@@ -160,13 +171,14 @@ export async function runRegalBackfillBatch(args: RegalBackfillArgs): Promise<Re
 
   return {
     dry_run: false,
-    processed_tasks: batch.length,
+    processed_tasks: processed,
     launched,
     skipped_existing_result,
     skipped_existing_workflow,
+    skipped_unprocessable,
     errors,
-    remaining_estimate: Math.max(0, candidates.length - batch.length),
-    sample: sampleOf(batch),
+    remaining_estimate: Math.max(0, candidates.length - scanned),
+    sample: sampleOf(processedSample),
     duplicate_audit,
   }
 }
