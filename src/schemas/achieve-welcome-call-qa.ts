@@ -7,14 +7,18 @@ export const AchieveWelcomeCallQASchema = z.object({
   script_version: z.string(),
 
   script_adherence: z.object({
-    welcome_greeting_completed: z.boolean(),
-    program_overview_covered: z.boolean(),
-    timeline_expectations_covered: z.boolean(),
-    payment_process_explained: z.boolean(),
-    client_communication_process_covered: z.boolean(),
-    next_steps_provided: z.boolean(),
+    greeting_and_identity_completed: z.boolean(),
+    recording_disclosure_provided: z.boolean(),
+    company_credibility_covered: z.boolean(),
+    call_agenda_provided: z.boolean(),
+    dedicated_account_deposits_explained: z.boolean(),
+    creditor_negotiation_explained: z.boolean(),
+    settlement_authorizations_explained: z.boolean(),
+    dashboard_account_setup_covered: z.boolean(),
+    tools_and_resources_covered: z.boolean(),
+    closing_and_support_provided: z.boolean(),
 
-    overall_script_adherence: z.enum(["full", "partial", "minimal"]),
+    overall_script_adherence: z.enum(["full", "substantial", "partial", "minimal", "none"]),
 
     missing_elements: z.array(z.string()),
     key_evidence_quotes: z.array(z.string()),

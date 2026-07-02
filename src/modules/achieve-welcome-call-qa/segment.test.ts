@@ -31,12 +31,16 @@ const FULL_WITH_DISCLOSURE = `${PRE_HANDOFF}\n${DISCLOSURE_AND_WELCOME}`
 
 const mockResponse = {
   script_adherence: {
-    welcome_greeting_completed: true,
-    program_overview_covered: true,
-    timeline_expectations_covered: true,
-    payment_process_explained: true,
-    client_communication_process_covered: true,
-    next_steps_provided: true,
+    greeting_and_identity_completed: true,
+    recording_disclosure_provided: true,
+    company_credibility_covered: true,
+    call_agenda_provided: true,
+    dedicated_account_deposits_explained: true,
+    creditor_negotiation_explained: true,
+    settlement_authorizations_explained: true,
+    dashboard_account_setup_covered: true,
+    tools_and_resources_covered: true,
+    closing_and_support_provided: true,
     overall_script_adherence: "full",
     missing_elements: [],
     key_evidence_quotes: ["Thank you for calling, this is your welcome call."],
@@ -136,7 +140,7 @@ describe("achieveWelcomeCallQAModule.evaluate segmentation", () => {
     const r = result.result as any
 
     expect(r.partner_id).toBe("achieve")
-    expect(r.script_version).toBe("fdr_wholesale_db_pilot_v0")
+    expect(r.script_version).toBe("fdr_wholesale_db_pilot_v1")
     expect(r.transcript_segment).toMatchObject({
       segment_type: "fdr_disclosure_and_welcome_call",
       marker: "welcome_call_greeting",

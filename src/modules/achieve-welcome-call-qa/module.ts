@@ -11,7 +11,7 @@ import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 // partner_id and script_version are not columns in eavesly_module_results;
 // they live in result_json so they are preserved and queryable without a migration.
 const PARTNER_ID = "achieve" as const
-const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v0" as const
+const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v1" as const
 const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
 
 // partner_id/script_version/transcript_segment are stamped deterministically by the
