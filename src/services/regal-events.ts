@@ -27,6 +27,12 @@ export interface ResolverPolicy {
   excludedCampaignFriendlyIds: string[]
   warmTransferLegalStateValue: string
   collectionsMinBalance: number
+  /**
+   * Achieve welcome-call QA (chained off warm_transfer) only scores calls at least
+   * this long. Genuine FDR welcome calls run ~45 min; shorter calls on the same
+   * enrollment disposition are servicing/escalation/pre-enrollment noise.
+   */
+  achieveMinDurationSeconds: number
 }
 
 export const DEFAULT_RESOLVER_POLICY: ResolverPolicy = {
@@ -35,6 +41,7 @@ export const DEFAULT_RESOLVER_POLICY: ResolverPolicy = {
   excludedCampaignFriendlyIds: [],
   warmTransferLegalStateValue: "No",
   collectionsMinBalance: 1,
+  achieveMinDurationSeconds: 1800,
 }
 
 /** Shape of a policy stored in eavesly_resolver_policies.policy_json. */
@@ -44,6 +51,9 @@ export const ResolverPolicySchema = z.object({
   excludedCampaignFriendlyIds: z.array(z.string()),
   warmTransferLegalStateValue: z.string().min(1),
   collectionsMinBalance: z.number().min(0),
+  // Defaulted so existing policy rows (written before this field) stay valid and
+  // don't fall back to the whole DEFAULT_RESOLVER_POLICY on parse.
+  achieveMinDurationSeconds: z.number().int().positive().default(1800),
 })
 
 export interface ActiveResolverPolicy {

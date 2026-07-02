@@ -118,12 +118,21 @@ describe("parseResolverPolicyRow", () => {
     excludedCampaignFriendlyIds: ["445"],
     warmTransferLegalStateValue: "No",
     collectionsMinBalance: 0,
+    achieveMinDurationSeconds: 2400,
   }
 
   it("returns the parsed policy and row id for a valid row", () => {
     const active = parseResolverPolicyRow({ id: 42, policy_json: validPolicy })
     expect(active.policyVersion).toBe(42)
     expect(active.policy).toEqual(validPolicy)
+  })
+
+  it("defaults achieveMinDurationSeconds for legacy rows written before the field existed", () => {
+    const { achieveMinDurationSeconds, ...legacy } = validPolicy
+    const active = parseResolverPolicyRow({ id: 43, policy_json: legacy })
+    expect(active.policyVersion).toBe(43)
+    expect(active.policy.achieveMinDurationSeconds).toBe(1800)
+    expect(active.policy.enrollmentMinDurationSeconds).toBe(900)
   })
 
   it("falls back to DEFAULT_RESOLVER_POLICY with null version when the row is absent", () => {

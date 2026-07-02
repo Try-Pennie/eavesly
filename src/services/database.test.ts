@@ -434,6 +434,7 @@ describe("DatabaseService", () => {
       excludedCampaignFriendlyIds: [],
       warmTransferLegalStateValue: "No",
       collectionsMinBalance: 1,
+      achieveMinDurationSeconds: 1800,
     }
 
     function mockPolicyRow(row: unknown, error: unknown = null) {

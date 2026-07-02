@@ -2,7 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createEnv } from "../../test/helpers/mock-env"
 import { createEvaluateRequest } from "../../test/helpers/create-request"
 import { MODULE_NAMES } from "../modules/constants"
-import { shouldRouteToPartner, routePartnerFollowup } from "./partner-routing"
+import { shouldRouteToPartner, routePartnerFollowup, isAchieveWelcomeCallEligible } from "./partner-routing"
+
+const ACHIEVE_POLICY = {
+  enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+  achieveMinDurationSeconds: 1800,
+}
+const withCallMeta = (duration: number, disposition?: string) =>
+  createEvaluateRequest({
+    transcript: { transcript: "x", metadata: { duration, timestamp: "2025-01-01T00:00:00Z", disposition } },
+  })
 
 describe("shouldRouteToPartner()", () => {
   it("routes when scalar partner matches and resolved", () => {
@@ -28,6 +37,23 @@ describe("shouldRouteToPartner()", () => {
   it("does not route when no assignment row exists", () => {
     expect(shouldRouteToPartner(null, "achieve")).toBe(false)
     expect(shouldRouteToPartner(null, "beyond")).toBe(false)
+  })
+})
+
+describe("isAchieveWelcomeCallEligible()", () => {
+  it("eligible: enrollment disposition and duration over the minimum", () => {
+    const r = isAchieveWelcomeCallEligible(withCallMeta(1801, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY)
+    expect(r.eligible).toBe(true)
+  })
+
+  it("ineligible: duration at or below the minimum (short servicing/escalation calls)", () => {
+    expect(isAchieveWelcomeCallEligible(withCallMeta(1800, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
+    expect(isAchieveWelcomeCallEligible(withCallMeta(600, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
+  })
+
+  it("ineligible: wrong or missing disposition even when long enough", () => {
+    expect(isAchieveWelcomeCallEligible(withCallMeta(3000, "2.1 - Something else"), ACHIEVE_POLICY).eligible).toBe(false)
+    expect(isAchieveWelcomeCallEligible(withCallMeta(3000, undefined), ACHIEVE_POLICY).eligible).toBe(false)
   })
 })
 
@@ -62,6 +88,28 @@ describe("routePartnerFollowup()", () => {
     expect(args.params.moduleName).toBe(MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)
     expect(args.params.callData).toBe(callData)
     expect(args.params.correlationId).toBe(correlationId)
+  })
+
+  it("skips the achieve follow-up when the eligibility gate fails, before any DB lookup", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
+    const callData = createEvaluateRequest({ agent_email: "a@achieve.com" })
+    const eligibility = () => ({ eligible: false, reason: "duration 300s <= 1800s" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
+
+    expect(create).not.toHaveBeenCalled()
+    expect(db.getAgentRegalAssignment).not.toHaveBeenCalled()
+  })
+
+  it("chains the achieve follow-up when the eligibility gate passes and agent is resolved", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
+    const callData = createEvaluateRequest({ call_id: "c-ok", agent_email: "a@achieve.com" })
+    const eligibility = () => ({ eligible: true, reason: "eligible" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(create.mock.calls[0][0].id).toBe(`c-ok-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`)
   })
 
   it("chains budget_inputs when agent is resolved to Beyond", async () => {
