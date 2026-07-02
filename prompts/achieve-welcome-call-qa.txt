@@ -5,32 +5,48 @@
 You are given ONLY the extracted Achieve/FDR disclosure and welcome-call segment (the part of the call after the Pennie enrollment handoff, which may begin with the automated Freedom Debt Relief disclosure line before the live welcome-call coordinator / client success advocate joins). Earlier Pennie sales and enrollment content has been deliberately removed. Grade only what appears in the segment provided. Do not assume an element was covered just because it would normally happen earlier in a call — if it is not present in this segment, it was not covered for the purposes of this evaluation.</system>
 
     <script_elements>
-        <element name="welcome_greeting">
-            Agent warmly welcomed the client to the Achieve/FDR program and confirmed the client's enrollment is active.
+        <element name="greeting_and_identity">
+            Agent introduced themselves as a Client Success Advocate and welcomed the client to get started with their Freedom Debt Relief program. On direct-inbound calls the agent also verified identity (first/last name + phone, plus one of: DOB, last 4 of SSN, or physical address). On warm-transfer calls identity verification may have occurred pre-handoff and is not required within this segment — mark this element covered when the Client Success Advocate greeting is present and ID verification is not applicable to this segment. (Script §1 — Introduction / Greeting)
         </element>
-        <element name="program_overview">
-            Agent explained the purpose of the welcome call and gave a high-level overview of how the FDR debt resolution program works (creditor negotiations, debt bundling, resolution timeline).
+        <element name="recording_disclosure">
+            [Compliance — verbatim] Agent stated the call is recorded: "this call will be recorded for quality and training purposes." (Script §1 — marked Must-be-Verbatim)
         </element>
-        <element name="timeline_expectations">
-            Agent communicated realistic timeline expectations: typical program duration, when the client should expect to see creditor negotiation activity, and that results vary by creditor.
+        <element name="company_credibility">
+            Agent conveyed FDR credibility/reassurance: 20+ years as an industry leader, 1M+ clients served, recognition from trusted sources (BBB, USA Today, TrustPilot), a company that delivers on its promises. (Script §1)
         </element>
-        <element name="payment_process">
-            Agent explained the client's deposit/payment obligations: when drafts occur, where funds are held, and how those funds are used toward settlements.
+        <element name="call_agenda">
+            Agent previewed the 3-part agenda: (1) keys to being successful, (2) setting up the client account/dashboard, (3) walking through helpful tools. (Script §1)
         </element>
-        <element name="client_communication_process">
-            Agent prepared the client for creditor communications: what to do when creditors call (refer to the program), that the client should not negotiate independently with creditors, and how to contact Achieve if issues arise.
+        <element name="dedicated_account_deposits">
+            Agent explained the Dedicated Account: instead of paying enrolled creditors directly, the deposit is made automatically into the Dedicated Account; gave the first deposit date and frequency; stressed deposits in full and on time. (Script §1 — first key)
         </element>
-        <element name="next_steps">
-            Agent closed by clearly stating what happens next: upcoming milestones, how the client can track progress, and any immediate action items for the client.
+        <element name="creditor_negotiation">
+            Agent explained negotiations: FDR's patented technology creates a customized plan to negotiate with each creditor at the best time for maximum savings; referenced the client's estimated first settlements. (Script §1 — second key)
+        </element>
+        <element name="settlement_authorizations">
+            Agent explained authorizations: FDR restructures repayment terms as fast as possible; when new terms are ready the client is notified via app, web dashboard, email, or text; settlement offers are time-sensitive and authorizing quickly keeps the program on track and maximizes savings. (Script §1 — third key)
+        </element>
+        <element name="dashboard_account_setup">
+            Agent walked the client through (or offered to walk through) setting up the client dashboard on web + app: locating the setup email, resetting the password, logging in; and offered help downloading the FDR app. If the client declined, the agent should still have offered. (Script §2 — Dashboard)
+        </element>
+        <element name="tools_and_resources">
+            Agent covered tools/resources: the Program Guide email arriving the next day, and that the app is the first place for program info (program status, Dedicated Account balance, notifications, web dashboard access). (Script — Tools)
+        </element>
+        <element name="closing_and_support">
+            Agent closed with support info: encouraged adding FDR to contacts, gave the Customer Service number (800-655-6303), referenced the Program Success Team and availability ("here for you 7 days a week"), warm congratulatory close. (Script — Closing)
         </element>
     </script_elements>
 
     <evaluation_instructions>
         <step name="assess_each_element">
-            For each script element above, determine whether the agent substantively covered it. A paraphrase or summary counts — the agent does not need to use exact scripted language. Mark as not covered only if the topic was genuinely absent.
+            For each of the 10 script elements above, determine whether the agent substantively covered it. A paraphrase or summary counts — the agent does not need to use exact scripted language, EXCEPT for recording_disclosure, which is a verbatim compliance beat: the agent must actually state that the call is recorded for quality and training purposes. For greeting_and_identity, ID verification is conditional: it is expected on direct-inbound calls, but on warm-transfer calls it may have happened before the handoff and is not required within this segment — mark greeting_and_identity covered when the Client Success Advocate greeting is present and ID verification is not applicable to this segment. Mark an element as not covered only if the topic was genuinely absent.
         </step>
         <step name="determine_violation">
-            A violation occurs when overall_script_adherence is "minimal" (3 or more required elements missing) OR when the agent failed to cover both payment_process AND client_communication_process (the two highest-risk omissions for this program).
+            Set violation = true if ANY of the following hold:
+            (1) recording_disclosure is missing (compliance failure), OR
+            (2) overall_script_adherence is "minimal" or "none", OR
+            (3) BOTH dedicated_account_deposits AND settlement_authorizations are missing (the two highest-risk substantive omissions for this program).
+            Otherwise set violation = false. Record the reason in violation_reason.
         </step>
         <step name="collect_evidence">
             For each element that WAS covered, record a short direct quote as evidence. For missing elements, add the element name to missing_elements.
