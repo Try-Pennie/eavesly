@@ -80,8 +80,17 @@ Each returns `202` with:
 ## Resolver policy (v1)
 
 `joinedEvents + ResolverPolicy -> ModuleTriggerPlan` (see
-`src/services/regal-events.ts`). A future QVV admin panel will edit the policy;
-decisions read it as data rather than inline conditionals.
+`src/services/regal-events.ts`). The policy is now DB-backed: the Worker reads
+the latest row of `eavesly_resolver_policies` per event
+(`DatabaseService.getResolverPolicy()`), Zod-validates its `policy_json`, and
+records the source `policy_version` (the row id, or `null` for the code default)
+into the stored plan. Any missing row, invalid `policy_json`, or query error
+falls back to `DEFAULT_RESOLVER_POLICY` with a warning — a bad config row can
+never stop QA triggering. The table is append-only, so the latest row is the
+active policy and older rows are the version history (rollback = re-insert an
+older `policy_json`). The QVV admin UI edits the policy by inserting new rows
+(PSAI-202/PSAI-201); until the SQL is applied the Worker safely uses the code
+default.
 
 | Module | Triggers when |
 | --- | --- |
@@ -96,12 +105,32 @@ decisions read it as data rather than inline conditionals.
 
 ## Storage
 
-Two tables (see `docs/sql/regal-event-joiner.sql`, applied manually — no
-migration framework here):
+Applied manually — no migration framework here.
+
+`docs/sql/regal-event-joiner.sql`:
 
 - `eavesly_regal_call_events` — durable ledger, idempotent on
   `(regal_task_id, event_type)`.
-- `eavesly_regal_resolver_plans` — shadow plans, one per `regal_task_id`.
+- `eavesly_regal_resolver_plans` — shadow plans, one per `regal_task_id`
+  (`plan_json` now carries `policy_version`).
+
+`docs/sql/resolver-policy-admin.sql` (PSAI-202):
+
+- `eavesly_resolver_policies` — append-only versioned policy; latest row is
+  active. Read-any (`authenticated`), write only for god-mode managers; the
+  Worker uses the service role.
+- `eavesly_module_prompts` — read-only mirror of the deployed module prompts,
+  keyed by `module_name`, synced by the Worker.
+
+## Module prompt mirror
+
+`POST /api/v1/admin/prompts/sync` (INTERNAL_API_KEY auth, no body) writes the
+bundled `prompts/*.txt` text into `eavesly_module_prompts` so QVV can render the
+prompts read-only. Editing stays in this repo (the `.txt` files); the endpoint
+only mirrors what's deployed. Content is SHA-256 hashed; `deployed_at` only bumps
+when a prompt changed. Call it once after each deploy (or whenever a prompt
+changes). The response is `{ synced: [{ module_name, content_hash, changed }] }`
+— it never returns prompt text.
 
 ## Migration note
 
