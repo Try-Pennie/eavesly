@@ -16,6 +16,7 @@ import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
 import { regalEventRoutes } from "./routes/regal-events"
 import { regalAdminRoutes } from "./routes/regal-admin"
+import { promptAdminRoutes } from "./routes/prompt-admin"
 
 const app = new Hono<AppEnv>()
 
@@ -38,6 +39,7 @@ app.route("/api/v1", achieveWelcomeCallQARoutes)
 app.route("/api/v1", statusRoutes)
 app.route("/api/v1", regalEventRoutes)
 app.route("/api/v1", regalAdminRoutes)
+app.route("/api/v1", promptAdminRoutes)
 
 app.onError((err, c) => {
   log("error", "Unhandled error", {

@@ -517,6 +517,53 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * Mirror one module's deployed prompt into eavesly_module_prompts. Upserts on
+   * module_name and only bumps deployed_at when the content hash changed, so the
+   * timestamp reads as "last change deployed". Returns true when the row was new
+   * or its hash differed. Throws on write error so the sync endpoint surfaces it.
+   */
+  async upsertModulePrompt(args: {
+    moduleName: string
+    promptText: string
+    contentHash: string
+  }): Promise<boolean> {
+    const { moduleName, promptText, contentHash } = args
+
+    const { data: existing, error: readError } = await this.client
+      .from("eavesly_module_prompts")
+      .select("content_hash")
+      .eq("module_name", moduleName)
+      .maybeSingle()
+
+    if (readError) {
+      log("error", "Failed to read module prompt before sync", {
+        module: moduleName,
+        error: readError.message,
+      })
+      throw readError
+    }
+
+    const changed = !existing || (existing as any).content_hash !== contentHash
+    if (!changed) return false
+
+    const { error } = await this.client.from("eavesly_module_prompts").upsert(
+      {
+        module_name: moduleName,
+        prompt_text: promptText,
+        content_hash: contentHash,
+        deployed_at: new Date().toISOString(),
+      },
+      { onConflict: "module_name" },
+    )
+
+    if (error) {
+      log("error", "Failed to upsert module prompt", { module: moduleName, error: error.message })
+      throw error
+    }
+    return true
+  }
+
   async healthCheck(): Promise<boolean> {
     const { error } = await this.client
       .from("eavesly_module_results")
