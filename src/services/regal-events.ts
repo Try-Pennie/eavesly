@@ -1,3 +1,4 @@
+import { z } from "zod"
 import type { EvaluateRequest } from "../schemas/requests"
 import type {
   TranscriptAvailableEvent,
@@ -36,6 +37,35 @@ export const DEFAULT_RESOLVER_POLICY: ResolverPolicy = {
   collectionsMinBalance: 1,
 }
 
+/** Shape of a policy stored in eavesly_resolver_policies.policy_json. */
+export const ResolverPolicySchema = z.object({
+  enrollmentDisposition: z.string().min(1),
+  enrollmentMinDurationSeconds: z.number().int().positive(),
+  excludedCampaignFriendlyIds: z.array(z.string()),
+  warmTransferLegalStateValue: z.string().min(1),
+  collectionsMinBalance: z.number().min(0),
+})
+
+export interface ActiveResolverPolicy {
+  policy: ResolverPolicy
+  /** eavesly_resolver_policies.id, or null when falling back to the code default. */
+  policyVersion: number | null
+}
+
+/**
+ * Pure parse of a policy table row (or absence of one) into the active policy.
+ * Any missing/invalid row falls back to DEFAULT_RESOLVER_POLICY — a bad config
+ * row must never stop QA triggering. Kept pure for unit testing.
+ */
+export function parseResolverPolicyRow(
+  row: { id: number; policy_json: unknown } | null,
+): ActiveResolverPolicy {
+  if (!row) return { policy: DEFAULT_RESOLVER_POLICY, policyVersion: null }
+  const parsed = ResolverPolicySchema.safeParse(row.policy_json)
+  if (!parsed.success) return { policy: DEFAULT_RESOLVER_POLICY, policyVersion: null }
+  return { policy: parsed.data, policyVersion: row.id }
+}
+
 export interface ModuleDecision {
   module: string
   trigger: boolean
@@ -48,6 +78,8 @@ export interface ModuleTriggerPlan {
   decisions: ModuleDecision[]
   /** Convenience: module names where trigger === true. */
   triggered: string[]
+  /** eavesly_resolver_policies.id the plan was built from, or null for the code default. */
+  policy_version?: number | null
 }
 
 /**
@@ -92,6 +124,7 @@ export function transcriptEventToCallData(
 export function buildModuleTriggerPlan(
   joined: JoinedRegalEvents,
   policy: ResolverPolicy,
+  policyVersion?: number | null,
 ): ModuleTriggerPlan {
   const { transcript, completed } = joined
   const regal_task_id = transcript?.regal_task_id ?? completed?.regal_task_id ?? ""
@@ -162,5 +195,6 @@ export function buildModuleTriggerPlan(
     enrolled,
     decisions,
     triggered: decisions.filter((d) => d.trigger).map((d) => d.module),
+    policy_version: policyVersion ?? null,
   }
 }

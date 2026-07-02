@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   buildModuleTriggerPlan,
   transcriptEventToCallData,
+  parseResolverPolicyRow,
   DEFAULT_RESOLVER_POLICY,
   type JoinedRegalEvents,
 } from "./regal-events"
@@ -99,6 +100,45 @@ describe("buildModuleTriggerPlan", () => {
       policy,
     )
     expect(plan.enrolled).toBe(false)
+  })
+
+  it("threads the policy version into the plan (null when omitted)", () => {
+    const withVersion = buildModuleTriggerPlan({ transcript: transcript() }, DEFAULT_RESOLVER_POLICY, 7)
+    expect(withVersion.policy_version).toBe(7)
+
+    const noVersion = buildModuleTriggerPlan({ transcript: transcript() }, DEFAULT_RESOLVER_POLICY)
+    expect(noVersion.policy_version).toBeNull()
+  })
+})
+
+describe("parseResolverPolicyRow", () => {
+  const validPolicy = {
+    enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+    enrollmentMinDurationSeconds: 900,
+    excludedCampaignFriendlyIds: ["445"],
+    warmTransferLegalStateValue: "No",
+    collectionsMinBalance: 0,
+  }
+
+  it("returns the parsed policy and row id for a valid row", () => {
+    const active = parseResolverPolicyRow({ id: 42, policy_json: validPolicy })
+    expect(active.policyVersion).toBe(42)
+    expect(active.policy).toEqual(validPolicy)
+  })
+
+  it("falls back to DEFAULT_RESOLVER_POLICY with null version when the row is absent", () => {
+    const active = parseResolverPolicyRow(null)
+    expect(active.policyVersion).toBeNull()
+    expect(active.policy).toEqual(DEFAULT_RESOLVER_POLICY)
+  })
+
+  it("falls back to DEFAULT_RESOLVER_POLICY with null version when policy_json is malformed", () => {
+    const active = parseResolverPolicyRow({
+      id: 9,
+      policy_json: { enrollmentMinDurationSeconds: -1, excludedCampaignFriendlyIds: "nope" },
+    })
+    expect(active.policyVersion).toBeNull()
+    expect(active.policy).toEqual(DEFAULT_RESOLVER_POLICY)
   })
 })
 
