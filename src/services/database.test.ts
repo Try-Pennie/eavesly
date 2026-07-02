@@ -427,6 +427,130 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getResolverPolicy()", () => {
+    const validPolicy = {
+      enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+      enrollmentMinDurationSeconds: 1200,
+      excludedCampaignFriendlyIds: [],
+      warmTransferLegalStateValue: "No",
+      collectionsMinBalance: 1,
+    }
+
+    function mockPolicyRow(row: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({
+        order: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: row, error }),
+          }),
+        }),
+      })
+    }
+
+    it("returns the latest policy row's policy and version", async () => {
+      mockPolicyRow({ id: 5, policy_json: validPolicy })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_resolver_policies")
+      expect(active.policyVersion).toBe(5)
+      expect(active.policy).toEqual(validPolicy)
+    })
+
+    it("falls back to the default policy (null version) when no row exists", async () => {
+      mockPolicyRow(null)
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+      expect(active.policy.enrollmentDisposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
+    })
+
+    it("falls back to the default policy when policy_json is malformed", async () => {
+      mockPolicyRow({ id: 9, policy_json: { enrollmentMinDurationSeconds: -1 } })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+    })
+
+    it("falls back to the default policy (does not throw) on query error", async () => {
+      mockPolicyRow(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+      expect(active.policy.enrollmentMinDurationSeconds).toBe(1200)
+    })
+  })
+
+  describe("upsertModulePrompt()", () => {
+    function mockPromptRead(existing: unknown, readError: unknown = null) {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: existing, error: readError }),
+        }),
+      })
+    }
+
+    it("upserts and bumps deployed_at when the hash is new", async () => {
+      mockPromptRead(null)
+      const db = new DatabaseService(createEnv())
+      const changed = await db.upsertModulePrompt({
+        moduleName: "full_qa",
+        promptText: "prompt body",
+        contentHash: "abc123",
+      })
+      expect(changed).toBe(true)
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_module_prompts")
+      expect(mockUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          module_name: "full_qa",
+          prompt_text: "prompt body",
+          content_hash: "abc123",
+        }),
+        { onConflict: "module_name" },
+      )
+      expect(mockUpsert.mock.calls[0][0].deployed_at).toBeTruthy()
+    })
+
+    it("upserts when the hash differs from the stored one", async () => {
+      mockPromptRead({ content_hash: "old" })
+      const db = new DatabaseService(createEnv())
+      const changed = await db.upsertModulePrompt({
+        moduleName: "full_qa",
+        promptText: "new body",
+        contentHash: "new",
+      })
+      expect(changed).toBe(true)
+      expect(mockUpsert).toHaveBeenCalled()
+    })
+
+    it("skips the write (no deployed_at bump) when the hash is unchanged", async () => {
+      mockPromptRead({ content_hash: "same" })
+      const db = new DatabaseService(createEnv())
+      const changed = await db.upsertModulePrompt({
+        moduleName: "full_qa",
+        promptText: "body",
+        contentHash: "same",
+      })
+      expect(changed).toBe(false)
+      expect(mockUpsert).not.toHaveBeenCalled()
+    })
+
+    it("throws on read error", async () => {
+      mockPromptRead(null, { message: "read boom" })
+      const db = new DatabaseService(createEnv())
+      await expect(
+        db.upsertModulePrompt({ moduleName: "full_qa", promptText: "b", contentHash: "h" }),
+      ).rejects.toEqual({ message: "read boom" })
+    })
+
+    it("throws on upsert error", async () => {
+      mockPromptRead(null)
+      mockUpsert.mockResolvedValue({ error: { message: "write boom" } })
+      const db = new DatabaseService(createEnv())
+      await expect(
+        db.upsertModulePrompt({ moduleName: "full_qa", promptText: "b", contentHash: "h" }),
+      ).rejects.toEqual({ message: "write boom" })
+    })
+  })
+
   describe("healthCheck()", () => {
     it("returns true when database is reachable", async () => {
       const db = new DatabaseService(createEnv())

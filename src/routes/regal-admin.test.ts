@@ -6,14 +6,27 @@ import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
 const getBackfillCandidates = vi.fn()
 const getDuplicateAudit = vi.fn()
 const getRegalCallEvents = vi.fn()
+const getResolverPolicy = vi.fn()
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
     getBackfillCandidates = getBackfillCandidates
     getDuplicateAudit = getDuplicateAudit
     getRegalCallEvents = getRegalCallEvents
+    getResolverPolicy = getResolverPolicy
   },
 }))
+
+const DEFAULT_ACTIVE_POLICY = {
+  policy: {
+    enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+    enrollmentMinDurationSeconds: 1200,
+    excludedCampaignFriendlyIds: [],
+    warmTransferLegalStateValue: "No",
+    collectionsMinBalance: 1,
+  },
+  policyVersion: null,
+}
 
 import { regalAdminRoutes } from "./regal-admin"
 
@@ -64,6 +77,7 @@ describe("Regal admin backfill route", () => {
       duplicate_resolver_plans: 0,
     })
     getRegalCallEvents.mockReset().mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
+    getResolverPolicy.mockReset().mockResolvedValue(DEFAULT_ACTIVE_POLICY)
   })
 
   it("returns 401 without auth", async () => {

@@ -3,7 +3,6 @@ import type { DatabaseService } from "./database"
 import {
   buildModuleTriggerPlan,
   transcriptEventToCallData,
-  DEFAULT_RESOLVER_POLICY,
 } from "./regal-events"
 import type { EvaluateRequest } from "../schemas/requests"
 import { log } from "../utils/logger"
@@ -122,6 +121,9 @@ export async function runRegalBackfillBatch(args: RegalBackfillArgs): Promise<Re
   // requires a stored transcript, but if one is unexpectedly missing (race with
   // event ingestion) count it as skipped_unprocessable and keep scanning so a
   // valid task behind it still drains — never getting stuck at the front.
+  // One policy read per batch, reused for every candidate's plan (not per candidate).
+  const { policy, policyVersion } = await db.getResolverPolicy()
+
   let launched = 0
   let skipped_existing_result = 0
   let skipped_existing_workflow = 0
@@ -146,7 +148,7 @@ export async function runRegalBackfillBatch(args: RegalBackfillArgs): Promise<Re
     processedSample.push({ regal_task_id: cand.regal_task_id, missing_modules: cand.missing_modules })
     try {
       const callData = transcriptEventToCallData(joined.transcript, joined.completed)
-      const plan = buildModuleTriggerPlan(joined, DEFAULT_RESOLVER_POLICY)
+      const plan = buildModuleTriggerPlan(joined, policy, policyVersion)
 
       // Only launch modules the plan still triggers AND that are still missing.
       const toLaunch = plan.triggered.filter((m) => cand.missing_modules.includes(m))

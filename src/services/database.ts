@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
-import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan } from "./regal-events"
+import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolverPolicy } from "./regal-events"
+import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow } from "./regal-events"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -483,6 +484,84 @@ export class DatabaseService {
       duplicate_call_events: countDupes(ce.data ?? [], (r) => `${r.regal_task_id}|${r.event_type}`),
       duplicate_resolver_plans: countDupes(rp.data ?? [], (r) => r.regal_task_id),
     }
+  }
+
+  /**
+   * Load the active resolver policy — the latest row of eavesly_resolver_policies.
+   * Any missing row, invalid policy_json, or query error falls back to
+   * DEFAULT_RESOLVER_POLICY (policyVersion null): a bad/absent config row must
+   * never stop QA triggering. The table won't exist until the PSAI-202 SQL is
+   * applied manually, so the fallback path is expected in production until then.
+   */
+  async getResolverPolicy(): Promise<ActiveResolverPolicy> {
+    try {
+      const { data, error } = await this.client
+        .from("eavesly_resolver_policies")
+        .select("id, policy_json")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      const active = parseResolverPolicyRow(data)
+      if (data && active.policyVersion === null) {
+        log("warn", "Invalid resolver policy row; using DEFAULT_RESOLVER_POLICY", {
+          rowId: (data as any).id,
+        })
+      }
+      return active
+    } catch (e) {
+      log("warn", "Failed to load resolver policy; using DEFAULT_RESOLVER_POLICY", {
+        error: e instanceof Error ? e.message : String(e),
+      })
+      return { policy: DEFAULT_RESOLVER_POLICY, policyVersion: null }
+    }
+  }
+
+  /**
+   * Mirror one module's deployed prompt into eavesly_module_prompts. Upserts on
+   * module_name and only bumps deployed_at when the content hash changed, so the
+   * timestamp reads as "last change deployed". Returns true when the row was new
+   * or its hash differed. Throws on write error so the sync endpoint surfaces it.
+   */
+  async upsertModulePrompt(args: {
+    moduleName: string
+    promptText: string
+    contentHash: string
+  }): Promise<boolean> {
+    const { moduleName, promptText, contentHash } = args
+
+    const { data: existing, error: readError } = await this.client
+      .from("eavesly_module_prompts")
+      .select("content_hash")
+      .eq("module_name", moduleName)
+      .maybeSingle()
+
+    if (readError) {
+      log("error", "Failed to read module prompt before sync", {
+        module: moduleName,
+        error: readError.message,
+      })
+      throw readError
+    }
+
+    const changed = !existing || (existing as any).content_hash !== contentHash
+    if (!changed) return false
+
+    const { error } = await this.client.from("eavesly_module_prompts").upsert(
+      {
+        module_name: moduleName,
+        prompt_text: promptText,
+        content_hash: contentHash,
+        deployed_at: new Date().toISOString(),
+      },
+      { onConflict: "module_name" },
+    )
+
+    if (error) {
+      log("error", "Failed to upsert module prompt", { module: moduleName, error: error.message })
+      throw error
+    }
+    return true
   }
 
   async healthCheck(): Promise<boolean> {

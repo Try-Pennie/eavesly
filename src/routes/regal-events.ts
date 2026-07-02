@@ -9,7 +9,6 @@ import { DatabaseService } from "../services/database"
 import {
   buildModuleTriggerPlan,
   transcriptEventToCallData,
-  DEFAULT_RESOLVER_POLICY,
   type RegalCallEvent,
 } from "../services/regal-events"
 import { launchModule, runRegalBackfillBatch, type ActiveTrigger } from "../services/regal-backfill"
@@ -101,7 +100,8 @@ function createRegalEventRoute(
     let activeTriggers: ActiveTrigger[] | undefined
     try {
       const joined = await db.getRegalCallEvents(event.regal_task_id)
-      const plan = buildModuleTriggerPlan(joined, DEFAULT_RESOLVER_POLICY)
+      const { policy, policyVersion } = await db.getResolverPolicy()
+      const plan = buildModuleTriggerPlan(joined, policy, policyVersion)
       await db.recordRegalResolverPlan(plan)
       planSummary = { enrolled: plan.enrolled, triggered: plan.triggered }
 

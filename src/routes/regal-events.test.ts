@@ -7,6 +7,7 @@ const recordRegalCallEvent = vi.fn().mockResolvedValue(undefined)
 const getRegalCallEvents = vi.fn()
 const recordRegalResolverPlan = vi.fn().mockResolvedValue(undefined)
 const logRequest = vi.fn().mockResolvedValue(undefined)
+const getResolverPolicy = vi.fn()
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
@@ -14,8 +15,21 @@ vi.mock("../services/database", () => ({
     getRegalCallEvents = getRegalCallEvents
     recordRegalResolverPlan = recordRegalResolverPlan
     logRequest = logRequest
+    getResolverPolicy = getResolverPolicy
   },
 }))
+
+// The real default policy the loader falls back to — mirrors DEFAULT_RESOLVER_POLICY.
+const DEFAULT_ACTIVE_POLICY = {
+  policy: {
+    enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+    enrollmentMinDurationSeconds: 1200,
+    excludedCampaignFriendlyIds: [],
+    warmTransferLegalStateValue: "No",
+    collectionsMinBalance: 1,
+  },
+  policyVersion: null,
+}
 
 // Keep the real launchModule (workflow-launch assertions below rely on it); only
 // stub the opportunistic backfill helper so we can assert it is invoked / throws.
@@ -69,6 +83,7 @@ describe("Regal event routes", () => {
     recordRegalResolverPlan.mockClear().mockResolvedValue(undefined)
     logRequest.mockClear()
     getRegalCallEvents.mockReset().mockResolvedValue({})
+    getResolverPolicy.mockReset().mockResolvedValue(DEFAULT_ACTIVE_POLICY)
     ;(runRegalBackfillBatch as any).mockReset().mockResolvedValue({ dry_run: false })
   })
 
