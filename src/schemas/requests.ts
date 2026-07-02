@@ -57,5 +57,3 @@ export const EvaluateFromRecordingRequestSchema = z.object({
   transcript_url: z.string().optional(),
   sfdc_lead_id: z.string().optional(),
 })
-
-export type EvaluateFromRecordingRequest = z.infer<typeof EvaluateFromRecordingRequestSchema>

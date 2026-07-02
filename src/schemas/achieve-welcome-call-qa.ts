@@ -50,5 +50,3 @@ export const AchieveWelcomeCallQASchema = z.object({
     used_full_transcript_fallback: z.boolean(),
   }),
 })
-
-export type AchieveWelcomeCallQAResult = z.infer<typeof AchieveWelcomeCallQASchema>

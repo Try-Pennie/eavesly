@@ -30,8 +30,6 @@ interface DeepgramListenResponse {
   }
 }
 
-export type DeepgramClient = ReturnType<typeof createDeepgramClient>
-
 export function createDeepgramClient(env: Bindings) {
   async function transcribe(audio: ArrayBuffer): Promise<DeepgramResult> {
     if (!env.DEEPGRAM_API_KEY) {
