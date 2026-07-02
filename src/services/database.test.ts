@@ -427,6 +427,58 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getResolverPolicy()", () => {
+    const validPolicy = {
+      enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+      enrollmentMinDurationSeconds: 1200,
+      excludedCampaignFriendlyIds: [],
+      warmTransferLegalStateValue: "No",
+      collectionsMinBalance: 1,
+    }
+
+    function mockPolicyRow(row: unknown, error: unknown = null) {
+      mockSelect.mockReturnValue({
+        order: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: row, error }),
+          }),
+        }),
+      })
+    }
+
+    it("returns the latest policy row's policy and version", async () => {
+      mockPolicyRow({ id: 5, policy_json: validPolicy })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(mockFrom).toHaveBeenCalledWith("eavesly_resolver_policies")
+      expect(active.policyVersion).toBe(5)
+      expect(active.policy).toEqual(validPolicy)
+    })
+
+    it("falls back to the default policy (null version) when no row exists", async () => {
+      mockPolicyRow(null)
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+      expect(active.policy.enrollmentDisposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
+    })
+
+    it("falls back to the default policy when policy_json is malformed", async () => {
+      mockPolicyRow({ id: 9, policy_json: { enrollmentMinDurationSeconds: -1 } })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+    })
+
+    it("falls back to the default policy (does not throw) on query error", async () => {
+      mockPolicyRow(null, { message: "boom" })
+      const db = new DatabaseService(createEnv())
+      const active = await db.getResolverPolicy()
+      expect(active.policyVersion).toBeNull()
+      expect(active.policy.enrollmentMinDurationSeconds).toBe(1200)
+    })
+  })
+
   describe("healthCheck()", () => {
     it("returns true when database is reachable", async () => {
       const db = new DatabaseService(createEnv())

@@ -2,7 +2,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
-import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan } from "./regal-events"
+import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolverPolicy } from "./regal-events"
+import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow } from "./regal-events"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -482,6 +483,37 @@ export class DatabaseService {
       duplicate_module_results: countDupes(mr.data ?? [], (r) => `${r.call_id}|${r.module_name}`),
       duplicate_call_events: countDupes(ce.data ?? [], (r) => `${r.regal_task_id}|${r.event_type}`),
       duplicate_resolver_plans: countDupes(rp.data ?? [], (r) => r.regal_task_id),
+    }
+  }
+
+  /**
+   * Load the active resolver policy — the latest row of eavesly_resolver_policies.
+   * Any missing row, invalid policy_json, or query error falls back to
+   * DEFAULT_RESOLVER_POLICY (policyVersion null): a bad/absent config row must
+   * never stop QA triggering. The table won't exist until the PSAI-202 SQL is
+   * applied manually, so the fallback path is expected in production until then.
+   */
+  async getResolverPolicy(): Promise<ActiveResolverPolicy> {
+    try {
+      const { data, error } = await this.client
+        .from("eavesly_resolver_policies")
+        .select("id, policy_json")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      const active = parseResolverPolicyRow(data)
+      if (data && active.policyVersion === null) {
+        log("warn", "Invalid resolver policy row; using DEFAULT_RESOLVER_POLICY", {
+          rowId: (data as any).id,
+        })
+      }
+      return active
+    } catch (e) {
+      log("warn", "Failed to load resolver policy; using DEFAULT_RESOLVER_POLICY", {
+        error: e instanceof Error ? e.message : String(e),
+      })
+      return { policy: DEFAULT_RESOLVER_POLICY, policyVersion: null }
     }
   }
 
