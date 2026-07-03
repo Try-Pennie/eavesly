@@ -91,9 +91,12 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     // result reaches the external partner.
     const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim()
     const segmentNormalized = normalize(seg.segment)
-    const verifiedQuotes = result.script_adherence.key_evidence_quotes.filter((q) =>
-      segmentNormalized.includes(normalize(q)),
-    )
+    const verifiedQuotes = result.script_adherence.key_evidence_quotes.filter((q) => {
+      // An empty/whitespace-only quote normalizes to "" and is a substring of every
+      // segment — never let it pass as "verified evidence".
+      const normalized = normalize(q)
+      return normalized.length > 0 && segmentNormalized.includes(normalized)
+    })
 
     // Stamp partner_id/script_version and deterministic segmentation metadata,
     // regardless of what the model returns.

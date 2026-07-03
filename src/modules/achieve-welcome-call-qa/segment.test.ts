@@ -185,6 +185,8 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
         key_evidence_quotes: [
           "your deposits go into your   Dedicated Account.", // in segment (whitespace/case differ)
           "I ran your soft credit check earlier.", // pre-handoff / fabricated
+          "   ", // whitespace-only: normalizes to "" (a substring of everything) — must be dropped
+          "", // empty string: same trap
         ],
       },
     })

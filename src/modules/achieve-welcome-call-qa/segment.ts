@@ -32,7 +32,7 @@ export interface WelcomeCallSegment {
   used_full_transcript_fallback: boolean
 }
 
-const TRANSFER_AGENT_LABEL = /^\s*\[transfer\s?agent\]\s*:/i
+const TRANSFER_AGENT_LABEL = /^\s*\[transfer\s*agent\]\s*:/i
 
 // ponytail: 10 ≈ ceiling of IVR/disclosure boilerplate seen in failed handoffs;
 // real welcome calls run 40+ transfer-agent lines. Tune here if a real call trips it.
