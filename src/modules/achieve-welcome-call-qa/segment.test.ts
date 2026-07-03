@@ -51,7 +51,7 @@ const mockResponse = {
     closing_and_support_provided: true,
     overall_script_adherence: "full",
     missing_elements: [],
-    key_evidence_quotes: ["Thank you for calling, this is your welcome call."],
+    key_evidence_quotes: ["This call will be recorded for quality and training purposes."],
     violation: false,
     violation_reason: "",
   },
@@ -130,7 +130,7 @@ describe("segmentWelcomeCall", () => {
   })
 })
 
-describe("achieveWelcomeCallQAModule.evaluate segmentation", () => {
+describe("achieveWelcomeCallQAModule.evaluate", () => {
   it("sends only the post-handoff segment to the LLM", async () => {
     const llm = createMockLLM(mockResponse)
     const request = createEvaluateRequest()
@@ -138,9 +138,7 @@ describe("achieveWelcomeCallQAModule.evaluate segmentation", () => {
 
     const [, userPrompt] = llm.getStructuredResponse.mock.calls[0]
     expect(userPrompt).not.toContain("soft credit check")
-    expect(userPrompt).not.toContain("enroll you in the program")
-    expect(userPrompt).toContain("client success advocate")
-    // preamble tells the model not to infer from earlier content
+    expect(userPrompt).toContain("Beyond Finance")
     expect(userPrompt).toContain("Do NOT give credit")
   })
 
@@ -154,23 +152,45 @@ describe("achieveWelcomeCallQAModule.evaluate segmentation", () => {
     expect(r.script_version).toBe("fdr_wholesale_db_pilot_v1")
     expect(r.transcript_segment).toMatchObject({
       segment_type: "fdr_disclosure_and_welcome_call",
-      marker: "welcome_call_greeting",
+      marker: "transfer_agent_label",
       segmentation_confidence: "high",
-      segmentation_score: 0.95,
+      segment_found: true,
+      skip_reason: null,
+      transfer_agent_lines: 11,
       used_full_transcript_fallback: false,
     })
-    expect(r.assessment_confidence.level).toBe("high")
   })
 
-  it("flags fallback in metadata when no handoff marker is present", async () => {
+  it("skips the LLM entirely and stores a deterministic result when no segment is found", async () => {
     const llm = createMockLLM(mockResponse)
     const request = createEvaluateRequest()
     const result = await achieveWelcomeCallQAModule.evaluate(PRE_HANDOFF, request, llm as any)
-    const r = result.result as any
-    expect(r.transcript_segment.used_full_transcript_fallback).toBe(true)
-    expect(r.transcript_segment.marker).toBeNull()
 
-    const [, userPrompt] = llm.getStructuredResponse.mock.calls[0]
-    expect(userPrompt).toContain("fallback")
+    expect(llm.getStructuredResponse).not.toHaveBeenCalled()
+    expect(result.has_violation).toBe(false)
+    expect(result.violation_type).toBeNull()
+    const r = result.result as any
+    expect(r.grading_skipped).toBe(true)
+    expect(r.skip_reason).toBe("no_transfer_leg")
+    expect(r.partner_id).toBe("achieve")
+    expect(r.transcript_segment.segment_found).toBe(false)
+    expect(r.script_adherence).toBeUndefined()
+  })
+
+  it("drops evidence quotes that are not verbatim from the graded segment", async () => {
+    const llm = createMockLLM({
+      ...mockResponse,
+      script_adherence: {
+        ...mockResponse.script_adherence,
+        key_evidence_quotes: [
+          "your deposits go into your   Dedicated Account.", // in segment (whitespace/case differ)
+          "I ran your soft credit check earlier.", // pre-handoff / fabricated
+        ],
+      },
+    })
+    const request = createEvaluateRequest()
+    const result = await achieveWelcomeCallQAModule.evaluate(FULL, request, llm as any)
+    const quotes = (result.result as any).script_adherence.key_evidence_quotes
+    expect(quotes).toEqual(["your deposits go into your   Dedicated Account."])
   })
 })

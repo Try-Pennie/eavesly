@@ -37,14 +37,42 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     // Freedom disclosure line when present and continuing through the live welcome call.
     const seg = segmentWelcomeCall(transcript)
 
+    const segmentMeta = {
+      segment_type: SEGMENT_TYPE,
+      start_line: seg.start_line,
+      marker: seg.marker,
+      segmentation_confidence: seg.segmentation_confidence,
+      segmentation_score: seg.segmentation_score,
+      used_full_transcript_fallback: seg.used_full_transcript_fallback,
+      segment_found: seg.segment_found,
+      skip_reason: seg.skip_reason,
+      transfer_agent_lines: seg.transfer_agent_lines,
+    }
+
+    if (!seg.segment_found) {
+      // No reliable Achieve/FDR boundary (mis-route or failed handoff). Never
+      // send an unbounded transcript to the model — record the skip instead.
+      return {
+        module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+        result: {
+          partner_id: PARTNER_ID,
+          script_version: SCRIPT_VERSION,
+          grading_skipped: true,
+          skip_reason: seg.skip_reason,
+          transcript_segment: segmentMeta,
+        },
+        has_violation: false,
+        violation_type: null,
+        processing_time_ms: Date.now() - start,
+      }
+    }
+
     const preamble = [
       "You are grading ONLY the extracted Achieve/FDR disclosure and welcome-call segment below",
       "(the portion of the call after the Pennie enrollment handoff; it may begin with the automated Freedom disclosure line before the live client success advocate joins).",
       "Do NOT give credit for, and do NOT infer required elements from, any earlier Pennie",
       "sales, enrollment, or disclosure content — that content is intentionally excluded here.",
-      seg.used_full_transcript_fallback
-        ? "NOTE: no welcome-call handoff marker was found, so the FULL transcript is shown as a fallback. Lower your assessment_confidence accordingly."
-        : `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
+      `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
       "",
       "Please evaluate the following Achieve/FDR segment for script adherence:",
     ].join(" ")
@@ -58,20 +86,23 @@ export const achieveWelcomeCallQAModule: EvalModule = {
       "achieve_welcome_call_qa_evaluation",
     )
 
+    // A quote that isn't literally in the graded segment is fabricated or lifted
+    // from outside the segment (e.g. Pennie-side content). Drop it before the
+    // result reaches the external partner.
+    const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim()
+    const segmentNormalized = normalize(seg.segment)
+    const verifiedQuotes = result.script_adherence.key_evidence_quotes.filter((q) =>
+      segmentNormalized.includes(normalize(q)),
+    )
+
     // Stamp partner_id/script_version and deterministic segmentation metadata,
     // regardless of what the model returns.
     const stamped = {
       ...result,
+      script_adherence: { ...result.script_adherence, key_evidence_quotes: verifiedQuotes },
       partner_id: PARTNER_ID,
       script_version: SCRIPT_VERSION,
-      transcript_segment: {
-        segment_type: SEGMENT_TYPE,
-        start_line: seg.start_line,
-        marker: seg.marker,
-        segmentation_confidence: seg.segmentation_confidence,
-        segmentation_score: seg.segmentation_score,
-        used_full_transcript_fallback: seg.used_full_transcript_fallback,
-      },
+      transcript_segment: segmentMeta,
     }
     const hasViolation = stamped.script_adherence.violation
 
