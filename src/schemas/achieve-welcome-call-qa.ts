@@ -52,5 +52,8 @@ export const AchieveWelcomeCallQASchema = z.object({
     segmentation_confidence: z.enum(["high", "medium", "low"]),
     segmentation_score: z.number().min(0).max(1),
     used_full_transcript_fallback: z.boolean(),
+    segment_found: z.boolean(),
+    skip_reason: z.string().nullable(),
+    transfer_agent_lines: z.number(),
   }),
 })
