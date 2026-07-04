@@ -386,6 +386,146 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getRegalIntegrityReport()", () => {
+    const START = "2026-07-03T00:00:00Z"
+    const END = "2026-07-04T00:00:00Z"
+    const GRACE = "2026-07-03T23:30:00Z"
+    const OLD = "2026-07-03T10:00:00+00:00" // past grace
+    const FRESH = "2026-07-03T23:45:00+00:00" // within grace
+
+    function mockIntegrityTables(opts: {
+      events?: any[]
+      eventsErr?: unknown
+      plans?: any[]
+      planExistence?: any[]
+      results?: any[]
+    }) {
+      mockFrom.mockImplementation((table: string) => {
+        if (table === "eavesly_regal_call_events") {
+          return {
+            select: () => ({
+              gte: () => ({ lt: () => Promise.resolve({ data: opts.events ?? [], error: opts.eventsErr ?? null }) }),
+            }),
+          }
+        }
+        if (table === "eavesly_regal_resolver_plans") {
+          return {
+            select: () => ({
+              gte: () => ({ lt: () => Promise.resolve({ data: opts.plans ?? [], error: null }) }),
+              in: () => Promise.resolve({ data: opts.planExistence ?? [], error: null }),
+            }),
+          }
+        }
+        if (table === "eavesly_module_results") {
+          return { select: () => ({ in: () => Promise.resolve({ data: opts.results ?? [], error: null }) }) }
+        }
+        return {}
+      })
+    }
+
+    it("aggregates event balance, plan lag, policy versions, and warm-transfer health", async () => {
+      mockIntegrityTables({
+        events: [
+          { regal_task_id: "task-1", event_type: "transcript_available" },
+          { regal_task_id: "task-1", event_type: "call_completed" },
+          { regal_task_id: "task-2", event_type: "transcript_available" },
+          { regal_task_id: "task-3", event_type: "call_completed" },
+        ],
+        plans: [
+          { regal_task_id: "task-1", triggered_modules: ["full_qa", "warm_transfer"], computed_at: OLD, policy_version: 3 },
+          { regal_task_id: "task-2", triggered_modules: [], computed_at: OLD, policy_version: null },
+          { regal_task_id: "task-4", triggered_modules: ["full_qa"], computed_at: FRESH, policy_version: 3 },
+        ],
+        // task-3 has events but no plan anywhere => missing plan.
+        planExistence: [],
+        results: [
+          { call_id: "task-1", module_name: "full_qa" },
+          { call_id: "task-1", module_name: "warm_transfer" },
+          { call_id: "task-1", module_name: "achieve_welcome_call_qa" },
+        ],
+      })
+      const db = new DatabaseService(createEnv())
+      const report = await db.getRegalIntegrityReport(START, END, GRACE)
+
+      expect(report.events).toEqual({
+        transcript_available: 2,
+        call_completed: 2,
+        tasks_with_both: 1,
+        transcript_only: 1,
+        completed_only: 1,
+      })
+      expect(report.plans).toEqual({
+        total: 3,
+        with_triggered_modules: 2,
+        policy_version_null: 1,
+        event_tasks_missing_plan: 1,
+      })
+      expect(report.module_results).toEqual({
+        plans_checked: 1,
+        plans_within_grace: 1,
+        plans_missing_results: 0,
+        missing_module_counts: {},
+        sample_missing: [],
+      })
+      expect(report.warm_transfer).toEqual({
+        triggered: 1,
+        with_result: 1,
+        with_partner_followup_result: 1,
+      })
+    })
+
+    it("counts missing modules per plan past the grace cutoff", async () => {
+      mockIntegrityTables({
+        plans: [
+          { regal_task_id: "task-1", triggered_modules: ["full_qa", "litigation_check"], computed_at: OLD, policy_version: 1 },
+          { regal_task_id: "task-2", triggered_modules: ["full_qa"], computed_at: OLD, policy_version: 1 },
+        ],
+        results: [{ call_id: "task-1", module_name: "full_qa" }],
+      })
+      const db = new DatabaseService(createEnv())
+      const report = await db.getRegalIntegrityReport(START, END, GRACE)
+
+      expect(report.module_results.plans_missing_results).toBe(2)
+      expect(report.module_results.missing_module_counts).toEqual({ litigation_check: 1, full_qa: 1 })
+      expect(report.module_results.sample_missing).toEqual([
+        { regal_task_id: "task-1", missing_modules: ["litigation_check"] },
+        { regal_task_id: "task-2", missing_modules: ["full_qa"] },
+      ])
+    })
+
+    it("does not flag plans still within the grace period", async () => {
+      mockIntegrityTables({
+        plans: [{ regal_task_id: "task-1", triggered_modules: ["full_qa"], computed_at: FRESH, policy_version: 1 }],
+        results: [],
+      })
+      const db = new DatabaseService(createEnv())
+      const report = await db.getRegalIntegrityReport(START, END, GRACE)
+
+      expect(report.module_results.plans_within_grace).toBe(1)
+      expect(report.module_results.plans_checked).toBe(0)
+      expect(report.module_results.plans_missing_results).toBe(0)
+    })
+
+    it("does not count a plan computed outside the window as missing", async () => {
+      mockIntegrityTables({
+        events: [{ regal_task_id: "task-1", event_type: "transcript_available" }],
+        plans: [],
+        // Existence check finds the plan even though it's outside the window.
+        planExistence: [{ regal_task_id: "task-1" }],
+      })
+      const db = new DatabaseService(createEnv())
+      const report = await db.getRegalIntegrityReport(START, END, GRACE)
+
+      expect(report.plans.event_tasks_missing_plan).toBe(0)
+    })
+
+    it("throws on events query error", async () => {
+      mockIntegrityTables({ events: null as any, eventsErr: { message: "boom" } })
+      const db = new DatabaseService(createEnv())
+      await expect(db.getRegalIntegrityReport(START, END, GRACE)).rejects.toEqual({ message: "boom" })
+    })
+  })
+
   describe("getDuplicateAudit()", () => {
     function mockDupTables(mr: unknown, ce: unknown, rp: unknown) {
       mockFrom.mockImplementation((table: string) => {

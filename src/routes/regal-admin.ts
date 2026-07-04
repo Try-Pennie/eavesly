@@ -30,8 +30,42 @@ const BackfillSchema = z.object({
   cleanup_duplicates: z.boolean().optional(),
 })
 
+/**
+ * Read-only aggregate integrity report for the post-Regal-Journeys cutover:
+ * events -> resolver plans -> module results. Query params: start/end (ISO,
+ * default last 24h) and grace_minutes (default 30) — plans newer than the
+ * grace period aren't counted as missing results. Counts and regal_task_id
+ * samples only; no transcripts, contacts, phones, payloads, or result_json.
+ */
+const IntegrityQuerySchema = z.object({
+  start: z.string().datetime().optional(),
+  end: z.string().datetime().optional(),
+  grace_minutes: z.coerce.number().int().min(0).max(1440).default(30),
+})
+
 const regalAdminRoutes = new Hono<AppEnv>()
 regalAdminRoutes.use("*", auth)
+
+regalAdminRoutes.get("/admin/regal-events/integrity", async (c) => {
+  const parsed = IntegrityQuerySchema.safeParse(c.req.query())
+  if (!parsed.success) {
+    return c.json({ error: "Validation failed", details: parsed.error.issues }, 400)
+  }
+
+  const now = Date.now()
+  const end = parsed.data.end ?? new Date(now).toISOString()
+  const start = parsed.data.start ?? new Date(now - 24 * 60 * 60 * 1000).toISOString()
+  const grace_minutes = parsed.data.grace_minutes
+  const graceCutoff = new Date(now - grace_minutes * 60 * 1000).toISOString()
+
+  const db = new DatabaseService(c.env)
+  const report = await db.getRegalIntegrityReport(start, end, graceCutoff)
+
+  return c.json({
+    window: { start, end, grace_minutes, grace_cutoff: graceCutoff },
+    ...report,
+  })
+})
 
 regalAdminRoutes.post("/admin/regal-events/backfill-missed", async (c) => {
   const correlationId = c.get("correlationId")

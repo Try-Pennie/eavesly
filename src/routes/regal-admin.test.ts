@@ -7,6 +7,7 @@ const getBackfillCandidates = vi.fn()
 const getDuplicateAudit = vi.fn()
 const getRegalCallEvents = vi.fn()
 const getResolverPolicy = vi.fn()
+const getRegalIntegrityReport = vi.fn()
 
 vi.mock("../services/database", () => ({
   DatabaseService: class {
@@ -14,6 +15,7 @@ vi.mock("../services/database", () => ({
     getDuplicateAudit = getDuplicateAudit
     getRegalCallEvents = getRegalCallEvents
     getResolverPolicy = getResolverPolicy
+    getRegalIntegrityReport = getRegalIntegrityReport
   },
 }))
 
@@ -205,6 +207,85 @@ describe("Regal admin backfill route", () => {
       expect(raw).not.toContain("payload")
       expect(raw).not.toContain("contact_phone")
     }
+  })
+
+  describe("integrity report route", () => {
+    const EMPTY_REPORT = {
+      events: { transcript_available: 0, call_completed: 0, tasks_with_both: 0, transcript_only: 0, completed_only: 0 },
+      plans: { total: 0, with_triggered_modules: 0, policy_version_null: 0, event_tasks_missing_plan: 0 },
+      module_results: {
+        plans_checked: 0,
+        plans_within_grace: 0,
+        plans_missing_results: 0,
+        missing_module_counts: {},
+        sample_missing: [],
+      },
+      warm_transfer: { triggered: 0, with_result: 0, with_partner_followup_result: 0 },
+    }
+
+    function get(query = "", auth = true) {
+      return app().request(
+        `/api/v1/admin/regal-events/integrity${query}`,
+        { headers: auth ? { Authorization: `Bearer ${TEST_API_KEY}` } : {} },
+        createEnv(),
+      )
+    }
+
+    beforeEach(() => {
+      getRegalIntegrityReport.mockReset().mockResolvedValue(EMPTY_REPORT)
+    })
+
+    it("returns 401 without auth", async () => {
+      const res = await get("", false)
+      expect(res.status).toBe(401)
+      expect(getRegalIntegrityReport).not.toHaveBeenCalled()
+    })
+
+    it("defaults to a 24h window with a 30-minute grace period", async () => {
+      const res = await get()
+      expect(res.status).toBe(200)
+      const json = (await res.json()) as any
+
+      const [start, end, graceCutoff] = getRegalIntegrityReport.mock.calls[0]
+      expect(new Date(end).getTime() - new Date(start).getTime()).toBe(24 * 60 * 60 * 1000)
+      expect(new Date(end).getTime() - new Date(graceCutoff).getTime()).toBe(30 * 60 * 1000)
+      expect(json.window).toEqual({ start, end, grace_minutes: 30, grace_cutoff: graceCutoff })
+      expect(json.events).toEqual(EMPTY_REPORT.events)
+      expect(json.plans).toEqual(EMPTY_REPORT.plans)
+      expect(json.module_results).toEqual(EMPTY_REPORT.module_results)
+      expect(json.warm_transfer).toEqual(EMPTY_REPORT.warm_transfer)
+    })
+
+    it("honors explicit start/end/grace_minutes", async () => {
+      const res = await get("?start=2026-07-01T00:00:00Z&end=2026-07-02T00:00:00Z&grace_minutes=120")
+      expect(res.status).toBe(200)
+      const json = (await res.json()) as any
+
+      expect(getRegalIntegrityReport).toHaveBeenCalledWith(
+        "2026-07-01T00:00:00Z",
+        "2026-07-02T00:00:00Z",
+        expect.any(String),
+      )
+      expect(json.window.grace_minutes).toBe(120)
+    })
+
+    it("rejects invalid query params", async () => {
+      expect((await get("?start=yesterday")).status).toBe(400)
+      expect((await get("?grace_minutes=-5")).status).toBe(400)
+      expect(getRegalIntegrityReport).not.toHaveBeenCalled()
+    })
+
+    it("is read-only: never launches workflows or touches backfill helpers", async () => {
+      const env = createEnv()
+      await app().request(
+        "/api/v1/admin/regal-events/integrity",
+        { headers: { Authorization: `Bearer ${TEST_API_KEY}` } },
+        env,
+      )
+      expect((env.EVALUATION_WORKFLOW.create as any)).not.toHaveBeenCalled()
+      expect(getBackfillCandidates).not.toHaveBeenCalled()
+      expect(getRegalCallEvents).not.toHaveBeenCalled()
+    })
   })
 
   it("returns duplicate audit counts without performing cleanup", async () => {

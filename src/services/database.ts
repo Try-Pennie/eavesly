@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Bindings } from "../types/env"
 import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from "../modules/types"
+import { MODULE_NAMES } from "../modules/constants"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolverPolicy } from "./regal-events"
 import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow } from "./regal-events"
@@ -438,6 +439,196 @@ export class DatabaseService {
         a.regal_task_id.localeCompare(b.regal_task_id),
     )
     return candidates.map(({ computed_at, ...c }) => c)
+  }
+
+  /**
+   * Read-only aggregate integrity report over the Regal pipeline for a window:
+   * events -> resolver plans -> module results. Counts + regal_task_id samples
+   * only — never transcripts, contacts, phones, payloads, or result_json — so
+   * the admin route response stays PII-free.
+   *
+   * `graceCutoff` (ISO timestamp): plans computed after it are still "within
+   * grace" and not counted as missing results, since their workflows may simply
+   * not have finished yet.
+   *
+   * Operational note: keep windows bounded (for example 24h) so Supabase's
+   * default response cap does not hide a larger backlog. If this report grows
+   * beyond daily checks, add explicit .range() pagination.
+   */
+  async getRegalIntegrityReport(
+    start: string,
+    end: string,
+    graceCutoff: string,
+  ): Promise<{
+    events: {
+      transcript_available: number
+      call_completed: number
+      tasks_with_both: number
+      transcript_only: number
+      completed_only: number
+    }
+    plans: {
+      total: number
+      with_triggered_modules: number
+      policy_version_null: number
+      event_tasks_missing_plan: number
+    }
+    module_results: {
+      plans_checked: number
+      plans_within_grace: number
+      plans_missing_results: number
+      missing_module_counts: Record<string, number>
+      sample_missing: Array<{ regal_task_id: string; missing_modules: string[] }>
+    }
+    warm_transfer: {
+      triggered: number
+      with_result: number
+      with_partner_followup_result: number
+    }
+  }> {
+    const { data: events, error: evErr } = await this.client
+      .from("eavesly_regal_call_events")
+      .select("regal_task_id, event_type")
+      .gte("received_at", start)
+      .lt("received_at", end)
+    if (evErr) {
+      log("error", "Integrity report: failed to fetch events", { error: evErr.message })
+      throw evErr
+    }
+
+    // policy_version lives inside plan_json; select only that key so the rest
+    // of the plan (decision reasons etc.) never leaves the database.
+    const { data: plans, error: planErr } = await this.client
+      .from("eavesly_regal_resolver_plans")
+      .select("regal_task_id, triggered_modules, computed_at, policy_version:plan_json->policy_version")
+      .gte("computed_at", start)
+      .lt("computed_at", end)
+    if (planErr) {
+      log("error", "Integrity report: failed to fetch resolver plans", { error: planErr.message })
+      throw planErr
+    }
+
+    // Event stream balance: transcript_available and call_completed should pair up.
+    const byTask = new Map<string, Set<string>>()
+    for (const e of events ?? []) {
+      const set = byTask.get(e.regal_task_id) ?? new Set<string>()
+      set.add(e.event_type)
+      byTask.set(e.regal_task_id, set)
+    }
+    let tasksWithBoth = 0
+    let transcriptOnly = 0
+    let completedOnly = 0
+    for (const types of byTask.values()) {
+      const t = types.has("transcript_available")
+      const c = types.has("call_completed")
+      if (t && c) tasksWithBoth++
+      else if (t) transcriptOnly++
+      else if (c) completedOnly++
+    }
+
+    // Resolver plan lag: event tasks in the window with no plan row at all
+    // (checked without the window filter so a plan computed just outside it
+    // doesn't false-positive). No grace period here: plans are written
+    // synchronously at event ingest, so absence is a real gap, not lag.
+    const planIds = new Set((plans ?? []).map((p: any) => p.regal_task_id))
+    const unplanned = [...byTask.keys()].filter((id) => !planIds.has(id))
+    let eventTasksMissingPlan = 0
+    if (unplanned.length > 0) {
+      const { data: existing, error: exErr } = await this.client
+        .from("eavesly_regal_resolver_plans")
+        .select("regal_task_id")
+        .in("regal_task_id", unplanned)
+      if (exErr) {
+        log("error", "Integrity report: failed to check plan existence", { error: exErr.message })
+        throw exErr
+      }
+      const found = new Set((existing ?? []).map((r: any) => r.regal_task_id))
+      eventTasksMissingPlan = unplanned.filter((id) => !found.has(id)).length
+    }
+
+    const withTriggers = (plans ?? []).filter(
+      (p: any) => Array.isArray(p.triggered_modules) && p.triggered_modules.length > 0,
+    )
+    const policyVersionNull = (plans ?? []).filter((p: any) => p.policy_version == null).length
+
+    // Missing module results: only judge plans past the grace cutoff.
+    const graceTime = new Date(graceCutoff).getTime()
+    const pastGrace = withTriggers.filter((p: any) => new Date(String(p.computed_at)).getTime() <= graceTime)
+    const withinGrace = withTriggers.length - pastGrace.length
+
+    const resultsByCall = new Map<string, Set<string>>()
+    if (pastGrace.length > 0) {
+      const { data: results, error: resErr } = await this.client
+        .from("eavesly_module_results")
+        .select("call_id, module_name")
+        .in("call_id", pastGrace.map((p: any) => p.regal_task_id))
+      if (resErr) {
+        log("error", "Integrity report: failed to fetch module results", { error: resErr.message })
+        throw resErr
+      }
+      for (const r of results ?? []) {
+        const set = resultsByCall.get(r.call_id) ?? new Set<string>()
+        set.add(r.module_name)
+        resultsByCall.set(r.call_id, set)
+      }
+    }
+
+    const missingModuleCounts: Record<string, number> = {}
+    const sampleMissing: Array<{ regal_task_id: string; missing_modules: string[] }> = []
+    let plansMissingResults = 0
+    let wtTriggered = 0
+    let wtWithResult = 0
+    let wtWithFollowup = 0
+    for (const p of pastGrace) {
+      const have = resultsByCall.get(p.regal_task_id) ?? new Set<string>()
+      const missing = (p.triggered_modules as string[]).filter((m) => !have.has(m))
+      if (missing.length > 0) {
+        plansMissingResults++
+        for (const m of missing) missingModuleCounts[m] = (missingModuleCounts[m] ?? 0) + 1
+        if (sampleMissing.length < 10) {
+          sampleMissing.push({ regal_task_id: p.regal_task_id, missing_modules: missing })
+        }
+      }
+
+      // warm_transfer -> partner follow-up health. Not every warm transfer routes
+      // to a partner (depends on agent assignment), so followup < with_result is
+      // expected — the counts are for trend-watching, not a hard invariant.
+      if ((p.triggered_modules as string[]).includes(MODULE_NAMES.WARM_TRANSFER)) {
+        wtTriggered++
+        if (have.has(MODULE_NAMES.WARM_TRANSFER)) wtWithResult++
+        if (have.has(MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)) wtWithFollowup++
+      }
+    }
+
+    const countEvents = (type: string) => (events ?? []).filter((e: any) => e.event_type === type).length
+
+    return {
+      events: {
+        transcript_available: countEvents("transcript_available"),
+        call_completed: countEvents("call_completed"),
+        tasks_with_both: tasksWithBoth,
+        transcript_only: transcriptOnly,
+        completed_only: completedOnly,
+      },
+      plans: {
+        total: (plans ?? []).length,
+        with_triggered_modules: withTriggers.length,
+        policy_version_null: policyVersionNull,
+        event_tasks_missing_plan: eventTasksMissingPlan,
+      },
+      module_results: {
+        plans_checked: pastGrace.length,
+        plans_within_grace: withinGrace,
+        plans_missing_results: plansMissingResults,
+        missing_module_counts: missingModuleCounts,
+        sample_missing: sampleMissing,
+      },
+      warm_transfer: {
+        triggered: wtTriggered,
+        with_result: wtWithResult,
+        with_partner_followup_result: wtWithFollowup,
+      },
+    }
   }
 
   /**
