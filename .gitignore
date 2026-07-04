@@ -154,6 +154,9 @@ test_results.log
 # Wrangler temp files
 .wrangler/
 
+# Claude Code local state (worktrees, settings)
+.claude/
+
 # Python virtual environments
 .venv/
 
