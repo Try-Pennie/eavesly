@@ -2,6 +2,7 @@ import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from "cloudflare:work
 import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import { getModule } from "./module-registry"
+import type { ModuleResult, Alert } from "../modules/types"
 import { createLLMClient } from "../services/llm-client"
 import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
@@ -95,23 +96,26 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       : []
 
     // Step 1: LLM evaluation (the expensive step)
-    const result = await step.do("evaluate-llm", {
+    // step.do() constrains its callback return to Workflows' Serializable<T>, which
+    // rejects our domain types; these values are plain JSON round-tripping, so cast
+    // at the boundary and keep the logical type on the result.
+    const result: ModuleResult = await step.do("evaluate-llm", {
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
       const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
-      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions, audience)
+      return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions, audience) as any
     })
 
     // Step 2: Store result in Supabase
-    const alerts = await step.do("store-result", {
+    const alerts: Alert[] = await step.do("store-result", {
       retries: { limit: 3, delay: "2 seconds", backoff: "exponential" },
       timeout: "1 minute",
     }, async () => {
       const db = new DatabaseService(this.env)
       const alerts = mod.extractAlerts(result, callData.call_id, callData.agent_id, callData)
       await db.storeModuleResult(callData.call_id, result, alerts.length > 0, callData)
-      return alerts
+      return alerts as any
     })
 
     // Step 2c: Partner routing (warm_transfer only). After the warm-transfer eval

@@ -97,6 +97,9 @@
   "warm_transfer_compliance": {
     "enrollment_completed": false,
     "warm_transfer_completed": false,
+    "agent_attempted_warm_transfer": false,
+    "client_stated_reason_cannot_transfer": false,
+    "client_stated_reason": "",
     "welcome_call_scheduled": false,
     "client_proactively_requested_scheduling": false,
     "warm_transfer_violation": false,
