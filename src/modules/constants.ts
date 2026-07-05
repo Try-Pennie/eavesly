@@ -19,6 +19,3 @@ export const VIOLATION_TYPES = {
   MIS_DISPOSITION: "mis_disposition",
   ACHIEVE_WELCOME_CALL: "achieve_welcome_call",
 } as const
-
-type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES]
-type ViolationType = (typeof VIOLATION_TYPES)[keyof typeof VIOLATION_TYPES]

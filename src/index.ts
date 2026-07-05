@@ -4,19 +4,30 @@ import { corsMiddleware } from "./middleware/cors"
 import { requestLogger } from "./middleware/request-logger"
 import { validateEnv } from "./utils/validate-env"
 import { log } from "./utils/logger"
-import { fullQARoutes } from "./routes/full-qa"
-import { budgetInputsRoutes } from "./routes/budget-inputs"
-import { warmTransferRoutes } from "./routes/warm-transfer"
-import { litigationCheckRoutes } from "./routes/litigation-check"
-import { programExpectationsRoutes } from "./routes/program-expectations"
-import { activeSettlementsRoutes } from "./routes/active-settlements"
-import { dispositionReviewRoutes } from "./routes/disposition-review"
-import { achieveWelcomeCallQARoutes } from "./routes/achieve-welcome-call-qa"
+import { MODULE_NAMES } from "./modules/constants"
+import { createEvalRoutes } from "./routes/create-eval-routes"
 import { healthRoutes } from "./routes/health"
 import { statusRoutes } from "./routes/status"
 import { regalEventRoutes } from "./routes/regal-events"
 import { regalAdminRoutes } from "./routes/regal-admin"
 import { promptAdminRoutes } from "./routes/prompt-admin"
+
+// Per-module evaluation endpoints. Each mounts /evaluate/<endpoint>,
+// /evaluate/<endpoint>/batch, and /evaluate/<endpoint>/from-recording under /api/v1.
+const EVAL_ROUTE_CONFIGS = [
+  { endpoint: "full-qa", moduleName: MODULE_NAMES.FULL_QA },
+  { endpoint: "budget-inputs", moduleName: MODULE_NAMES.BUDGET_INPUTS },
+  { endpoint: "warm-transfer", moduleName: MODULE_NAMES.WARM_TRANSFER },
+  { endpoint: "litigation-check", moduleName: MODULE_NAMES.LITIGATION_CHECK },
+  { endpoint: "program-expectations", moduleName: MODULE_NAMES.PROGRAM_EXPECTATIONS },
+  { endpoint: "active-settlements", moduleName: MODULE_NAMES.ACTIVE_SETTLEMENTS },
+  { endpoint: "disposition-review", moduleName: MODULE_NAMES.DISPOSITION_REVIEW },
+  {
+    endpoint: "achieve-welcome-call-qa",
+    moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+    requiredPartnerId: "achieve",
+  },
+] as const
 
 const app = new Hono<AppEnv>()
 
@@ -28,14 +39,9 @@ app.use("*", async (c, next) => {
 })
 
 app.route("/", healthRoutes)
-app.route("/api/v1", fullQARoutes)
-app.route("/api/v1", budgetInputsRoutes)
-app.route("/api/v1", warmTransferRoutes)
-app.route("/api/v1", litigationCheckRoutes)
-app.route("/api/v1", programExpectationsRoutes)
-app.route("/api/v1", activeSettlementsRoutes)
-app.route("/api/v1", dispositionReviewRoutes)
-app.route("/api/v1", achieveWelcomeCallQARoutes)
+for (const config of EVAL_ROUTE_CONFIGS) {
+  app.route("/api/v1", createEvalRoutes(config))
+}
 app.route("/api/v1", statusRoutes)
 app.route("/api/v1", regalEventRoutes)
 app.route("/api/v1", regalAdminRoutes)

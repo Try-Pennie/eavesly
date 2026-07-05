@@ -1,5 +1,6 @@
 import { Hono } from "hono"
-import { zValidator } from "@hono/zod-validator"
+import type { Context } from "hono"
+import { HTTPException } from "hono/http-exception"
 import type { AppEnv } from "../types/env"
 import {
   EvaluateRequestSchema,
@@ -24,10 +25,13 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
 
   routes.use("*", auth)
 
-  routes.post(`/evaluate/${endpoint}`, async (c) => {
-    const db = new DatabaseService(c.env)
-    const correlationId = c.get("correlationId")
-
+  // Reads the raw body, parses JSON, and enforces the partner_id gate.
+  // Returns the parsed payload, or a 400 Response (already logged) to return as-is.
+  async function parseAndLog(
+    c: Context<AppEnv>,
+    db: DatabaseService,
+    correlationId: string | undefined,
+  ): Promise<{ rawBody: string; parsed: unknown } | Response> {
     let rawBody: string
     try {
       rawBody = await c.req.text()
@@ -71,6 +75,17 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
         return c.json({ error: `partner_id must be '${requiredPartnerId}'` }, 400)
       }
     }
+
+    return { rawBody, parsed }
+  }
+
+  routes.post(`/evaluate/${endpoint}`, async (c) => {
+    const db = new DatabaseService(c.env)
+    const correlationId = c.get("correlationId")
+
+    const parseResult = await parseAndLog(c, db, correlationId)
+    if (parseResult instanceof Response) return parseResult
+    const { rawBody, parsed } = parseResult
 
     const validation = EvaluateRequestSchema.safeParse(parsed)
     if (!validation.success) {
@@ -131,9 +146,25 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
 
   routes.post(
     `/evaluate/${endpoint}/batch`,
-    zValidator("json", BatchEvaluateRequestSchema),
     async (c) => {
-      const { calls } = c.req.valid("json")
+      // Mirrors the previous zValidator("json", ...): only parse when the
+      // Content-Type is JSON (otherwise the empty body fails schema validation),
+      // 400 "Malformed JSON" on parse failure, and return the raw safeParse
+      // result on schema failure so the 400 body shape is unchanged.
+      let body: unknown = {}
+      const contentType = c.req.header("Content-Type")
+      if (contentType && /^application\/([a-z-.]+\+)?json(;\s*[a-zA-Z0-9-]+=([^;]+))*$/.test(contentType)) {
+        try {
+          body = await c.req.json()
+        } catch {
+          throw new HTTPException(400, { message: "Malformed JSON in request body" })
+        }
+      }
+      const validation = BatchEvaluateRequestSchema.safeParse(body)
+      if (!validation.success) {
+        return c.json(validation, 400)
+      }
+      const { calls } = validation.data
       const correlationId = c.get("correlationId") ?? crypto.randomUUID()
       const instances = await Promise.all(
         calls.map(callData =>
@@ -157,49 +188,9 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
     const db = new DatabaseService(c.env)
     const correlationId = c.get("correlationId")
 
-    let rawBody: string
-    try {
-      rawBody = await c.req.text()
-    } catch (e) {
-      await db.logRequest({
-        endpoint,
-        status: "body_read_error",
-        statusCode: 400,
-        errorMessage: e instanceof Error ? e.message : String(e),
-        correlationId,
-      })
-      return c.json({ error: "Failed to read request body" }, 400)
-    }
-
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(rawBody)
-    } catch (e) {
-      await db.logRequest({
-        endpoint,
-        status: "json_parse_error",
-        statusCode: 400,
-        errorMessage: e instanceof Error ? e.message : String(e),
-        rawBody,
-        correlationId,
-      })
-      return c.json({ error: "Invalid JSON" }, 400)
-    }
-
-    if (requiredPartnerId) {
-      const incomingPartnerId = (parsed as any)?.partner_id
-      if (incomingPartnerId !== undefined && incomingPartnerId !== requiredPartnerId) {
-        await db.logRequest({
-          endpoint,
-          callId: (parsed as any)?.call_id,
-          status: "partner_id_mismatch",
-          statusCode: 400,
-          errorMessage: `partner_id must be '${requiredPartnerId}'`,
-          correlationId,
-        })
-        return c.json({ error: `partner_id must be '${requiredPartnerId}'` }, 400)
-      }
-    }
+    const parseResult = await parseAndLog(c, db, correlationId)
+    if (parseResult instanceof Response) return parseResult
+    const { rawBody, parsed } = parseResult
 
     const validation = EvaluateFromRecordingRequestSchema.safeParse(parsed)
     if (!validation.success) {
