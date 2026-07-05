@@ -19,6 +19,30 @@ export function shouldRouteToPartner(assignment: Assignment, partner: string): b
 }
 
 /**
+ * Eligibility gate for the Achieve welcome-call QA follow-up. Achieve should only
+ * score genuine post-enrollment welcome calls, so it requires the enrollment
+ * disposition AND a call at least `achieveMinDurationSeconds` long — short calls on
+ * the same disposition are servicing/escalation/pre-enrollment noise.
+ *
+ * LegalState == "No" is already enforced upstream by the warm_transfer gate this
+ * follow-up chains off (and is not carried on callData), so it is not re-checked here.
+ */
+export function isAchieveWelcomeCallEligible(
+  callData: EvaluateRequest,
+  policy: { enrollmentDisposition: string; achieveMinDurationSeconds: number },
+): { eligible: boolean; reason: string } {
+  const disposition = callData.transcript.metadata.disposition
+  const duration = callData.transcript.metadata.duration ?? 0
+  if (disposition !== policy.enrollmentDisposition) {
+    return { eligible: false, reason: `disposition '${disposition ?? ""}' != enrollment disposition` }
+  }
+  if (duration <= policy.achieveMinDurationSeconds) {
+    return { eligible: false, reason: `duration ${duration}s <= ${policy.achieveMinDurationSeconds}s` }
+  }
+  return { eligible: true, reason: "eligible" }
+}
+
+/**
  * After a warm_transfer eval is stored, deterministically chain a partner-specific
  * follow-up module (achieve_welcome_call_qa, budget_inputs, ...) when the completing
  * agent is resolved to `partner` in agent_regal_assignments. Keyed by agent_email
@@ -31,9 +55,28 @@ export async function routePartnerFollowup(
   db: DatabaseService,
   callData: EvaluateRequest,
   correlationId: string,
-  opts: { partner: string; moduleName: string },
+  opts: {
+    partner: string
+    moduleName: string
+    /** Optional per-call gate; when it returns not-eligible the follow-up is skipped. */
+    eligibility?: (callData: EvaluateRequest) => { eligible: boolean; reason: string }
+  },
 ): Promise<void> {
-  const { partner, moduleName } = opts
+  const { partner, moduleName, eligibility } = opts
+
+  // Cheap, DB-free eligibility short-circuit (e.g. Achieve's disposition + duration gate).
+  if (eligibility) {
+    const check = eligibility(callData)
+    if (!check.eligible) {
+      log("info", "Partner routing skipped: call not eligible", {
+        callId: callData.call_id,
+        partner,
+        moduleName,
+        reason: check.reason,
+      })
+      return
+    }
+  }
 
   let agentEmail = normalizeAgentEmail(callData.agent_email)
   if (!agentEmail) {

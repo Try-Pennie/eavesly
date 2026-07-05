@@ -7,7 +7,7 @@ import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
-import { routePartnerFollowup } from "./partner-routing"
+import { routePartnerFollowup, isAchieveWelcomeCallEligible } from "./partner-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -120,8 +120,23 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     // Achieve -> achieve_welcome_call_qa, Beyond -> budget_inputs. Each is
     // best-effort: routing must never fail the warm_transfer workflow.
     if (moduleName === MODULE_NAMES.WARM_TRANSFER) {
+      // Load the active resolver policy once so the Achieve follow-up can enforce its
+      // eligibility gate (enrollment disposition + minimum call duration). LegalState
+      // == "No" is already guaranteed here because this only runs after warm_transfer.
+      const { policy } = await step.do("load-resolver-policy", {
+        retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+        timeout: "30 seconds",
+      }, async () => {
+        const db = new DatabaseService(this.env)
+        return await db.getResolverPolicy()
+      })
+
       const followups = [
-        { partner: "achieve", moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA },
+        {
+          partner: "achieve",
+          moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+          eligibility: (cd: EvaluateRequest) => isAchieveWelcomeCallEligible(cd, policy),
+        },
         { partner: "beyond", moduleName: MODULE_NAMES.BUDGET_INPUTS },
       ]
       for (const followup of followups) {
