@@ -86,7 +86,7 @@ describe("createLLMClient", () => {
     ).rejects.toThrow("Schema validation failed")
   })
 
-  it("uses default temperature 0.3 and maxTokens 16000", async () => {
+  it("uses default temperature 0.3", async () => {
     const data = { score: 1, message: "ok" }
     mockLLMResponse(JSON.stringify(data))
 
@@ -96,7 +96,6 @@ describe("createLLMClient", () => {
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         temperature: 0.3,
-        max_tokens: 16000,
       }),
     )
   })

@@ -1,3 +1,4 @@
+import { vi } from "vitest"
 import type { Bindings } from "../../src/types/env"
 
 export const TEST_API_KEY = "test-api-key-12345"
