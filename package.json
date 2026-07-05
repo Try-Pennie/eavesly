@@ -15,7 +15,6 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.4.1",
     "@supabase/supabase-js": "^2.49.1",
     "hono": "^4.6.0",
     "openai": "^4.77.0",
