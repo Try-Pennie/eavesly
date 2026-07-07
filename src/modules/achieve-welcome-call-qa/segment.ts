@@ -14,10 +14,18 @@
 // 2. Content markers (secondary, label-less feeds only). "client success
 //    advocate" and coordinator-handoff phrasing are gone — both misfired on
 //    Pennie-side speech in the audit.
+//
+// Beyond Finance is a COMPETITOR, not the Achieve/FDR partner. Agents sometimes
+// mis-transfer to it; those calls must never be graded here (results are shown to
+// Achieve in an external portal — grading a competitor call there is a conflict of
+// interest). We detect a competitor greeting ON THE TRANSFER LEG ONLY (Regal
+// payloads carry no transfer-destination number) and record a `competitor_transfer`
+// skip with an empty segment. Pennie-side ("[handling agent]:") mentions of Beyond
+// before the handoff do NOT count.
 
 export type SegmentationConfidence = "high" | "medium" | "low"
 
-export type SegmentSkipReason = "no_transfer_leg" | "transfer_leg_too_short"
+export type SegmentSkipReason = "no_transfer_leg" | "transfer_leg_too_short" | "competitor_transfer"
 
 export interface WelcomeCallSegment {
   segment_found: boolean
@@ -38,14 +46,20 @@ const TRANSFER_AGENT_LABEL = /^\s*\[transfer\s*agent\]\s*:/i
 // real welcome calls run 40+ transfer-agent lines. Tune here if a real call trips it.
 const MIN_TRANSFER_AGENT_LINES = 10
 
+// Competitor (Beyond Finance) detection — greeting / agent self-identification only.
+// Bare "with beyond finance" is intentionally NOT matched: legit FDR calls where the
+// customer is switching FROM Beyond say things like "cancel your program with Beyond
+// Finance". Only a competitor GREETING or the transfer agent identifying themselves as
+// Beyond signals a mis-transfer.
+const COMPETITOR_GREETING = /thank you for (calling|contacting)[^\n]{0,40}beyond finance/i
+const COMPETITOR_SELF_ID = /(my name is|this is) [a-z]+ (with|from) beyond finance/i
+
 const MARKERS: { pattern: RegExp; label: string; confidence: "high" | "medium"; score: number }[] = [
   // "freedom debt relief disclosure line" and the newer "debt resolution" branding
   { pattern: /debt (relief|resolution) disclosure line/i, label: "fdr_disclosure_line_start", confidence: "high", score: 0.95 },
   // observed both "client's" and "customer's"
   { pattern: /enter the (customer|client)'?s (10|ten)[ -]?digit phone number/i, label: "fdr_disclosure_phone_prompt", confidence: "high", score: 0.9 },
   { pattern: /thank you for calling[^\n]{0,40}welcome call/i, label: "welcome_call_greeting", confidence: "high", score: 0.95 },
-  // ~5/64 audited calls are Beyond Finance-branded with zero "Freedom" wording
-  { pattern: /thank you for calling beyond finance/i, label: "beyond_finance_greeting", confidence: "high", score: 0.9 },
   { pattern: /welcome call specialist/i, label: "welcome_call_specialist", confidence: "high", score: 0.85 },
   { pattern: /freedom debt relief client dashboard app/i, label: "fdr_dashboard_app", confidence: "high", score: 0.9 },
   { pattern: /log\s?in to your client dashboard/i, label: "client_dashboard_login", confidence: "high", score: 0.9 },
@@ -75,6 +89,24 @@ export function segmentWelcomeCall(transcript: string): WelcomeCallSegment {
         used_full_transcript_fallback: false,
       }
     }
+    // A real transfer leg exists, but it may be to Beyond Finance (a competitor), not
+    // Achieve. Scan ONLY the transfer-agent-labeled lines for a competitor greeting or
+    // self-identification — Pennie-side ("[handling agent]:") Beyond mentions don't count.
+    for (const idx of labelLines) {
+      if (COMPETITOR_GREETING.test(lines[idx]) || COMPETITOR_SELF_ID.test(lines[idx])) {
+        return {
+          segment_found: false,
+          skip_reason: "competitor_transfer",
+          segment: "",
+          start_line: labelLines[0],
+          marker: "beyond_finance_transfer",
+          segmentation_confidence: "high",
+          segmentation_score: 0.95,
+          transfer_agent_lines: labelLines.length,
+          used_full_transcript_fallback: false,
+        }
+      }
+    }
     return {
       segment_found: true,
       skip_reason: null,
@@ -90,6 +122,20 @@ export function segmentWelcomeCall(transcript: string): WelcomeCallSegment {
 
   // Label-less transcript: earliest content-marker line wins.
   for (let i = 0; i < lines.length; i++) {
+    // A Beyond Finance greeting here means a competitor mis-transfer — skip, don't grade.
+    if (COMPETITOR_GREETING.test(lines[i])) {
+      return {
+        segment_found: false,
+        skip_reason: "competitor_transfer",
+        segment: "",
+        start_line: i,
+        marker: "beyond_finance_transfer",
+        segmentation_confidence: "high",
+        segmentation_score: 0.95,
+        transfer_agent_lines: 0,
+        used_full_transcript_fallback: false,
+      }
+    }
     for (const m of MARKERS) {
       if (m.pattern.test(lines[i])) {
         return {
