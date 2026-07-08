@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest"
 import {
   buildModuleTriggerPlan,
   transcriptEventToCallData,
+  callCompletedEventToCallRow,
+  regalEpochToISO,
   parseResolverPolicyRow,
   DEFAULT_RESOLVER_POLICY,
   type JoinedRegalEvents,
@@ -192,5 +194,61 @@ describe("transcriptEventToCallData", () => {
     expect(data.transcript.metadata.disposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
     expect(data.transcript.metadata.campaign_name).toBe("End Campaigns")
     expect(data.transcript.metadata.timestamp).toBe("2026-01-02T00:00:00Z")
+  })
+})
+
+describe("regalEpochToISO", () => {
+  it("treats the value as epoch seconds (not millis)", () => {
+    // 1783539045s -> 2026, not 1970 (which is what a millis reading would give)
+    expect(regalEpochToISO("1783539045")).toBe(new Date(1783539045 * 1000).toISOString())
+    expect(regalEpochToISO("1783539045")?.startsWith("2026-07-08")).toBe(true)
+    expect(regalEpochToISO(1783539045)?.startsWith("2026-07-08")).toBe(true)
+  })
+
+  it("returns null for empty/missing/invalid", () => {
+    expect(regalEpochToISO("")).toBeNull()
+    expect(regalEpochToISO(undefined)).toBeNull()
+    expect(regalEpochToISO(null)).toBeNull()
+    expect(regalEpochToISO(0)).toBeNull()
+    expect(regalEpochToISO("nope")).toBeNull()
+  })
+})
+
+describe("callCompletedEventToCallRow", () => {
+  it("maps completed-event fields and converts epoch-second timestamps", () => {
+    const row = callCompletedEventToCallRow(
+      completed({
+        regal_task_id: "WTabc",
+        agent_email: "a@b.com",
+        disposition: "1.1A - No Show - First Call",
+        campaign_name: "Camp",
+        contact_phone: "+15550001111",
+        talk_time: 2401,
+        handle_time: 2555,
+        wrapup_time: 154,
+        started_at: "1783539045",
+        ended_at: 1783541446,
+        completed_at: "1783541600",
+      }),
+    )
+    expect(row.call_id).toBe("WTabc")
+    expect(row.agent_email).toBe("a@b.com")
+    expect(row.disposition).toBe("1.1A - No Show - First Call")
+    expect(row.campaign_name).toBe("Camp")
+    expect(row.talk_time).toBe(2401)
+    expect(row.started_at?.startsWith("2026-07-08")).toBe(true)
+    expect(row.ended_at?.startsWith("2026-07-08")).toBe(true)
+    // id + created_at are set at write time, never mapped from the payload
+    expect(row).not.toHaveProperty("id")
+    expect(row).not.toHaveProperty("created_at")
+  })
+
+  it("nulls empty agent_email and empty/missing timestamps", () => {
+    const row = callCompletedEventToCallRow(
+      completed({ agent_email: "", started_at: "", ended_at: undefined }),
+    )
+    expect(row.agent_email).toBeNull()
+    expect(row.started_at).toBeNull()
+    expect(row.ended_at).toBeNull()
   })
 })

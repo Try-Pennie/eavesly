@@ -125,6 +125,48 @@ export function transcriptEventToCallData(
 }
 
 /**
+ * Convert a Regal timestamp field into an ISO string, or null when absent.
+ * Regal sends started_at/ended_at/completed_at as unix epoch *seconds* (e.g.
+ * "1783539045"), sometimes stringified and sometimes an empty string.
+ * ponytail: assumes seconds, not millis — the payloads are ~1.7e9 (2026), a
+ * millis reading would land in 1970. Revisit only if Regal changes the unit.
+ */
+export function regalEpochToISO(v: string | number | undefined | null): string | null {
+  if (v === undefined || v === null || v === "") return null
+  const n = typeof v === "number" ? v : Number(v)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return new Date(n * 1000).toISOString()
+}
+
+/**
+ * Project a call_completed event onto an eavesly_calls row. The Regal-webhook QA
+ * path writes eavesly_regal_call_events + eavesly_transcription_qa but not
+ * eavesly_calls, which is the table the manager dashboard reads — so without this
+ * the dashboard shows 0 calls even while QA + Slack alerts run (incident
+ * 2026-07-01, when ingestion cut over from the retired SFDC/Pipedream sync that
+ * used to populate eavesly_calls). sfdc_lead_id / agent_full_name / direction /
+ * campaign_id are not in the Regal payload and stay null (they came from SFDC).
+ * `id` is a generated identity and `created_at` is set at write time, so neither
+ * is mapped here.
+ */
+export function callCompletedEventToCallRow(e: CallCompletedEvent) {
+  return {
+    call_id: e.regal_task_id,
+    agent_email: e.agent_email || null,
+    disposition: e.disposition ?? null,
+    campaign_name: e.campaign_name ?? null,
+    contact_phone: e.contact_phone ?? null,
+    conversation_happened: e.conversation_happened ?? null,
+    talk_time: e.talk_time ?? null,
+    handle_time: e.handle_time ?? null,
+    wrapup_time: e.wrapup_time ?? null,
+    started_at: regalEpochToISO(e.started_at),
+    ended_at: regalEpochToISO(e.ended_at),
+    completed_at: regalEpochToISO(e.completed_at),
+  }
+}
+
+/**
  * Deterministic resolver: joinedEvents + policy -> ModuleTriggerPlan.
  *
  * The events endpoints launch EVALUATION_WORKFLOW for every module in `triggered`

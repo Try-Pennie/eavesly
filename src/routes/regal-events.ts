@@ -93,6 +93,13 @@ function createRegalEventRoute(
     // Primary write: store the event in the durable ledger (idempotent).
     await db.recordRegalCallEvent(event)
 
+    // Project completed calls into eavesly_calls, the dashboard's source table.
+    // The QA/alert path doesn't write it, so without this the manager dashboard
+    // shows 0 calls even though QA + alerts run. Best-effort inside the method.
+    if (event.event_type === "call_completed") {
+      await db.upsertCallFromCompletedEvent(event)
+    }
+
     // Build + store the resolver plan from whatever events we have joined so far,
     // then actively launch a workflow per triggered module. Best-effort: a plan or
     // launch failure must not fail the ledger write.
