@@ -4,6 +4,7 @@ import type { AppEnv } from "../types/env"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
 
 const recordRegalCallEvent = vi.fn().mockResolvedValue(undefined)
+const upsertCallFromCompletedEvent = vi.fn().mockResolvedValue(undefined)
 const getRegalCallEvents = vi.fn()
 const recordRegalResolverPlan = vi.fn().mockResolvedValue(undefined)
 const logRequest = vi.fn().mockResolvedValue(undefined)
@@ -12,6 +13,7 @@ const getResolverPolicy = vi.fn()
 vi.mock("../services/database", () => ({
   DatabaseService: class {
     recordRegalCallEvent = recordRegalCallEvent
+    upsertCallFromCompletedEvent = upsertCallFromCompletedEvent
     getRegalCallEvents = getRegalCallEvents
     recordRegalResolverPlan = recordRegalResolverPlan
     logRequest = logRequest
@@ -80,11 +82,24 @@ function post(path: string, body: unknown, auth = true) {
 describe("Regal event routes", () => {
   beforeEach(() => {
     recordRegalCallEvent.mockClear().mockResolvedValue(undefined)
+    upsertCallFromCompletedEvent.mockClear().mockResolvedValue(undefined)
     recordRegalResolverPlan.mockClear().mockResolvedValue(undefined)
     logRequest.mockClear()
     getRegalCallEvents.mockReset().mockResolvedValue({})
     getResolverPolicy.mockReset().mockResolvedValue(DEFAULT_ACTIVE_POLICY)
     ;(runRegalBackfillBatch as any).mockReset().mockResolvedValue({ dry_run: false })
+  })
+
+  it("projects completed calls into eavesly_calls, but not transcript events", async () => {
+    await post("/events/call-completed", completedBody, true)
+    expect(upsertCallFromCompletedEvent).toHaveBeenCalledTimes(1)
+    expect(upsertCallFromCompletedEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "call_completed", regal_task_id: "task-1" }),
+    )
+
+    upsertCallFromCompletedEvent.mockClear()
+    await post("/events/transcript-available", transcriptBody, true)
+    expect(upsertCallFromCompletedEvent).not.toHaveBeenCalled()
   })
 
   it("returns 401 without auth", async () => {

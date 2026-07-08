@@ -4,7 +4,8 @@ import type { ModuleResult, CallHistoryContext, PriorCall, Disposition } from ".
 import { MODULE_NAMES } from "../modules/constants"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolverPolicy } from "./regal-events"
-import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow } from "./regal-events"
+import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow, callCompletedEventToCallRow } from "./regal-events"
+import type { CallCompletedEvent } from "../schemas/regal-events"
 import { log } from "../utils/logger"
 
 export class DatabaseService {
@@ -296,6 +297,31 @@ export class DatabaseService {
         error: error.message,
       })
       throw error
+    }
+  }
+
+  /**
+   * Project a completed call into eavesly_calls — the table the manager dashboard
+   * reads (fetchDashboardData). The Regal-webhook QA path doesn't otherwise write
+   * it, so without this the dashboard shows 0 calls even though QA + alerts run.
+   * Keyed on call_id (unique) so redeliveries upsert idempotently; columns absent
+   * from the Regal payload (sfdc_lead_id, agent_full_name, …) are left untouched
+   * on update so any richer legacy row isn't clobbered. Best-effort — logs and
+   * swallows so a projection failure never fails the events endpoint or the QA
+   * pipeline, matching recordRegalResolverPlan. `created_at` is bumped on redelivery
+   * (not used for date filtering — the dashboard filters on started_at).
+   */
+  async upsertCallFromCompletedEvent(event: CallCompletedEvent): Promise<void> {
+    const { error } = await this.client.from("eavesly_calls").upsert(
+      { ...callCompletedEventToCallRow(event), created_at: new Date().toISOString() },
+      { onConflict: "call_id" },
+    )
+
+    if (error) {
+      log("warn", "Failed to upsert eavesly_calls from completed event", {
+        callId: event.regal_task_id,
+        error: error.message,
+      })
     }
   }
 
