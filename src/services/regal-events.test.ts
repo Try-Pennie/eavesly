@@ -178,6 +178,7 @@ describe("transcriptEventToCallData", () => {
       transcript({ agent_email: undefined, recording_duration: undefined }),
       completed({
         agent_email: "completed-agent@trypennie.com",
+        sfdc_lead_id: "00Q5f000009zzzz",
         contact_phone: "+155****1111",
         recording_duration: 1501,
         talk_time: 1300,
@@ -188,6 +189,7 @@ describe("transcriptEventToCallData", () => {
     )
 
     expect(data.agent_id).toBe("completed-agent@trypennie.com")
+    expect(data.sfdc_lead_id).toBe("00Q5f000009zzzz")
     expect(data.contact_phone).toBe("+155****1111")
     expect(data.transcript.metadata.duration).toBe(1501)
     expect(data.transcript.metadata.talk_time).toBe(1300)
@@ -220,6 +222,7 @@ describe("callCompletedEventToCallRow", () => {
       completed({
         regal_task_id: "WTabc",
         agent_email: "a@b.com",
+        sfdc_lead_id: "00Q5f000001abcd",
         disposition: "1.1A - No Show - First Call",
         campaign_name: "Camp",
         contact_phone: "+15550001111",
@@ -233,6 +236,7 @@ describe("callCompletedEventToCallRow", () => {
     )
     expect(row.call_id).toBe("WTabc")
     expect(row.agent_email).toBe("a@b.com")
+    expect(row.sfdc_lead_id).toBe("00Q5f000001abcd")
     expect(row.disposition).toBe("1.1A - No Show - First Call")
     expect(row.campaign_name).toBe("Camp")
     expect(row.talk_time).toBe(2401)

@@ -116,6 +116,7 @@ export function transcriptEventToCallData(
       },
     },
     agent_email: e.agent_email ?? completed?.agent_email,
+    sfdc_lead_id: e.sfdc_lead_id ?? completed?.sfdc_lead_id,
     contact_name: e.contact_name,
     contact_phone: e.contact_phone ?? completed?.contact_phone,
     recording_link: e.recording_link,
@@ -144,15 +145,17 @@ export function regalEpochToISO(v: string | number | undefined | null): string |
  * eavesly_calls, which is the table the manager dashboard reads — so without this
  * the dashboard shows 0 calls even while QA + Slack alerts run (incident
  * 2026-07-01, when ingestion cut over from the retired SFDC/Pipedream sync that
- * used to populate eavesly_calls). sfdc_lead_id / agent_full_name / direction /
- * campaign_id are not in the Regal payload and stay null (they came from SFDC).
- * `id` is a generated identity and `created_at` is set at write time, so neither
- * is mapped here.
+ * used to populate eavesly_calls). agent_full_name / direction / campaign_id are
+ * not in the Regal payload and stay null; sfdc_lead_id is now carried on the
+ * canonical Regal payload (added 2026-07-08) but stays null on older events that
+ * predate that change. `id` is a generated identity and `created_at` is set at
+ * write time, so neither is mapped here.
  */
 export function callCompletedEventToCallRow(e: CallCompletedEvent) {
   return {
     call_id: e.regal_task_id,
     agent_email: e.agent_email || null,
+    sfdc_lead_id: e.sfdc_lead_id || null,
     disposition: e.disposition ?? null,
     campaign_name: e.campaign_name ?? null,
     contact_phone: e.contact_phone ?? null,
