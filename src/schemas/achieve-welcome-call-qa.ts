@@ -48,6 +48,7 @@ export const AchieveWelcomeCallQASchema = z.object({
   transcript_segment: z.object({
     segment_type: z.string(),
     start_line: z.number(),
+    end_line: z.number(),
     marker: z.string().nullable(),
     segmentation_confidence: z.enum(["high", "medium", "low"]),
     segmentation_score: z.number().min(0).max(1),

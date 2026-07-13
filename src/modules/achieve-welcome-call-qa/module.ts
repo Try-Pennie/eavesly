@@ -33,13 +33,14 @@ export const achieveWelcomeCallQAModule: EvalModule = {
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    // Grade only the actual Achieve/FDR segment (post-handoff), beginning with the
-    // Freedom disclosure line when present and continuing through the live welcome call.
+    // Grade only the bounded live Achieve/FDR welcome-call interaction. IVR audio and
+    // transfer-partner content before/after that interaction are excluded.
     const seg = segmentWelcomeCall(transcript)
 
     const segmentMeta = {
       segment_type: SEGMENT_TYPE,
       start_line: seg.start_line,
+      end_line: seg.end_line,
       marker: seg.marker,
       segmentation_confidence: seg.segmentation_confidence,
       segmentation_score: seg.segmentation_score,
@@ -68,10 +69,9 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     }
 
     const preamble = [
-      "You are grading ONLY the extracted Achieve/FDR disclosure and welcome-call segment below",
-      "(the portion of the call after the Pennie enrollment handoff; it may begin with the automated Freedom disclosure line before the live client success advocate joins).",
-      "Do NOT give credit for, and do NOT infer required elements from, any earlier Pennie",
-      "sales, enrollment, or disclosure content — that content is intentionally excluded here.",
+      "You are grading ONLY the bounded live Achieve/FDR welcome-call interaction below.",
+      "Automated menu/disclosure audio and transfer-partner content before or after this interaction are intentionally excluded.",
+      "Do NOT give credit for, and do NOT infer required elements from, content outside this segment.",
       `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
       "",
       "Please evaluate the following Achieve/FDR segment for script adherence:",
