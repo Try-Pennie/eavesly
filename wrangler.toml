@@ -12,6 +12,7 @@ DEEPGRAM_MODEL = "nova-3"
 
 # Secrets (set via `wrangler secret put`):
 # INTERNAL_API_KEY
+# SKYFALL_PROFILE_RECAP_AUTH_KEY (32+ characters; set separately for staging and production)
 # SUPABASE_URL
 # SUPABASE_SERVICE_ROLE_KEY
 # CF_ACCOUNT_ID

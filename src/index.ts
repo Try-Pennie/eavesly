@@ -11,6 +11,7 @@ import { statusRoutes } from "./routes/status"
 import { regalEventRoutes } from "./routes/regal-events"
 import { regalAdminRoutes } from "./routes/regal-admin"
 import { promptAdminRoutes } from "./routes/prompt-admin"
+import { createProfileRecapRoutes } from "./routes/profile-recap"
 
 // Per-module evaluation endpoints. Each mounts /evaluate/<endpoint>,
 // /evaluate/<endpoint>/batch, and /evaluate/<endpoint>/from-recording under /api/v1.
@@ -39,6 +40,9 @@ app.use("*", async (c, next) => {
 })
 
 app.route("/", healthRoutes)
+// Mount before the existing /api/v1 routers, whose wildcard auth middleware
+// otherwise handles every request under that prefix.
+app.route("/api/v1", createProfileRecapRoutes())
 for (const config of EVAL_ROUTE_CONFIGS) {
   app.route("/api/v1", createEvalRoutes(config))
 }

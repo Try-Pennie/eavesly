@@ -1,4 +1,6 @@
 INTERNAL_API_KEY=your_secure_api_key
+# Dedicated 32+ character bearer credential for POST /api/v1/profile-recap (do not reuse INTERNAL_API_KEY).
+SKYFALL_PROFILE_RECAP_AUTH_KEY=your_skyfall_profile_recap_key_32_chars_minimum
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 CF_ACCOUNT_ID=your_cloudflare_account_id
