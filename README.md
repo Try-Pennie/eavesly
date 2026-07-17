@@ -41,6 +41,14 @@ npx wrangler secret put CF_GATEWAY_ID
 npx wrangler secret put CF_AIG_TOKEN
 ```
 
+The Skyfall profile-recap credential must be at least 32 characters and must be
+configured separately for both deployed Workers:
+
+```bash
+cfp wrangler pennie -- secret put SKYFALL_PROFILE_RECAP_AUTH_KEY --env staging
+cfp wrangler pennie -- secret put SKYFALL_PROFILE_RECAP_AUTH_KEY --env production
+```
+
 For the Twilio transcription path (see "Transcribing from a recording" below), also set:
 
 ```bash
@@ -77,7 +85,28 @@ src/
 | `POST` | `/api/v1/evaluate` | Evaluate a single call |
 | `POST` | `/api/v1/batch` | Batch evaluate multiple calls |
 | `POST` | `/api/v1/evaluate/{module}/from-recording` | Transcribe a call recording, then evaluate |
+| `POST` | `/api/v1/profile-recap` | Read one lead's profile recap for Skyfall |
 | `GET` | `/health` | Health check |
+
+### Skyfall profile recap
+
+This server-to-server endpoint accepts only a dedicated bearer credential; it does
+not accept `INTERNAL_API_KEY`, a Supabase anon key, or the legacy `apiKey` header.
+The Salesforce Lead ID must be exactly 18 alphanumeric characters beginning
+with `00Q`; the RPC performs exact text matching.
+
+```http
+POST /api/v1/profile-recap
+Authorization: Bearer <SKYFALL_PROFILE_RECAP_AUTH_KEY>
+Content-Type: application/json
+
+{"p_sfdc_lead_id":"00Q123456789ABCDEF"}
+```
+
+The response is the existing `get_lead_profile_recap_agent_view` JSON object
+(`lead_id`, `total_calls`, and `timeline`) without an additional envelope. Responses
+are not cached. Configure `SKYFALL_PROFILE_RECAP_AUTH_KEY` separately in each
+Worker environment and set Skyfall's profile-recap URL to this endpoint.
 
 ### Transcribing from a recording (Twilio)
 

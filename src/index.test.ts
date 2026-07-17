@@ -54,6 +54,17 @@ describe("E2E app tests", () => {
   })
 
   describe("auth enforcement", () => {
+    it("mounts the protected Skyfall profile recap endpoint", async () => {
+      const res = await app.request("/api/v1/profile-recap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p_sfdc_lead_id: "00Q123456789ABCDEF" }),
+      }, createEnv())
+
+      expect(res.status).toBe(401)
+      expect(await res.json()).toEqual({ error: "Unauthorized" })
+    })
+
     it("rejects unauthenticated full-qa request", async () => {
       const res = await app.request("/api/v1/evaluate/full-qa", {
         method: "POST",

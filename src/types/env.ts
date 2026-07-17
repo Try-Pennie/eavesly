@@ -4,6 +4,8 @@ export interface Bindings {
   /** Optional per-module override; disposition-review uses this when set, else OPENROUTER_MODEL. */
   DISPOSITION_REVIEW_MODEL?: string
   INTERNAL_API_KEY: string
+  /** Dedicated 32+ character server-to-server credential for the Skyfall profile recap endpoint. */
+  SKYFALL_PROFILE_RECAP_AUTH_KEY?: string
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
   CF_ACCOUNT_ID: string
