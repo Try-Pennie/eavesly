@@ -2,6 +2,7 @@ import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { DatabaseService } from "../services/database"
 import { log } from "../utils/logger"
+import { workflowRetentionForEnvironment } from "./workflow-retention"
 
 type Assignment = { partner_assignment: string | null; assignment_status: string | null } | null
 
@@ -106,6 +107,7 @@ export async function routePartnerFollowup(
     await env.EVALUATION_WORKFLOW.create({
       id: instanceId,
       params: { moduleName, callData, correlationId },
+      retention: workflowRetentionForEnvironment(env.ENVIRONMENT),
     })
     log("info", "Chained partner follow-up", { callId: callData.call_id, partner, moduleName, instanceId })
   } catch (e) {

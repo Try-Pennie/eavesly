@@ -21,8 +21,10 @@ import { log } from "../utils/logger"
  * These record the event into the durable ledger, compute + store a resolver
  * plan, and actively launch EVALUATION_WORKFLOW for every triggered module once a
  * transcript is available. Workflow instance ids are deterministic
- * (`${call_id}-${moduleName}`) so Cloudflare Workflows dedupes concurrent starts.
- * `shadow_plan` is retained in the response for continued shadow comparison.
+ * (`${call_id}-${moduleName}`) so Cloudflare Workflows dedupes concurrent starts
+ * and later retries while the instance remains inside its configured retention
+ * window. `shadow_plan` is retained in the response for continued shadow
+ * comparison.
  */
 
 export { launchModule, type ActiveTrigger }

@@ -76,6 +76,7 @@ describe("routePartnerFollowup()", () => {
   })
 
   it("chains achieve_welcome_call_qa when agent is resolved to Achieve", async () => {
+    env.ENVIRONMENT = "production"
     db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
     const callData = createEvaluateRequest({ call_id: "c-1", agent_email: "  A@ACHIEVE.COM " })
 
@@ -88,6 +89,10 @@ describe("routePartnerFollowup()", () => {
     expect(args.params.moduleName).toBe(MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)
     expect(args.params.callData).toBe(callData)
     expect(args.params.correlationId).toBe(correlationId)
+    expect(args.retention).toEqual({
+      successRetention: "7 days",
+      errorRetention: "14 days",
+    })
   })
 
   it("skips the achieve follow-up when the eligibility gate fails, before any DB lookup", async () => {
@@ -113,6 +118,7 @@ describe("routePartnerFollowup()", () => {
   })
 
   it("chains budget_inputs when agent is resolved to Beyond", async () => {
+    env.ENVIRONMENT = "development"
     db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })
     const callData = createEvaluateRequest({ call_id: "c-9", agent_email: "  B@BEYOND.COM " })
 
@@ -125,6 +131,10 @@ describe("routePartnerFollowup()", () => {
     expect(args.params.moduleName).toBe(MODULE_NAMES.BUDGET_INPUTS)
     expect(args.params.callData).toBe(callData)
     expect(args.params.correlationId).toBe(correlationId)
+    expect(args.retention).toEqual({
+      successRetention: "1 day",
+      errorRetention: "3 days",
+    })
   })
 
   it("does not route budget_inputs for an Achieve-resolved agent", async () => {

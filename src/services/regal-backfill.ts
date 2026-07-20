@@ -6,6 +6,7 @@ import {
 } from "./regal-events"
 import type { EvaluateRequest } from "../schemas/requests"
 import { log } from "../utils/logger"
+import { workflowRetentionForEnvironment } from "../workflows/workflow-retention"
 
 /**
  * Shared backfill logic for the Regal missed-window incident (2026-07-01), when
@@ -17,17 +18,19 @@ import { log } from "../utils/logger"
  * the fixed window from normal traffic. Selects candidates whose triggered
  * modules still have no results, re-launches only the still-missing ones via the
  * same resolver plan + callData path, and dedupes on the deterministic
- * `${call_id}-${moduleName}` workflow instance id. All results are name/id/count
- * only — never transcript, contact, or payload data.
+ * `${call_id}-${moduleName}` workflow instance id while that instance remains
+ * inside its configured retention window. All results are name/id/count only —
+ * never transcript, contact, or payload data.
  */
 
 /** Per-module launch status. Names + status only (no PII). */
 export type ActiveTrigger = { module: string; status: "queued" | "skipped" | "error" }
 
 /**
- * Launch one module's EVALUATION_WORKFLOW. Idempotent via the deterministic
- * instance id: an "already exists" error is treated as skipped, other errors are
- * logged and reported but never fail the caller.
+ * Launch one module's EVALUATION_WORKFLOW. Idempotent within the configured
+ * Workflow retention window via the deterministic instance id: an "already
+ * exists" error is treated as skipped, other errors are logged and reported but
+ * never fail the caller.
  */
 export async function launchModule(
   env: AppEnv["Bindings"],
@@ -40,6 +43,7 @@ export async function launchModule(
     await env.EVALUATION_WORKFLOW.create({
       id: instanceId,
       params: { moduleName, callData, correlationId },
+      retention: workflowRetentionForEnvironment(env.ENVIRONMENT),
     })
     return { module: moduleName, status: "queued" }
   } catch (e) {

@@ -117,7 +117,7 @@ describe("Regal admin backfill route", () => {
         missing_modules: ["full_qa", "litigation_check"],
       },
     ])
-    const env = createEnv()
+    const env = createEnv({ ENVIRONMENT: "staging" })
     const create = env.EVALUATION_WORKFLOW.create as any
 
     const res = await post({ dry_run: false }, env)
@@ -136,6 +136,10 @@ describe("Regal admin backfill route", () => {
     expect(new Set(launchedModules)).toEqual(new Set(["full_qa", "litigation_check"]))
     for (const call of create.mock.calls) {
       expect(call[0].id).toBe(`task-1-${call[0].params.moduleName}`)
+      expect(call[0].retention).toEqual({
+        successRetention: "1 day",
+        errorRetention: "3 days",
+      })
     }
   })
 
