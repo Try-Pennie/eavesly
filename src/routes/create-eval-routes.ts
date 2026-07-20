@@ -10,6 +10,7 @@ import {
 import type { EvaluateRequest } from "../schemas/requests"
 import { DatabaseService } from "../services/database"
 import { auth } from "../middleware/auth"
+import { workflowRetentionForEnvironment } from "../workflows/workflow-retention"
 
 interface EvalRouteConfig {
   endpoint: string
@@ -120,6 +121,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
       const instance = await c.env.EVALUATION_WORKFLOW.create({
         id: instanceId,
         params: { moduleName, callData, correlationId },
+        retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
       })
 
       return c.json({
@@ -171,6 +173,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
           c.env.EVALUATION_WORKFLOW.create({
             id: `${callData.call_id}-${moduleName}`,
             params: { moduleName, callData, correlationId },
+            retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
           })
         )
       )
@@ -249,6 +252,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
           correlationId,
           recording: { url: data.recording_url, source: data.recording_source },
         },
+        retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
       })
 
       return c.json({

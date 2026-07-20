@@ -160,7 +160,7 @@ describe("Regal event routes", () => {
 
   it("launches a workflow per triggered module when a transcript is joined", async () => {
     getRegalCallEvents.mockResolvedValue({ transcript: transcriptBody, completed: completedBody })
-    const env = createEnv()
+    const env = createEnv({ ENVIRONMENT: "production" })
     const create = env.EVALUATION_WORKFLOW.create as any
 
     const res = await postWithEnv("/events/transcript-available", transcriptBody, env)
@@ -177,6 +177,10 @@ describe("Regal event routes", () => {
       expect(call[0].params.callData.call_id).toBe("task-1")
       expect(call[0].params.callData.transcript.metadata.disposition).toBe(completedBody.disposition)
       expect(call[0].params.callData.transcript.metadata.duration).toBe(transcriptBody.recording_duration)
+      expect(call[0].retention).toEqual({
+        successRetention: "7 days",
+        errorRetention: "14 days",
+      })
     }
   })
 

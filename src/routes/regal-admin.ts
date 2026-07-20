@@ -12,10 +12,10 @@ import { auth } from "../middleware/auth"
  * POST /api/v1/admin/regal-events/backfill-missed re-launches only the triggered
  * modules that still have no eavesly_module_results, reusing the shared
  * runRegalBackfillBatch helper (same resolver plan + callData path as the live
- * events endpoints). Idempotent via deterministic `${call_id}-${moduleName}`
- * instance ids. Behind the same INTERNAL_API_KEY auth as every other internal
- * route. Responses are name/id/count only — never transcript, contact, or
- * payload data.
+ * events endpoints). Deduplicated within the configured Workflow retention
+ * window via deterministic `${call_id}-${moduleName}` instance ids. Behind the
+ * same INTERNAL_API_KEY auth as every other internal route. Responses are
+ * name/id/count only — never transcript, contact, or payload data.
  */
 
 const BackfillSchema = z.object({

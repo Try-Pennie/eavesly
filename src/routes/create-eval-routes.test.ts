@@ -22,8 +22,9 @@ function createApp(endpoint: string, moduleName: string) {
   return app
 }
 
-function createEnvWithWorkflow() {
+function createEnvWithWorkflow(environment = "test") {
   return createEnv({
+    ENVIRONMENT: environment,
     EVALUATION_WORKFLOW: { create: mockWorkflowCreate, get: vi.fn() } as any,
   })
 }
@@ -102,12 +103,16 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify(validBody),
-      }, createEnvWithWorkflow())
+      }, createEnvWithWorkflow("production"))
       expect(mockWorkflowCreate).toHaveBeenCalledOnce()
       const createArgs = mockWorkflowCreate.mock.calls[0][0]
       expect(createArgs.id).toBe(`test-call-123-${moduleName}`)
       expect(createArgs.params.moduleName).toBe(moduleName)
       expect(createArgs.params.callData.call_id).toBe("test-call-123")
+      expect(createArgs.retention).toEqual({
+        successRetention: "7 days",
+        errorRetention: "14 days",
+      })
     })
   })
 
@@ -121,13 +126,17 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
         body: JSON.stringify({ calls: [validBody] }),
-      }, createEnvWithWorkflow())
+      }, createEnvWithWorkflow("staging"))
       expect(res.status).toBe(202)
       const body = (await res.json()) as any
       expect(body.total).toBe(1)
       expect(body.instances).toHaveLength(1)
       expect(body.instances[0].id).toBe("test-instance-id")
       expect(body.status).toBe("queued")
+      expect(mockWorkflowCreate.mock.calls[0][0].retention).toEqual({
+        successRetention: "1 day",
+        errorRetention: "3 days",
+      })
     })
 
     it("returns 400 with more than 10 calls", async () => {
@@ -205,7 +214,7 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${TEST_API_KEY}` },
         body: JSON.stringify(validRecordingBody),
-      }, createEnvWithWorkflow())
+      }, createEnvWithWorkflow("development"))
 
       expect(res.status).toBe(202)
       const body = (await res.json()) as any
@@ -219,6 +228,10 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
       expect(createArgs.params.recording).toEqual({ url: "https://api.twilio.com/REC123", source: "twilio" })
       expect(createArgs.params.callData.transcript.transcript).toBe("")
       expect(createArgs.params.callData.recording_link).toBe("https://api.twilio.com/REC123")
+      expect(createArgs.retention).toEqual({
+        successRetention: "1 day",
+        errorRetention: "3 days",
+      })
     })
   })
 })
