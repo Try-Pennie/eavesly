@@ -6,6 +6,7 @@ import type { LLMClient } from "../../services/llm-client"
 import { AchieveWelcomeCallQASchema } from "../../schemas/achieve-welcome-call-qa"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import { segmentWelcomeCall } from "./segment"
+import { analyzeTransferExperience } from "./transfer-experience"
 import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 
 // partner_id and script_version are not columns in eavesly_module_results;
@@ -14,11 +15,12 @@ const PARTNER_ID = "achieve" as const
 const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v1" as const
 const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
 
-// partner_id/script_version/transcript_segment are stamped deterministically by the
-// module after the call, so the model is allowed to omit them.
+// Partner, segmentation, and transfer-quality fields are stamped deterministically
+// after the model returns, so the model may omit them.
 const EvalSchema = AchieveWelcomeCallQASchema.extend({
   partner_id: z.string().optional(),
   script_version: z.string().optional(),
+  transfer_experience: AchieveWelcomeCallQASchema.shape.transfer_experience.optional(),
   transcript_segment: AchieveWelcomeCallQASchema.shape.transcript_segment.optional(),
 })
 
@@ -98,16 +100,18 @@ export const achieveWelcomeCallQAModule: EvalModule = {
       return normalized.length > 0 && segmentNormalized.includes(normalized)
     })
 
-    // Stamp partner_id/script_version and deterministic segmentation metadata,
-    // regardless of what the model returns.
+    // Stamp partner/script, segmentation, and transfer-quality metadata regardless
+    // of what the model returns. The transfer analyzer sees only the bounded segment.
+    const transferExperience = analyzeTransferExperience(seg)
     const stamped = {
       ...result,
       script_adherence: { ...result.script_adherence, key_evidence_quotes: verifiedQuotes },
       partner_id: PARTNER_ID,
       script_version: SCRIPT_VERSION,
+      transfer_experience: transferExperience,
       transcript_segment: segmentMeta,
     }
-    const hasViolation = stamped.script_adherence.violation
+    const hasViolation = stamped.script_adherence.violation || stamped.transfer_experience.poor_transfer
 
     return {
       module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,

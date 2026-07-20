@@ -3,6 +3,7 @@ import { segmentWelcomeCall } from "./segment"
 import { achieveWelcomeCallQAModule } from "./module"
 import { createMockLLM } from "../../../test/helpers/mock-llm"
 import { createEvaluateRequest } from "../../../test/helpers/create-request"
+import { AchieveWelcomeCallQASchema } from "../../schemas/achieve-welcome-call-qa"
 
 // Production transcript format: "[handling agent]:", "[contact]:", "[transfer agent]:"
 // labels, no timestamps. PRE_HANDOFF deliberately contains "client success advocate"
@@ -33,6 +34,28 @@ const TRANSFER_LEG = [
 ].join("\n")
 
 const FULL = `${PRE_HANDOFF}\n${TRANSFER_LEG}`
+
+// Sanitized poor-transfer regression: one live welcome representative is followed by
+// known client-enrollment IVR re-entry, then another live representative completes the
+// welcome script. This intentionally contains no production identifiers or customer data.
+const POOR_TRANSFER_LEG = [
+  "[transfer agent]: Hello? This is Avery. Welcome call.",
+  "[contact]: Hello?",
+  "[transfer agent]: Thank you for calling. Please listen closely as the menu options have changed.",
+  "[transfer agent]: For FDR, press 1.",
+  "[transfer agent]: Thank you for calling Freedom Debt Relief's client enrollment department.",
+  "[transfer agent]: My name is Riley, your client success advocate.",
+  "[contact]: Hi, Riley.",
+  "[transfer agent]: Welcome to your Freedom Debt Relief program. This call will be recorded.",
+  "[transfer agent]: Your deposits go into a dedicated account.",
+  "[transfer agent]: We negotiate with each of your creditors.",
+  "[transfer agent]: You authorize settlements from your dashboard.",
+  "[transfer agent]: Let us set up your client dashboard now.",
+  "[transfer agent]: Your program guide explains the available tools and resources.",
+  "[transfer agent]: Call customer service if you need support. Have a great day.",
+].join("\n")
+
+const POOR_TRANSFER_FULL = `${PRE_HANDOFF}\n${POOR_TRANSFER_LEG}`
 
 // Mis-transfer to Beyond Finance (competitor): a real transfer leg, but the transfer
 // agent greets/identifies as Beyond. Must never be graded.
@@ -409,6 +432,13 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
       transfer_agent_lines: 11,
       used_full_transcript_fallback: false,
     })
+    expect(r.transfer_experience).toMatchObject({
+      poor_transfer: false,
+      reasons: [],
+      ivr_reentry_lines: [],
+      detection_version: "achieve_poor_transfer_v1",
+    })
+    expect(AchieveWelcomeCallQASchema.safeParse(r).success).toBe(true)
   })
 
   it("skips the LLM entirely and stores a deterministic result when no segment is found", async () => {
@@ -425,6 +455,7 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
     expect(r.partner_id).toBe("achieve")
     expect(r.transcript_segment.segment_found).toBe(false)
     expect(r.script_adherence).toBeUndefined()
+    expect(r.transfer_experience).toBeUndefined()
   })
 
   it("skips the LLM for a competitor (Beyond Finance) mis-transfer", async () => {
@@ -439,6 +470,46 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
     expect(r.skip_reason).toBe("competitor_transfer")
     expect(r.transcript_segment.segment_found).toBe(false)
     expect(r.script_adherence).toBeUndefined()
+  })
+
+  it("persists poor transfer as a violation while preserving full script adherence", async () => {
+    const llm = createMockLLM(mockResponse)
+    const request = createEvaluateRequest()
+
+    const result = await achieveWelcomeCallQAModule.evaluate(POOR_TRANSFER_FULL, request, llm as any)
+    const r = result.result as any
+
+    expect(result.has_violation).toBe(true)
+    expect(result.violation_type).toBe("achieve_welcome_call")
+    expect(r.script_adherence.overall_script_adherence).toBe("full")
+    expect(r.script_adherence.violation).toBe(false)
+    expect(r.script_adherence.violation_reason).toBe("")
+    expect(r.transfer_experience.poor_transfer).toBe(true)
+    expect(r.transfer_experience.reasons).toEqual([
+      "live_rep_then_ivr_reentry_then_live_rep",
+    ])
+  })
+
+  it("overwrites model-supplied transfer experience with deterministic analysis", async () => {
+    const llm = createMockLLM({
+      ...mockResponse,
+      transfer_experience: {
+        poor_transfer: false,
+        reasons: [],
+        ivr_reentry_lines: [],
+        agent_attempts: [],
+        evidence: [],
+        detection_version: "achieve_poor_transfer_v1",
+      },
+    })
+    const request = createEvaluateRequest()
+
+    const result = await achieveWelcomeCallQAModule.evaluate(POOR_TRANSFER_FULL, request, llm as any)
+    const transferExperience = (result.result as any).transfer_experience
+
+    expect(transferExperience.poor_transfer).toBe(true)
+    expect(transferExperience.ivr_reentry_lines).toEqual([6, 7, 8])
+    expect(transferExperience.agent_attempts).toHaveLength(2)
   })
 
   it("drops evidence quotes that are not verbatim from the graded segment", async () => {

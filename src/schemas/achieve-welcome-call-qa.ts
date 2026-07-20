@@ -44,6 +44,23 @@ export const AchieveWelcomeCallQASchema = z.object({
     limitations: z.array(z.string()),
   }),
 
+  // Deterministic transfer-quality metadata, stamped by the module (not the LLM).
+  transfer_experience: z.object({
+    poor_transfer: z.boolean(),
+    reasons: z.array(z.enum(["live_rep_then_ivr_reentry_then_live_rep"])),
+    ivr_reentry_lines: z.array(z.number().int().nonnegative()),
+    agent_attempts: z.array(z.object({
+      line: z.number().int().nonnegative(),
+      name_asr: z.string().nullable(),
+      quote: z.string(),
+    })),
+    evidence: z.array(z.object({
+      line: z.number().int().nonnegative(),
+      quote: z.string(),
+    })),
+    detection_version: z.literal("achieve_poor_transfer_v1"),
+  }),
+
   // Deterministic segmentation metadata, stamped by the module (not the LLM).
   transcript_segment: z.object({
     segment_type: z.string(),
