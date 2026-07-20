@@ -135,7 +135,14 @@ function findLastMatchingLine(lines: string[], lineIndexes: number[], pattern: R
   return null
 }
 
-function findLiveWelcomeRepLine(lines: string[], labelLines: number[]): number | null {
+/**
+ * Returns the first transfer-agent line with live welcome-representative evidence.
+ * The bounded three-line fallback preserves split ASR greetings.
+ */
+export function findLiveWelcomeRepLine(
+  lines: readonly string[],
+  labelLines: readonly number[],
+): number | null {
   for (const lineIndex of labelLines) {
     if (LIVE_WELCOME_REP.test(lines[lineIndex])) return lineIndex
   }
