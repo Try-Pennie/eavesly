@@ -306,7 +306,10 @@ export class DatabaseService {
    * it, so without this the dashboard shows 0 calls even though QA + alerts run.
    * Keyed on call_id (unique) so redeliveries upsert idempotently; columns absent
    * from the Regal payload (sfdc_lead_id, agent_full_name, …) are left untouched
-   * on update so any richer legacy row isn't clobbered. Best-effort — logs and
+   * on update so any richer legacy row isn't clobbered. agent_full_name is filled
+   * DB-side by the trg_eavesly_calls_resolve_agent_name trigger (agent_directory
+   * lookup on agent_email — see quality-voice-view migration
+   * agent_name_directory_backfill_and_trigger, 2026-07-21). Best-effort — logs and
    * swallows so a projection failure never fails the events endpoint or the QA
    * pipeline, matching recordRegalResolverPlan. `created_at` is bumped on redelivery
    * (not used for date filtering — the dashboard filters on started_at).

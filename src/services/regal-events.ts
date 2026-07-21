@@ -145,8 +145,12 @@ export function regalEpochToISO(v: string | number | undefined | null): string |
  * eavesly_calls, which is the table the manager dashboard reads — so without this
  * the dashboard shows 0 calls even while QA + Slack alerts run (incident
  * 2026-07-01, when ingestion cut over from the retired SFDC/Pipedream sync that
- * used to populate eavesly_calls). agent_full_name / direction / campaign_id are
- * not in the Regal payload and stay null; sfdc_lead_id is now carried on the
+ * used to populate eavesly_calls). direction / campaign_id are not in the Regal
+ * payload and stay null. agent_full_name isn't in the payload either, but since
+ * 2026-07-21 a DB trigger (trg_eavesly_calls_resolve_agent_name, see the
+ * quality-voice-view migration agent_name_directory_backfill_and_trigger) fills
+ * it from agent_directory keyed on agent_email — so don't map it here, and don't
+ * "fix" the null: the trigger owns it. sfdc_lead_id is now carried on the
  * canonical Regal payload (added 2026-07-08) but stays null on older events that
  * predate that change. `id` is a generated identity and `created_at` is set at
  * write time, so neither is mapped here.
