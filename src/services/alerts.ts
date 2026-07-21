@@ -31,6 +31,17 @@ function isAchieveAlert(alert: Alert): boolean {
   )
 }
 
+// TEMPORARY: gota_check is soft-launched while the new Achieve GOTA process beds
+// in. Results store normally in eavesly_module_results for accuracy review; Slack
+// alerts stay muted until the module is validated on real calls. Remove this gate
+// (and its processAlert early-return) to go live with manager alerts.
+function isGotaCheckAlert(alert: Alert): boolean {
+  return (
+    alert.module_name === MODULE_NAMES.GOTA_CHECK ||
+    alert.violation_type === VIOLATION_TYPES.GOTA_CHECK
+  )
+}
+
 function shouldMirrorToJoel(alert: Alert): boolean {
   if (alert.agent_email?.toLowerCase() !== JOEL_NELSON_EMAIL) return false
 
@@ -71,6 +82,16 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   // the workflow store the module result for internal review.
   if (isDispositionReviewAlert(alert)) {
     log("info", "Disposition-review Slack alert muted", {
+      callId: alert.call_id,
+      agentEmail: alert.agent_email,
+    })
+    return
+  }
+
+  // TEMPORARY: gota_check soft launch — store results, mute Slack while the new
+  // Achieve GOTA process beds in and the module is validated on real calls.
+  if (isGotaCheckAlert(alert)) {
+    log("info", "GOTA-check Slack alert muted (soft launch)", {
       callId: alert.call_id,
       agentEmail: alert.agent_email,
     })

@@ -935,6 +935,37 @@ describe("Achieve module alert suppression", () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it("mutes Slack alerts for gota_check during soft launch (module_name)", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.GOTA_CHECK,
+      violation_type: VIOLATION_TYPES.GOTA_CHECK,
+      agent_email: "agent@trypennie.com",
+      result: gotaViolationFixture,
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it("mutes gota_check by violation_type alone during soft launch", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: "some_other_name",
+      violation_type: VIOLATION_TYPES.GOTA_CHECK,
+      result: {},
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it("mutes by violation_type alone (achieve_welcome_call)", async () => {
     const ctx = createMockCtx()
     const env = createEnv()
