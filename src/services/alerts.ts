@@ -6,6 +6,7 @@ import type { WarmTransferResult } from "../schemas/warm-transfer"
 import type { LitigationCheckResult } from "../schemas/litigation-check"
 import type { ProgramExpectationsResult } from "../schemas/program-expectations"
 import type { ActiveSettlementsResult } from "../schemas/active-settlements"
+import type { GotaCheckResult } from "../schemas/gota-check"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../modules/constants"
 import { log } from "../utils/logger"
 import { createClient } from "@supabase/supabase-js"
@@ -304,6 +305,8 @@ function formatViolationType(type: string): string {
       return "Program expectations"
     case VIOLATION_TYPES.ACTIVE_SETTLEMENTS:
       return "Active settlements"
+    case VIOLATION_TYPES.GOTA_CHECK:
+      return "Achieve GOTA"
     default:
       return type
   }
@@ -330,6 +333,9 @@ function extractViolationReason(alert: Alert): string {
     }
     case VIOLATION_TYPES.ACTIVE_SETTLEMENTS: {
       return (result as ActiveSettlementsResult)?.violation_reason || "Active settlement negotiation detected"
+    }
+    case VIOLATION_TYPES.GOTA_CHECK: {
+      return (result as GotaCheckResult)?.violation_reason || "Client signed without the GOTA walkthrough"
     }
     default:
       return ""
@@ -358,6 +364,9 @@ function extractEvidence(alert: Alert): string {
     }
     case VIOLATION_TYPES.ACTIVE_SETTLEMENTS: {
       return (result as ActiveSettlementsResult)?.key_evidence_quote || ""
+    }
+    case VIOLATION_TYPES.GOTA_CHECK: {
+      return (result as GotaCheckResult)?.key_evidence_quote || ""
     }
     default:
       return ""
@@ -481,6 +490,32 @@ function extractDetail(alert: Alert): string {
         lines.push(`  Evidence: "${r.cancellation_evidence_quote}"`)
       }
       return lines.join("\n") || "Active settlement negotiation detected"
+    }
+    case VIOLATION_TYPES.GOTA_CHECK: {
+      const r = result as GotaCheckResult
+      const gotaTypeLabel =
+        r?.gota_type === "turnbull_red"
+          ? "Turnbull Law Group (red / legal-model state)"
+          : r?.gota_type === "fdr_green"
+            ? "Freedom Debt Relief (green state)"
+            : "Unknown"
+      const lines: string[] = [
+        `GOTA walkthrough conducted: ${r?.gota_conducted ? "yes" : "NO"}`,
+        `Agreement packet: ${gotaTypeLabel}`,
+        `Welcome-call transfer on this call: ${r?.wc_transfer_occurred ? "yes" : "no"}`,
+      ]
+      if (r?.enrollment_evidence_quote) {
+        lines.push("")
+        lines.push(`Signing confirmed: "${r.enrollment_evidence_quote}"`)
+      }
+      if (r?.missing_beats?.length > 0) {
+        lines.push("")
+        lines.push("Missing walkthrough beats:")
+        for (const beat of r.missing_beats) {
+          lines.push(`- ${beat}`)
+        }
+      }
+      return lines.join("\n")
     }
     default:
       return ""

@@ -16,7 +16,7 @@
         <step name="filter_standard_disclosures">
             <action>Review each mention and classify it as either a "standard disclosure" or "specific account discussion"</action>
             <action>EXCLUDE mentions that fall into any of these standard disclosure categories:
-                - GOTA (Good Overview of The Agreement) or ACDR compliance script reading (e.g., "Your creditors may subject you to collections or lawsuits...")
+                - GOTA (Going Over The Agreement) signing-guide walkthrough or ACDR compliance script reading (e.g., "Your creditors may subject you to collections or lawsuits...")
                 - Enrollment agreement walkthrough language about general risks
                 - Legal protection product descriptions (e.g., "...litigation or collection efforts if needed")
                 - Any scripted/boilerplate language the agent is required to read about general possibilities, not about a specific account
@@ -58,6 +58,7 @@
 
         <excluded_from_litigation_discussed>
             <case>Agent reading standard GOTA/ACDR compliance disclosures about general risks (e.g., "Your creditors may subject you to collections or lawsuits...")</case>
+            <case>Agent conducting the guided agreement-signing walkthrough (the Achieve GOTA signing guide) and describing litigation defense, lawsuit representation, or attorney protection as program features — e.g., "in the slim chance a creditor ever sues on an enrolled debt, Turnbull's attorneys stand up for you", "this form makes you eligible for an attorney — with their fees covered — to stand up for you", "if a creditor ever takes legal action, your attorneys step right in", "litigation defense is built in" — this is scripted product description during signing, not discussion of a specific account in litigation</case>
             <case>Agent reading enrollment agreement language about what may happen in general (e.g., "Legal action is rare with the majority of accounts...")</case>
             <case>Agent describing a legal protection product or service feature (e.g., "...litigation or collection efforts if needed")</case>
             <case>Contact casually referring to debts as "collections" or "the collections" without indicating a specific account has active legal action (e.g., "the collections, and then the high interest loans")</case>

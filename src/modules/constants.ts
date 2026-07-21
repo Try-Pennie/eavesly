@@ -7,6 +7,7 @@ export const MODULE_NAMES = {
   ACTIVE_SETTLEMENTS: "active_settlements",
   DISPOSITION_REVIEW: "disposition_review",
   ACHIEVE_WELCOME_CALL_QA: "achieve_welcome_call_qa",
+  GOTA_CHECK: "gota_check",
 } as const
 
 export const VIOLATION_TYPES = {
@@ -18,4 +19,5 @@ export const VIOLATION_TYPES = {
   ACTIVE_SETTLEMENTS: "active_settlements",
   MIS_DISPOSITION: "mis_disposition",
   ACHIEVE_WELCOME_CALL: "achieve_welcome_call",
+  GOTA_CHECK: "gota_check",
 } as const

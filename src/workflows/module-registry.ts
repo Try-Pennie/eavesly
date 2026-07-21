@@ -6,6 +6,7 @@ import { programExpectationsModule } from "../modules/program-expectations/modul
 import { activeSettlementsModule } from "../modules/active-settlements/module"
 import { dispositionReviewModule } from "../modules/disposition-review/module"
 import { achieveWelcomeCallQAModule } from "../modules/achieve-welcome-call-qa/module"
+import { gotaCheckModule } from "../modules/gota-check/module"
 import { MODULE_NAMES } from "../modules/constants"
 import type { EvalModule } from "../modules/types"
 
@@ -18,6 +19,7 @@ const REGISTRY: Record<string, EvalModule> = {
   [MODULE_NAMES.ACTIVE_SETTLEMENTS]: activeSettlementsModule,
   [MODULE_NAMES.DISPOSITION_REVIEW]: dispositionReviewModule,
   [MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA]: achieveWelcomeCallQAModule,
+  [MODULE_NAMES.GOTA_CHECK]: gotaCheckModule,
 }
 
 export function getModule(name: string): EvalModule {

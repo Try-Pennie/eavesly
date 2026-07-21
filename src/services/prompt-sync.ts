@@ -12,6 +12,7 @@ import programExpectationsPrompt from "../../prompts/program-expectations.txt"
 import activeSettlementsPrompt from "../../prompts/active-settlements.txt"
 import dispositionReviewPrompt from "../../prompts/disposition-review.txt"
 import achieveWelcomeCallQaPrompt from "../../prompts/achieve-welcome-call-qa.txt"
+import gotaCheckPrompt from "../../prompts/gota-check.txt"
 
 /**
  * Every canonical module name → its deployed prompt text. Keyed by MODULE_NAMES
@@ -27,6 +28,7 @@ export const MODULE_PROMPTS: Record<string, string> = {
   [MODULE_NAMES.ACTIVE_SETTLEMENTS]: activeSettlementsPrompt,
   [MODULE_NAMES.DISPOSITION_REVIEW]: dispositionReviewPrompt,
   [MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA]: achieveWelcomeCallQaPrompt,
+  [MODULE_NAMES.GOTA_CHECK]: gotaCheckPrompt,
 }
 
 export interface PromptSyncResult {

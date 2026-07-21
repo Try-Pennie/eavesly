@@ -8,7 +8,7 @@ import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
-import { routePartnerFollowup, isAchieveWelcomeCallEligible } from "./partner-routing"
+import { routePartnerFollowup, isAchieveWelcomeCallEligible, isAchieveGotaCheckEligible } from "./partner-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
 
@@ -160,6 +160,36 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
             error: err instanceof Error ? err.message : String(err),
           })
         }
+      }
+    }
+
+    // Step 2d: Achieve GOTA follow-up (full_qa only). The GOTA signing walkthrough
+    // is mandatory on every Achieve enrollment regardless of LegalState — red/Turnbull
+    // legal-model states never reach warm_transfer — so it chains off full_qa, which
+    // fires on every transcript. Gated by the enrollment disposition + duration
+    // (cheap, DB-free) before the partner-assignment lookup. Best-effort: routing
+    // must never fail the full_qa workflow.
+    if (moduleName === MODULE_NAMES.FULL_QA && callData.transcript.metadata.disposition) {
+      try {
+        await step.do(`route-${MODULE_NAMES.GOTA_CHECK}`, {
+          retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
+          timeout: "1 minute",
+        }, async () => {
+          const db = new DatabaseService(this.env)
+          const { policy } = await db.getResolverPolicy()
+          await routePartnerFollowup(this.env, db, callData, correlationId, {
+            partner: "achieve",
+            moduleName: MODULE_NAMES.GOTA_CHECK,
+            eligibility: (cd: EvaluateRequest) => isAchieveGotaCheckEligible(cd, policy),
+          })
+        })
+      } catch (err) {
+        log("error", "Partner routing failed (non-fatal)", {
+          callId: callData.call_id,
+          partner: "achieve",
+          module: MODULE_NAMES.GOTA_CHECK,
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
     }
 
