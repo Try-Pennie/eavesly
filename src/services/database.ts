@@ -141,7 +141,8 @@ export class DatabaseService {
 
   /**
    * Look up an agent's Regal partner assignment by email. Source of truth for
-   * warm-transfer → achieve_welcome_call_qa routing. Populated hourly by a
+   * partner follow-up routing (achieve_welcome_call_qa, gota_check, budget_inputs).
+   * Populated hourly by a
    * Pipedream cron. Returns null when the agent isn't in the table (advisory
    * flow degrades to "not routed").
    */

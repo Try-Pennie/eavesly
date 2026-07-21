@@ -6,7 +6,7 @@ import { shouldRouteToPartner, routePartnerFollowup, isAchieveWelcomeCallEligibl
 
 const ACHIEVE_POLICY = {
   enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
-  achieveMinDurationSeconds: 1800,
+  achieveMinDurationSeconds: 300,
 }
 const withCallMeta = (duration: number, disposition?: string) =>
   createEvaluateRequest({
@@ -42,13 +42,18 @@ describe("shouldRouteToPartner()", () => {
 
 describe("isAchieveWelcomeCallEligible()", () => {
   it("eligible: enrollment disposition and duration over the minimum", () => {
-    const r = isAchieveWelcomeCallEligible(withCallMeta(1801, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY)
+    const r = isAchieveWelcomeCallEligible(withCallMeta(301, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY)
     expect(r.eligible).toBe(true)
   })
 
-  it("ineligible: duration at or below the minimum (short servicing/escalation calls)", () => {
-    expect(isAchieveWelcomeCallEligible(withCallMeta(1800, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
-    expect(isAchieveWelcomeCallEligible(withCallMeta(600, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
+  it("eligible: 13-minute welcome-call transfers (previously excluded by the 30-min floor)", () => {
+    expect(isAchieveWelcomeCallEligible(withCallMeta(780, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(true)
+    expect(isAchieveWelcomeCallEligible(withCallMeta(1109, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(true)
+  })
+
+  it("ineligible: duration at or below the minimum (dial legs / instant hangups)", () => {
+    expect(isAchieveWelcomeCallEligible(withCallMeta(300, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
+    expect(isAchieveWelcomeCallEligible(withCallMeta(45, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
   })
 
   it("ineligible: wrong or missing disposition even when long enough", () => {
@@ -120,7 +125,7 @@ describe("routePartnerFollowup()", () => {
   it("skips the achieve follow-up when the eligibility gate fails, before any DB lookup", async () => {
     db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
     const callData = createEvaluateRequest({ agent_email: "a@achieve.com" })
-    const eligibility = () => ({ eligible: false, reason: "duration 300s <= 1800s" })
+    const eligibility = () => ({ eligible: false, reason: "duration 45s <= 300s" })
 
     await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
 
