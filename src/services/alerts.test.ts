@@ -9,6 +9,7 @@ import budgetViolationFixture from "../../test/fixtures/responses/budget-inputs-
 import warmViolationFixture from "../../test/fixtures/responses/warm-transfer-violation.json"
 import activeSettlementsDetected from "../../test/fixtures/responses/active-settlements-detected.json"
 import activeSettlementsCompetitor from "../../test/fixtures/responses/active-settlements-with-competitor.json"
+import gotaViolationFixture from "../../test/fixtures/responses/gota-check-violation.json"
 
 const mockSingle = vi.fn()
 const mockEq = vi.fn(() => ({ single: mockSingle }))
@@ -624,6 +625,49 @@ describe("buildSlackPayload — active_settlements", () => {
     })
     const payload = buildSlackPayload(alert)
     expect(payload.evidence).toBe(activeSettlementsDetected.key_evidence_quote)
+  })
+})
+
+describe("buildSlackPayload — gota_check", () => {
+  function gotaAlert(result: unknown = gotaViolationFixture) {
+    return createAlert({
+      module_name: MODULE_NAMES.GOTA_CHECK,
+      violation_type: VIOLATION_TYPES.GOTA_CHECK,
+      result,
+    })
+  }
+
+  it("uses Achieve GOTA label and violation_reason in summary", () => {
+    const payload = buildSlackPayload(gotaAlert())
+    expect(payload.summary).toContain("Achieve GOTA violation")
+    expect(payload.summary).toContain(gotaViolationFixture.violation_reason)
+  })
+
+  it("uses key_evidence_quote as evidence", () => {
+    const payload = buildSlackPayload(gotaAlert())
+    expect(payload.evidence).toBe(gotaViolationFixture.key_evidence_quote)
+  })
+
+  it("detail names the GOTA gap, packet type, and WC transfer status", () => {
+    const payload = buildSlackPayload(gotaAlert())
+    expect(payload.detail).toContain("GOTA walkthrough conducted: NO")
+    expect(payload.detail).toContain("Agreement packet: Unknown")
+    expect(payload.detail).toContain("Welcome-call transfer on this call: yes")
+    expect(payload.detail).toContain(`Signing confirmed: "${gotaViolationFixture.enrollment_evidence_quote}"`)
+  })
+
+  it("detail lists missing walkthrough beats when present", () => {
+    const payload = buildSlackPayload(
+      gotaAlert({ ...gotaViolationFixture, missing_beats: ["Banking details read-back", "SSN verification"] }),
+    )
+    expect(payload.detail).toContain("Missing walkthrough beats:")
+    expect(payload.detail).toContain("- Banking details read-back")
+    expect(payload.detail).toContain("- SSN verification")
+  })
+
+  it("detail labels the Turnbull packet for red-state walkthroughs", () => {
+    const payload = buildSlackPayload(gotaAlert({ ...gotaViolationFixture, gota_type: "turnbull_red" }))
+    expect(payload.detail).toContain("Turnbull Law Group (red / legal-model state)")
   })
 })
 

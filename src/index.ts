@@ -28,6 +28,7 @@ const EVAL_ROUTE_CONFIGS = [
     moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
     requiredPartnerId: "achieve",
   },
+  { endpoint: "gota-check", moduleName: MODULE_NAMES.GOTA_CHECK },
 ] as const
 
 const app = new Hono<AppEnv>()

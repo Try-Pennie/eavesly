@@ -44,6 +44,30 @@ export function isAchieveWelcomeCallEligible(
 }
 
 /**
+ * Eligibility gate for the Achieve GOTA check. The GOTA (Going Over The Agreement)
+ * signing walkthrough is mandatory on every Achieve enrollment — red/Turnbull
+ * legal-model states AND green/FDR states — so this follow-up chains off full_qa
+ * (which fires on every transcript) rather than warm_transfer (LegalState == "No"
+ * only, which would silently exclude red states). Gate on the enrollment
+ * disposition + the standard enrollment duration threshold so LLM time is only
+ * spent on genuine enrollment/signing calls.
+ */
+export function isAchieveGotaCheckEligible(
+  callData: EvaluateRequest,
+  policy: { enrollmentDisposition: string; enrollmentMinDurationSeconds: number },
+): { eligible: boolean; reason: string } {
+  const disposition = callData.transcript.metadata.disposition
+  const duration = callData.transcript.metadata.duration ?? 0
+  if (disposition !== policy.enrollmentDisposition) {
+    return { eligible: false, reason: `disposition '${disposition ?? ""}' != enrollment disposition` }
+  }
+  if (duration <= policy.enrollmentMinDurationSeconds) {
+    return { eligible: false, reason: `duration ${duration}s <= ${policy.enrollmentMinDurationSeconds}s` }
+  }
+  return { eligible: true, reason: "eligible" }
+}
+
+/**
  * After a warm_transfer eval is stored, deterministically chain a partner-specific
  * follow-up module (achieve_welcome_call_qa, budget_inputs, ...) when the completing
  * agent is resolved to `partner` in agent_regal_assignments. Keyed by agent_email

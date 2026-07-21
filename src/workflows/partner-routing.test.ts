@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createEnv } from "../../test/helpers/mock-env"
 import { createEvaluateRequest } from "../../test/helpers/create-request"
 import { MODULE_NAMES } from "../modules/constants"
-import { shouldRouteToPartner, routePartnerFollowup, isAchieveWelcomeCallEligible } from "./partner-routing"
+import { shouldRouteToPartner, routePartnerFollowup, isAchieveWelcomeCallEligible, isAchieveGotaCheckEligible } from "./partner-routing"
 
 const ACHIEVE_POLICY = {
   enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
@@ -54,6 +54,28 @@ describe("isAchieveWelcomeCallEligible()", () => {
   it("ineligible: wrong or missing disposition even when long enough", () => {
     expect(isAchieveWelcomeCallEligible(withCallMeta(3000, "2.1 - Something else"), ACHIEVE_POLICY).eligible).toBe(false)
     expect(isAchieveWelcomeCallEligible(withCallMeta(3000, undefined), ACHIEVE_POLICY).eligible).toBe(false)
+  })
+})
+
+const GOTA_POLICY = {
+  enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+  enrollmentMinDurationSeconds: 1200,
+}
+
+describe("isAchieveGotaCheckEligible()", () => {
+  it("eligible: enrollment disposition and duration over the enrollment minimum", () => {
+    const r = isAchieveGotaCheckEligible(withCallMeta(1201, GOTA_POLICY.enrollmentDisposition), GOTA_POLICY)
+    expect(r.eligible).toBe(true)
+  })
+
+  it("ineligible: duration at or below the enrollment minimum", () => {
+    expect(isAchieveGotaCheckEligible(withCallMeta(1200, GOTA_POLICY.enrollmentDisposition), GOTA_POLICY).eligible).toBe(false)
+    expect(isAchieveGotaCheckEligible(withCallMeta(300, GOTA_POLICY.enrollmentDisposition), GOTA_POLICY).eligible).toBe(false)
+  })
+
+  it("ineligible: wrong or missing disposition even when long enough", () => {
+    expect(isAchieveGotaCheckEligible(withCallMeta(3000, "2.1 - Something else"), GOTA_POLICY).eligible).toBe(false)
+    expect(isAchieveGotaCheckEligible(withCallMeta(3000, undefined), GOTA_POLICY).eligible).toBe(false)
   })
 })
 

@@ -27,7 +27,7 @@
                 - Pennie agent describing what Pennie will do (e.g., "we'll negotiate settlements for you") — this is product description, not the client's existing situation
                 - Client describing a one-time creditor letter or settlement offer they DECLINED, ignored, or have no intention of pursuing — there must be evidence of ongoing engagement, not a closed/declined offer
                 - Client mentioning a creditor "calling" or "contacting" them without any description of a settlement offer or negotiation in flight
-                - Standard GOTA/ACDR/enrollment-agreement boilerplate
+                - Standard GOTA/ACDR/enrollment-agreement boilerplate, including the guided GOTA agreement-signing walkthrough where the agent describes how future settlements will work (e.g., "you have the final say on every settlement", "most clients see their first settlement within the first few months", "nothing is earned until a debt is negotiated, you approve the offer, and a payment is made", "once a deal is locked in, your deposits keep it on track")
                 - Past, fully-resolved settlements (e.g., "I already paid that one off") — only count negotiations currently in flight
                 - Hypothetical or aspirational statements ("if they ever offer me a settlement, I'd take it") with no concrete current activity
                 - Litigation/lawsuit/court/judgment/garnishment/summons language — that belongs to litigation_check, NOT here
@@ -93,7 +93,7 @@
             <case>Generic creditor contact ("they keep calling me") with no settlement offer or negotiation in flight</case>
             <case>Past, fully-resolved debts ("I already paid that off")</case>
             <case>Hypothetical statements ("if they ever offered me a settlement...")</case>
-            <case>Standard GOTA/ACDR enrollment-agreement boilerplate or product education</case>
+            <case>Standard GOTA/ACDR enrollment-agreement boilerplate or product education, including the guided GOTA signing walkthrough's descriptions of how settlements will work in the program (e.g., "you have the final say on every settlement", "most clients see their first settlement within the first few months")</case>
             <case>The client mentioning that a creditor is "willing to work with them" with no concrete in-flight negotiation</case>
         </excluded_from_active_settlements_detected>
 
