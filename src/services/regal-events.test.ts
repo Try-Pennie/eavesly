@@ -133,7 +133,7 @@ describe("parseResolverPolicyRow", () => {
     const { achieveMinDurationSeconds, ...legacy } = validPolicy
     const active = parseResolverPolicyRow({ id: 43, policy_json: legacy })
     expect(active.policyVersion).toBe(43)
-    expect(active.policy.achieveMinDurationSeconds).toBe(1800)
+    expect(active.policy.achieveMinDurationSeconds).toBe(300)
     expect(active.policy.enrollmentMinDurationSeconds).toBe(900)
   })
 

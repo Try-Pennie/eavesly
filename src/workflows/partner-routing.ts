@@ -20,13 +20,19 @@ export function shouldRouteToPartner(assignment: Assignment, partner: string): b
 }
 
 /**
- * Eligibility gate for the Achieve welcome-call QA follow-up. Achieve should only
- * score genuine post-enrollment welcome calls, so it requires the enrollment
- * disposition AND a call at least `achieveMinDurationSeconds` long — short calls on
- * the same disposition are servicing/escalation/pre-enrollment noise.
+ * Eligibility gate for the Achieve welcome-call QA follow-up. Chains off
+ * disposition_review — the one module guaranteed to run exactly once with BOTH
+ * the transcript and the completed event joined regardless of arrival order
+ * (63% of calls receive transcript_available before call_completed, so a
+ * full_qa-chained gate would silently skip most calls; warm_transfer only fires
+ * for LegalState == "No", which excluded legal-model clients whose welcome calls
+ * are just as real — field review 2026-07-21).
  *
- * LegalState == "No" is already enforced upstream by the warm_transfer gate this
- * follow-up chains off (and is not carried on callData), so it is not re-checked here.
+ * Gate: enrollment disposition + a token duration floor (`achieveMinDurationSeconds`,
+ * ~5 min) that filters dial legs and instant hangups. The module's own deterministic
+ * segmentation gate (live welcome-rep detection) is the real filter for
+ * servicing/IVR-only/non-welcome calls, so no LegalState or long-duration
+ * pre-filtering is applied here.
  */
 export function isAchieveWelcomeCallEligible(
   callData: EvaluateRequest,
