@@ -217,6 +217,118 @@ describe("analyzeTransferExperience", () => {
     expect(result.ivr_reentry_lines).toEqual([])
   })
 
+  it("flags dead air when the client asks if anyone is there before the rep speaks", () => {
+    const transcript = [
+      PRE_HANDOFF,
+      "[transfer agent]: This is Jordan with Freedom Debt Relief.",
+      "[contact]: Hello? Are you there?",
+      "[contact]: Can you hear me?",
+      "[transfer agent]: Sorry about that. Welcome to your Freedom Debt Relief program with a dedicated account.",
+      "[transfer agent]: We negotiate with each creditor and you authorize settlements.",
+    ].join("\n")
+
+    const result = analyze(transcript)
+
+    expect(result.poor_transfer).toBe(true)
+    expect(result.reasons).toEqual(["dead_air_handoff"])
+    expect(result.ivr_reentry_lines).toEqual([])
+    expect(result.agent_attempts).toEqual([
+      { line: 2, name_asr: "Jordan", quote: "This is Jordan" },
+    ])
+    expect(result.evidence).toEqual([
+      { line: 2, quote: "This is Jordan" },
+      { line: 3, quote: "Hello?" },
+    ])
+    expect(result.detection_version).toBe("achieve_poor_transfer_v1")
+  })
+
+  it("flags a ghost pickup when near-empty transfer audio precedes the live rep", () => {
+    // The bounded segment normally starts at the live rep, so drive the analyzer
+    // directly with a segment that still retains the pre-rep ghost audio.
+    const segment = {
+      start_line: 10,
+      segment: [
+        "[transfer agent]: Hello?",
+        "[transfer agent]: Yeah, hi.",
+        "[transfer agent]: One sec.",
+        "[transfer agent]: My name is Jordan with Freedom Debt Relief.",
+        "[contact]: Hi.",
+        "[transfer agent]: Welcome to your program with a dedicated account.",
+      ].join("\n"),
+    }
+
+    const result = analyzeTransferExperience(segment)
+
+    expect(result.poor_transfer).toBe(true)
+    expect(result.reasons).toEqual(["ghost_pickup"])
+    expect(result.ivr_reentry_lines).toEqual([])
+    expect(result.agent_attempts).toEqual([
+      { line: 13, name_asr: "Jordan", quote: "My name is Jordan" },
+    ])
+    expect(result.evidence).toEqual([
+      { line: 13, quote: "My name is Jordan" },
+      { line: 10, quote: "Hello?" },
+      { line: 11, quote: "Yeah, hi." },
+      { line: 12, quote: "One sec." },
+    ])
+  })
+
+  it("does not treat hold-queue or IVR-menu audio before the rep as a ghost pickup", () => {
+    const segment = {
+      start_line: 0,
+      segment: [
+        "[transfer agent]: Please hold.",
+        "[transfer agent]: For FDR, press 1.",
+        "[transfer agent]: My name is Jordan with Freedom Debt Relief.",
+        "[contact]: Hi.",
+        "[transfer agent]: Welcome to your program with a dedicated account.",
+      ].join("\n"),
+    }
+
+    const result = analyzeTransferExperience(segment)
+
+    expect(result.poor_transfer).toBe(false)
+    expect(result.reasons).toEqual([])
+  })
+
+  it("flags two differently-named live reps with no IVR between them", () => {
+    const transcript = [
+      PRE_HANDOFF,
+      "[transfer agent]: My name is Jordan with Freedom Debt Relief.",
+      "[contact]: Okay.",
+      "[transfer agent]: We got disconnected, one moment.",
+      "[transfer agent]: My name is Taylor with Freedom Debt Relief.",
+      "[transfer agent]: Welcome to your program with a dedicated account.",
+    ].join("\n")
+
+    const result = analyze(transcript)
+
+    expect(result.poor_transfer).toBe(true)
+    expect(result.reasons).toEqual(["multi_attempt_no_ivr"])
+    expect(result.ivr_reentry_lines).toEqual([])
+    expect(result.agent_attempts).toEqual([
+      { line: 2, name_asr: "Jordan", quote: "My name is Jordan" },
+      { line: 5, name_asr: "Taylor", quote: "My name is Taylor" },
+    ])
+  })
+
+  it("does not flag a clean single-rep welcome call", () => {
+    const transcript = [
+      PRE_HANDOFF,
+      "[transfer agent]: My name is Jordan with Freedom Debt Relief.",
+      "[contact]: Hello.",
+      "[transfer agent]: Welcome to your program with a dedicated account.",
+      "[transfer agent]: We negotiate with each creditor and you authorize settlements.",
+    ].join("\n")
+
+    const result = analyze(transcript)
+
+    expect(result.poor_transfer).toBe(false)
+    expect(result.reasons).toEqual([])
+    expect(result.ivr_reentry_lines).toEqual([])
+    expect(result.agent_attempts).toHaveLength(1)
+  })
+
   it("ignores a customer-service transfer after the bounded welcome segment", () => {
     const transcript = [
       PRE_HANDOFF,
