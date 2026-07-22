@@ -120,17 +120,13 @@ describe("E2E app tests", () => {
     })
   })
 
-  describe("CORS headers", () => {
-    it("includes CORS headers on responses", async () => {
+  describe("CORS", () => {
+    // The API is server-to-server only (bearer auth everywhere); there is no
+    // browser consumer, so no CORS headers should be emitted. If a browser
+    // client ever appears, add a scoped allowlist — not `origin: "*"`.
+    it("does not emit CORS headers", async () => {
       const res = await app.request("/", {}, createEnv())
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*")
-    })
-
-    it("handles OPTIONS preflight", async () => {
-      const res = await app.request("/api/v1/evaluate/full-qa", {
-        method: "OPTIONS",
-      }, createEnv())
-      expect(res.status).toBe(204)
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull()
     })
   })
 

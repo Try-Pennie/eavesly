@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "smoke-test": "tsx scripts/smoke-test.ts",
     "eval:disposition": "tsx scripts/eval-disposition-models.ts",
+    "eval:achieve-wc": "tsx scripts/eval-achieve-wc-qa.ts",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
