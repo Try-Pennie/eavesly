@@ -1,6 +1,5 @@
 import { Hono } from "hono"
 import type { AppEnv } from "./types/env"
-import { corsMiddleware } from "./middleware/cors"
 import { requestLogger } from "./middleware/request-logger"
 import { validateEnv } from "./utils/validate-env"
 import { log } from "./utils/logger"
@@ -33,7 +32,6 @@ const EVAL_ROUTE_CONFIGS = [
 
 const app = new Hono<AppEnv>()
 
-app.use("*", corsMiddleware())
 app.use("*", requestLogger)
 app.use("*", async (c, next) => {
   validateEnv(c.env)
