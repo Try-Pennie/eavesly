@@ -121,6 +121,12 @@ const mockResponse = {
     agent_tone: "professional",
     client_engagement: "engaged",
     notes: "",
+    delivery_naturalness: "natural",
+    handoff_quality: "smooth",
+  },
+  agent_identity_check: {
+    correctly_identified_as_fdr: true,
+    issue_quote: null,
   },
   assessment_confidence: {
     score: 0.9,
