@@ -20,6 +20,7 @@ const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
 const EvalSchema = AchieveWelcomeCallQASchema.extend({
   partner_id: z.string().optional(),
   script_version: z.string().optional(),
+  agent_identity_check: AchieveWelcomeCallQASchema.shape.agent_identity_check.optional(),
   transfer_experience: AchieveWelcomeCallQASchema.shape.transfer_experience.optional(),
   transcript_segment: AchieveWelcomeCallQASchema.shape.transcript_segment.optional(),
 })
@@ -111,7 +112,7 @@ export const achieveWelcomeCallQAModule: EvalModule = {
       transfer_experience: transferExperience,
       transcript_segment: segmentMeta,
     }
-    const hasViolation = stamped.script_adherence.violation || stamped.transfer_experience.poor_transfer
+    const hasViolation = stamped.script_adherence.violation || stamped.transfer_experience.poor_transfer || stamped.agent_identity_check?.correctly_identified_as_fdr === false
 
     return {
       module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,

@@ -53,6 +53,15 @@ Confidentiality: your entire output may be shared with the external partner (Ach
         <step name="collect_evidence">
             For each element that WAS covered, record a short direct quote as evidence. For missing elements, add the element name to missing_elements.
         </step>
+        <step name="check_agent_identity">
+            Check whether the welcome agent correctly identifies themselves and their company as Freedom Debt Relief (FDR). Flag any instance where the agent names a different company. If the agent names a different company, set correctly_identified_as_fdr=false and provide a verbatim issue_quote copied character-for-character from the segment; otherwise set correctly_identified_as_fdr=true and issue_quote=null. Most calls will pass.
+        </step>
+        <step name="assess_delivery_naturalness">
+            Based on transcript text only (not audio or tone), assess delivery_naturalness as "natural", "scripted", or "robotic". Look for: verbatim script recitation, self-corrections/restarts, and client confusion at robotic phrasing. Do not assess accent or audio quality.
+        </step>
+        <step name="assess_handoff_quality">
+            Assess handoff_quality as "smooth", "delayed", or "silent". Mark "delayed" if the client says "hello?", "are you there?", or similar before the rep speaks substantively. Mark "silent" if [transfer agent] lines appear but the rep does not speak before the client prompts. Otherwise mark "smooth".
+        </step>
         <step name="assess_call">
             Note the overall call outcome, agent tone, and client engagement level.
         </step>
