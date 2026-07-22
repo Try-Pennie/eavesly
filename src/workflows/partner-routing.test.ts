@@ -213,6 +213,64 @@ describe("routePartnerFollowup()", () => {
     expect(create).not.toHaveBeenCalled()
   })
 
+  it("logs a warn-level routing gap when the agent has no assignment record (null)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const info = vi.spyOn(console, "info").mockImplementation(() => {})
+    db.getAgentRegalAssignment.mockResolvedValue(null)
+    const callData = createEvaluateRequest({ call_id: "c-gap", agent_email: "missing@achieve.com" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, ACHIEVE)
+
+    expect(create).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledOnce()
+    const entry = JSON.parse(warn.mock.calls[0][0] as string)
+    expect(entry.level).toBe("warn")
+    expect(entry.message).toBe("Partner routing gap: agent has no assignment record")
+    expect(entry.callId).toBe("c-gap")
+    expect(entry.agentEmail).toBe("missing@achieve.com")
+    expect(entry.partner).toBe("achieve")
+    warn.mockRestore()
+    info.mockRestore()
+  })
+
+  it("logs at info (not warn) when a record exists but assignment_status is not resolved", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const info = vi.spyOn(console, "info").mockImplementation(() => {})
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "unassigned" })
+    const callData = createEvaluateRequest({ call_id: "c-unres", agent_email: "a@achieve.com" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, ACHIEVE)
+
+    expect(create).not.toHaveBeenCalled()
+    expect(warn).not.toHaveBeenCalled()
+    expect(info).toHaveBeenCalledOnce()
+    const entry = JSON.parse(info.mock.calls[0][0] as string)
+    expect(entry.level).toBe("info")
+    expect(entry.message).toBe("Partner routing skipped: agent assignment not resolved")
+    expect(entry.assignmentStatus).toBe("unassigned")
+    warn.mockRestore()
+    info.mockRestore()
+  })
+
+  it("logs at info (not warn) when the agent is resolved to a different partner", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const info = vi.spyOn(console, "info").mockImplementation(() => {})
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })
+    const callData = createEvaluateRequest({ call_id: "c-wrong", agent_email: "b@beyond.com" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, ACHIEVE)
+
+    expect(create).not.toHaveBeenCalled()
+    expect(warn).not.toHaveBeenCalled()
+    expect(info).toHaveBeenCalledOnce()
+    const entry = JSON.parse(info.mock.calls[0][0] as string)
+    expect(entry.level).toBe("info")
+    expect(entry.message).toBe("Partner routing skipped: agent assigned to different partner")
+    expect(entry.actualPartnerAssignment).toBe("beyond")
+    warn.mockRestore()
+    info.mockRestore()
+  })
+
   it("swallows 'already exists' so duplicate budget_inputs retries don't fail", async () => {
     db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })
     create.mockRejectedValue(new Error("instance with id ... already exists"))
