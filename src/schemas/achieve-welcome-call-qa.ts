@@ -27,10 +27,17 @@ export const AchieveWelcomeCallQASchema = z.object({
     violation_reason: z.string(),
   }),
 
+  agent_identity_check: z.object({
+    correctly_identified_as_fdr: z.boolean(),
+    issue_quote: z.string().nullable(),
+  }),
+
   call_overview: z.object({
     call_outcome: z.string(),
     agent_tone: z.enum(["professional", "neutral", "unprofessional"]),
     client_engagement: z.enum(["engaged", "neutral", "disengaged"]),
+    delivery_naturalness: z.enum(["natural", "scripted", "robotic"]),
+    handoff_quality: z.enum(["smooth", "delayed", "silent"]),
     notes: z.string(),
   }),
 
@@ -47,7 +54,7 @@ export const AchieveWelcomeCallQASchema = z.object({
   // Deterministic transfer-quality metadata, stamped by the module (not the LLM).
   transfer_experience: z.object({
     poor_transfer: z.boolean(),
-    reasons: z.array(z.enum(["live_rep_then_ivr_reentry_then_live_rep"])),
+    reasons: z.array(z.enum(["live_rep_then_ivr_reentry_then_live_rep", "dead_air_handoff", "ghost_pickup", "multi_attempt_no_ivr"])),
     ivr_reentry_lines: z.array(z.number().int().nonnegative()),
     agent_attempts: z.array(z.object({
       line: z.number().int().nonnegative(),

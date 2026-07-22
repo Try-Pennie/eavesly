@@ -14,6 +14,15 @@ type Assignment = { partner_assignment: string | null; assignment_status: string
  * exactly one known partner label is present. Ambiguous Achieve+Beyond workers keep
  * partner_assignment null, so this scalar-only gate excludes them even if the
  * partner_assignments array contains the label.
+ *
+ * Three distinct failure modes (see routePartnerFollowup for per-case logging):
+ *   a) assignment === null — the agent has no agent_regal_assignments record at all
+ *      (logged at warn: a genuine routing gap, e.g. a real Achieve welcome call
+ *      silently skipped because the agent was never synced).
+ *   b) assignment_status !== "resolved" — a record exists but the sync has not
+ *      resolved it to a single partner (logged at info: expected/transient).
+ *   c) partner_assignment !== partner — the agent is resolved to a different
+ *      partner than the one being routed (logged at info: expected).
  */
 export function shouldRouteToPartner(assignment: Assignment, partner: string): boolean {
   return assignment?.partner_assignment === partner && assignment?.assignment_status === "resolved"
@@ -120,14 +129,32 @@ export async function routePartnerFollowup(
   }
 
   const assignment = await db.getAgentRegalAssignment(agentEmail)
-  if (!shouldRouteToPartner(assignment, partner)) {
-    log("info", "Partner routing skipped: agent not resolved to partner", {
+  if (assignment === null) {
+    log("warn", "Partner routing gap: agent has no assignment record", {
       callId: callData.call_id,
       agentEmail,
       partner,
       moduleName,
-      partnerAssignment: assignment?.partner_assignment ?? null,
-      assignmentStatus: assignment?.assignment_status ?? null,
+    })
+    return
+  }
+  if (assignment.assignment_status !== "resolved") {
+    log("info", "Partner routing skipped: agent assignment not resolved", {
+      callId: callData.call_id,
+      agentEmail,
+      partner,
+      moduleName,
+      assignmentStatus: assignment.assignment_status,
+    })
+    return
+  }
+  if (assignment.partner_assignment !== partner) {
+    log("info", "Partner routing skipped: agent assigned to different partner", {
+      callId: callData.call_id,
+      agentEmail,
+      partner,
+      moduleName,
+      actualPartnerAssignment: assignment.partner_assignment,
     })
     return
   }
