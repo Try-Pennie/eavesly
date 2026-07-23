@@ -54,6 +54,9 @@ class_name = "EvaluationWorkflow"
 [env.production]
 name = "eavesly-production"
 vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
+routes = [
+  { pattern = "eavesly-api.trypennie.dev/*", zone_name = "trypennie.dev" }
+]
 
 [[env.production.workflows]]
 name = "eavesly-evaluation-production"
