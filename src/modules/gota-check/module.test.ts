@@ -66,6 +66,30 @@ describe("gotaCheckModule", () => {
       ])
     })
 
+    it("stores evidence as a literal transcript substring when the model moves the speaker label onto an excerpt", async () => {
+      const transcript = "[handling agent]: On page seven, the fee is performance-based and nothing is earned until settlement."
+      const llm = createMockLLM({
+        ...conductedFixture,
+        fee_structure_evidence: "[handling agent]: the fee is performance-based and nothing is earned until settlement.",
+      })
+      const request = createEvaluateRequest()
+      const result = await gotaCheckModule.evaluate(transcript, request, llm as any)
+      expect((result.result as any).fee_structure_evidence).toBe(
+        "the fee is performance-based and nothing is earned until settlement.",
+      )
+    })
+
+    it("clears evidence that cannot be found literally in the transcript", async () => {
+      const transcript = "[handling agent]: Review the agreement with me.\n[contact]: Okay."
+      const llm = createMockLLM({
+        ...conductedFixture,
+        gota_evidence_quote: "[handling agent]: Review the agreement and sign every page with me.",
+      })
+      const request = createEvaluateRequest()
+      const result = await gotaCheckModule.evaluate(transcript, request, llm as any)
+      expect((result.result as any).gota_evidence_quote).toBe("")
+    })
+
     it("server-side recount lists all 6 beats missing when nothing was walked through", async () => {
       const llm = createMockLLM(violationFixture)
       const request = createEvaluateRequest()

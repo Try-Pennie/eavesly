@@ -28,7 +28,7 @@
             <action>Determine whether the handling agent conducted a GUIDED signing walkthrough: the agent stays on the line during signing and walks the client through the packet page by page / section by section, explaining what sections mean and directing signatures or initials as they go.</action>
             <action>Set gota_conducted=true only when BOTH are present: (1) the agent explains the content of multiple pages/sections of the agreement during the signing session, and (2) the agent directs the client's signatures/initials as they scroll through the packet together.</action>
             <action>Set gota_conducted=false when the agent merely sends the e-sign packet and tells the client to sign on their own, only confirms after the fact that signatures came through, or the only agreement content on the call is the recorded compliance script (PSC/ACDR read-through) rather than a signing walkthrough.</action>
-            <action>Identify gota_type: "turnbull_red" if the walkthrough is of the Turnbull Law Group packet, "fdr_green" if it is the Freedom Debt Relief packet, "unknown" otherwise.</action>
+            <action>Identify gota_type ONLY from the handling agent's guided signing walkthrough: "turnbull_red" if they walk through the Turnbull Law Group packet, "fdr_green" if they walk through the Freedom Debt Relief packet. If gota_conducted=false, ALWAYS set gota_type="unknown" — do not infer a packet type from a welcome/transfer agent, a post-signing handoff, or a company name outside a guided walkthrough.</action>
             <action>Record gota_evidence_quote — the quote best showing the guided walkthrough (or empty string).</action>
         </step>
         <step name="key_beats">
@@ -74,11 +74,11 @@
         1. Read the entire transcript before scoring.
         2. Decide enrollment_completed first: was e-signing completed on THIS call? If not, violation=false and finish the remaining fields honestly.
         3. Decide gota_conducted using the guided-walkthrough criteria — explanation of multiple sections PLUS directed signatures. Be generous on wording, strict on the guided behavior.
-        4. Set gota_type from the partner named in the walkthrough (Turnbull Law Group → "turnbull_red", Freedom Debt Relief/FDR → "fdr_green", otherwise "unknown").
+        4. Set gota_type from the partner named in the handling agent's guided walkthrough (Turnbull Law Group → "turnbull_red", Freedom Debt Relief/FDR → "fdr_green"). When gota_conducted=false, gota_type MUST be "unknown" regardless of company names elsewhere in the call.
         5. Mark each of the six key beats with handling-agent evidence quotes. Statements by the welcome/transfer agent never count.
         6. Set wc_transfer_occurred and its evidence quote.
         7. Set violation = enrollment_completed AND NOT gota_conducted. Never flag for missing beats alone.
-        8. Keep every quote verbatim from the transcript. Use empty strings when there is no evidence.
+        8. Every evidence quote MUST be one contiguous, character-for-character substring from a single transcript line. Never combine adjacent utterances into one quote, move a speaker label onto an excerpt from later in that line, add omitted words, or normalize punctuation. Copy the full line when that is the safest way to remain exact. Use an empty string when no exact supporting quote exists.
     </instructions>
 
     <prior_call_context>
