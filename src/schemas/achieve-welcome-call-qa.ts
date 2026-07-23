@@ -82,3 +82,15 @@ export const AchieveWelcomeCallQASchema = z.object({
     transfer_agent_lines: z.number(),
   }),
 })
+
+/**
+ * Structured output requested from the LLM. Partner metadata, transfer analysis,
+ * and transcript boundaries are deterministic and stamped by the module after
+ * this response is parsed; omitting them keeps every JSON-schema field required.
+ */
+export const AchieveWelcomeCallQAModelResponseSchema = AchieveWelcomeCallQASchema.omit({
+  partner_id: true,
+  script_version: true,
+  transfer_experience: true,
+  transcript_segment: true,
+})
