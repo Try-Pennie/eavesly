@@ -394,6 +394,38 @@ describe("backfill-by-ID route", () => {
     expect(body.scanned).toBe(10)
     expect(body.summary.queued).toBe(1)
   })
+
+  it("can discover the next page without loading transcripts or queueing workflows", async () => {
+    mockGetBackfillCandidatePage.mockResolvedValue({
+      call_ids: ["call-1"],
+      next_cursor: "call-10",
+      scanned: 10,
+    })
+    const app = createApp("full-qa", MODULE_NAMES.FULL_QA)
+
+    const res = await app.request("/api/v1/evaluate/full-qa/backfill-next", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({
+        start: "2026-07-26T10:04:00Z",
+        end: "2026-07-26T10:10:00Z",
+        discover_only: true,
+        run_id: "regal-outage-2026-07-full-1",
+      }),
+    }, createEnvWithWorkflow("production"))
+
+    expect(res.status).toBe(200)
+    expect(mockWorkflowCreate).not.toHaveBeenCalled()
+    expect(mockGetBackfillCallData).not.toHaveBeenCalled()
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      call_ids: ["call-1"],
+      next_cursor: "call-10",
+      scanned: 10,
+    }))
+  })
 })
 
 describe("requiredPartnerId validation", () => {

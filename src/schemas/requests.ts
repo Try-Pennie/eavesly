@@ -52,6 +52,7 @@ export const BackfillNextRequestSchema = z.strictObject({
   after_call_id: z.string().min(1).optional(),
   filter: z.enum(["all", "enrollment"]).default("all"),
   limit: z.number().int().min(1).max(10).default(10),
+  discover_only: z.boolean().default(false),
   run_id: RunIdSchema,
 })
 

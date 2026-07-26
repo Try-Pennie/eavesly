@@ -236,6 +236,7 @@ export function createEvalRoutes(
       after_call_id: afterCallId,
       filter,
       limit,
+      discover_only: discoverOnly,
       run_id: runId,
     } = validation.data
     const execution = { mode: "backfill" as const, run_id: runId }
@@ -252,6 +253,16 @@ export function createEvalRoutes(
       enrollmentDisposition: activePolicy?.policy.enrollmentDisposition,
       enrollmentMinDurationSeconds: activePolicy?.policy.enrollmentMinDurationSeconds,
     })
+
+    if (discoverOnly) {
+      return c.json({
+        execution,
+        scanned: page.scanned,
+        next_cursor: page.next_cursor,
+        call_ids: page.call_ids,
+        timestamp: new Date().toISOString(),
+      })
+    }
 
     const instances = await Promise.all(
       page.call_ids.map(async (callId) => {

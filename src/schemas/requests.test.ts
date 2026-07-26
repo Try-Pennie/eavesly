@@ -135,7 +135,10 @@ describe("BackfillNextRequestSchema", () => {
     })
 
     expect(result.success).toBe(true)
-    if (result.success) expect(result.data.limit).toBe(10)
+    if (result.success) {
+      expect(result.data.limit).toBe(10)
+      expect(result.data.discover_only).toBe(false)
+    }
   })
 })
 
