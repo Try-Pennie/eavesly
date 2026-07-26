@@ -46,6 +46,15 @@ export const BackfillEvaluateRequestSchema = z.strictObject({
   run_id: RunIdSchema,
 })
 
+export const BackfillNextRequestSchema = z.strictObject({
+  start: z.string().datetime(),
+  end: z.string().datetime(),
+  after_call_id: z.string().min(1).optional(),
+  filter: z.enum(["all", "enrollment"]).default("all"),
+  limit: z.number().int().min(1).max(10).default(10),
+  run_id: RunIdSchema,
+})
+
 const FromRecordingMetadataSchema = z.object({
   timestamp: z.string(),
   duration: z.coerce.number().nonnegative().optional(),

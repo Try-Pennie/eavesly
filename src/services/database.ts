@@ -104,6 +104,75 @@ export class DatabaseService {
   }
 
   /**
+   * Read one deterministic source page for a resumable backfill. Results that
+   * already exist are omitted, while the cursor advances across every scanned
+   * source row so retries and restarts never depend on mutable result counts.
+   */
+  async getBackfillCandidatePage(args: {
+    start: string
+    end: string
+    afterCallId?: string
+    moduleName: string
+    filter: "all" | "enrollment"
+    limit: number
+    enrollmentDisposition?: string
+    enrollmentMinDurationSeconds?: number
+  }): Promise<{ call_ids: string[]; next_cursor: string | null; scanned: number }> {
+    let sourceQuery = this.client
+      .from("eavesly_transcription_qa")
+      .select("call_id")
+      .gte("created_at", args.start)
+      .lt("created_at", args.end)
+      .not("original_transcript", "is", null)
+      .order("call_id", { ascending: true })
+
+    if (args.afterCallId) sourceQuery = sourceQuery.gt("call_id", args.afterCallId)
+
+    const { data: sourceRows, error: sourceError } = await sourceQuery.limit(args.limit)
+    if (sourceError) throw sourceError
+
+    const scannedRows = sourceRows ?? []
+    const nextCursor = scannedRows.at(-1)?.call_id ?? null
+    const sourceIds = [...new Set(scannedRows.map((row: any) => row.call_id).filter(Boolean))]
+    if (sourceIds.length === 0) {
+      return { call_ids: [], next_cursor: nextCursor, scanned: scannedRows.length }
+    }
+
+    let eligibleIds = sourceIds
+    if (args.filter === "enrollment") {
+      if (!args.enrollmentDisposition || args.enrollmentMinDurationSeconds === undefined) {
+        throw new Error("Enrollment backfill filter requires the active resolver policy")
+      }
+      const { data: eligibleRows, error: eligibilityError } = await this.client
+        .from("eavesly_calls")
+        .select("call_id")
+        .in("call_id", sourceIds)
+        .eq("disposition", args.enrollmentDisposition)
+        .gt("talk_time", args.enrollmentMinDurationSeconds)
+      if (eligibilityError) throw eligibilityError
+      eligibleIds = (eligibleRows ?? []).map((row: any) => row.call_id)
+    }
+
+    if (eligibleIds.length === 0) {
+      return { call_ids: [], next_cursor: nextCursor, scanned: scannedRows.length }
+    }
+
+    const { data: existingRows, error: existingError } = await this.client
+      .from("eavesly_module_results")
+      .select("call_id")
+      .eq("module_name", args.moduleName)
+      .in("call_id", eligibleIds)
+    if (existingError) throw existingError
+
+    const existingIds = new Set((existingRows ?? []).map((row: any) => row.call_id))
+    return {
+      call_ids: eligibleIds.filter((callId) => !existingIds.has(callId)),
+      next_cursor: nextCursor,
+      scanned: scannedRows.length,
+    }
+  }
+
+  /**
    * Rebuild workflow input from the two Phase A source projections. This keeps
    * transcript text and contact data inside Eavesly rather than returning them to
    * an operator that only needs to submit call IDs.

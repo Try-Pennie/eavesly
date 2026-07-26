@@ -9,10 +9,20 @@ import { createEvalRoutes } from "./create-eval-routes"
 const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "test-instance-id" })
 const mockLogRequest = vi.fn().mockResolvedValue(undefined)
 const mockGetBackfillCallData = vi.fn()
+const mockGetBackfillCandidatePage = vi.fn()
+const mockGetResolverPolicy = vi.fn().mockResolvedValue({
+  policy: {
+    enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
+    enrollmentMinDurationSeconds: 1200,
+  },
+  policyVersion: 1,
+})
 const routeDependencies = {
   createDatabase: () => ({
     logRequest: mockLogRequest,
     getBackfillCallData: mockGetBackfillCallData,
+    getBackfillCandidatePage: mockGetBackfillCandidatePage,
+    getResolverPolicy: mockGetResolverPolicy,
   }),
 }
 
@@ -52,6 +62,7 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
     mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
     mockLogRequest.mockClear()
     mockGetBackfillCallData.mockReset()
+    mockGetBackfillCandidatePage.mockReset()
   })
 
   describe(`POST /evaluate/${endpoint}`, () => {
@@ -308,6 +319,7 @@ describe("backfill-by-ID route", () => {
     mockWorkflowCreate.mockReset()
     mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
     mockGetBackfillCallData.mockReset()
+    mockGetBackfillCandidatePage.mockReset()
     mockGetBackfillCallData.mockImplementation(async (callId: string) => ({
       ...validBody,
       call_id: callId,
@@ -348,6 +360,40 @@ describe("backfill-by-ID route", () => {
       status: "queued",
     }])
   })
+
+  it("discovers and queues the next checkpointed source page", async () => {
+    mockGetBackfillCandidatePage.mockResolvedValue({
+      call_ids: ["call-1"],
+      next_cursor: "call-10",
+      scanned: 10,
+    })
+    const app = createApp("full-qa", MODULE_NAMES.FULL_QA)
+
+    const res = await app.request("/api/v1/evaluate/full-qa/backfill-next", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({
+        start: "2026-07-26T10:04:00Z",
+        end: "2026-07-26T10:10:00Z",
+        run_id: "regal-outage-2026-07-full-1",
+      }),
+    }, createEnvWithWorkflow("production"))
+
+    expect(res.status).toBe(202)
+    expect(mockGetBackfillCandidatePage).toHaveBeenCalledWith(expect.objectContaining({
+      moduleName: MODULE_NAMES.FULL_QA,
+      filter: "all",
+      limit: 10,
+    }))
+    expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+    const body = (await res.json()) as any
+    expect(body.next_cursor).toBe("call-10")
+    expect(body.scanned).toBe(10)
+    expect(body.summary.queued).toBe(1)
+  })
 })
 
 describe("requiredPartnerId validation", () => {
@@ -356,6 +402,7 @@ describe("requiredPartnerId validation", () => {
     mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
     mockLogRequest.mockClear()
     mockGetBackfillCallData.mockReset()
+    mockGetBackfillCandidatePage.mockReset()
   })
 
   it("returns 400 when partner_id in body does not match requiredPartnerId", async () => {

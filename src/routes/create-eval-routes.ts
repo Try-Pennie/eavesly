@@ -6,6 +6,7 @@ import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
   BackfillEvaluateRequestSchema,
+  BackfillNextRequestSchema,
   EvaluateFromRecordingRequestSchema,
 } from "../schemas/requests"
 import type { EvaluateRequest } from "../schemas/requests"
@@ -13,7 +14,10 @@ import { DatabaseService } from "../services/database"
 import { auth } from "../middleware/auth"
 import { workflowRetentionForEnvironment } from "../workflows/workflow-retention"
 
-type EvalRouteDatabase = Pick<DatabaseService, "logRequest" | "getBackfillCallData">
+type EvalRouteDatabase = Pick<
+  DatabaseService,
+  "logRequest" | "getBackfillCallData" | "getBackfillCandidatePage" | "getResolverPolicy"
+>
 
 interface EvalRouteDependencies {
   createDatabase: (env: AppEnv["Bindings"]) => EvalRouteDatabase
@@ -214,6 +218,86 @@ export function createEvalRoutes(
       }, 202)
     },
   )
+
+  routes.post(`/evaluate/${endpoint}/backfill-next`, async (c) => {
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      throw new HTTPException(400, { message: "Malformed JSON in request body" })
+    }
+
+    const validation = BackfillNextRequestSchema.safeParse(body)
+    if (!validation.success) return c.json(validation, 400)
+
+    const {
+      start,
+      end,
+      after_call_id: afterCallId,
+      filter,
+      limit,
+      run_id: runId,
+    } = validation.data
+    const execution = { mode: "backfill" as const, run_id: runId }
+    const correlationId = c.get("correlationId") ?? crypto.randomUUID()
+    const db = dependencies.createDatabase(c.env)
+    const activePolicy = filter === "enrollment" ? await db.getResolverPolicy() : null
+    const page = await db.getBackfillCandidatePage({
+      start,
+      end,
+      afterCallId,
+      moduleName,
+      filter,
+      limit,
+      enrollmentDisposition: activePolicy?.policy.enrollmentDisposition,
+      enrollmentMinDurationSeconds: activePolicy?.policy.enrollmentMinDurationSeconds,
+    })
+
+    const instances = await Promise.all(
+      page.call_ids.map(async (callId) => {
+        const instanceId = `${callId}-${moduleName}`
+        try {
+          const callData = await db.getBackfillCallData(callId)
+          const instance = await c.env.EVALUATION_WORKFLOW.create({
+            id: instanceId,
+            params: { moduleName, callData, correlationId, execution },
+            retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
+          })
+          return { call_id: callId, id: instance.id, status: "queued" as const }
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("already exists")) {
+            return { call_id: callId, id: instanceId, status: "already_exists" as const }
+          }
+          await db.logRequest({
+            endpoint: `${endpoint}/backfill-next`,
+            callId,
+            status: "backfill_queue_error",
+            statusCode: 500,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorDetails: { run_id: runId },
+            correlationId,
+          })
+          return { call_id: callId, id: instanceId, status: "error" as const }
+        }
+      }),
+    )
+    const summary = {
+      queued: instances.filter((instance) => instance.status === "queued").length,
+      already_exists: instances.filter((instance) => instance.status === "already_exists").length,
+      errors: instances.filter((instance) => instance.status === "error").length,
+    }
+
+    return c.json({
+      correlation_id: correlationId,
+      execution,
+      scanned: page.scanned,
+      next_cursor: page.next_cursor,
+      instances,
+      summary,
+      status: summary.errors > 0 ? "partially_queued" : "queued",
+      timestamp: new Date().toISOString(),
+    }, 202)
+  })
 
   routes.post(`/evaluate/${endpoint}/backfill`, async (c) => {
     let body: unknown

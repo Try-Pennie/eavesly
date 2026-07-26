@@ -3,6 +3,7 @@ import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
   BackfillEvaluateRequestSchema,
+  BackfillNextRequestSchema,
   EvaluateFromRecordingRequestSchema,
 } from "./requests"
 
@@ -120,6 +121,21 @@ describe("BackfillEvaluateRequestSchema", () => {
     })
 
     expect(result.success).toBe(true)
+  })
+})
+
+describe("BackfillNextRequestSchema", () => {
+  it("accepts a checkpoint cursor and an enrollment filter", () => {
+    const result = BackfillNextRequestSchema.safeParse({
+      start: "2026-07-26T10:04:00Z",
+      end: "2026-07-26T10:10:00Z",
+      after_call_id: "WT123",
+      filter: "enrollment",
+      run_id: "regal-outage-2026-07-full-1",
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.limit).toBe(10)
   })
 })
 
