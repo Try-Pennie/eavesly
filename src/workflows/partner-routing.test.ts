@@ -144,6 +144,22 @@ describe("routePartnerFollowup()", () => {
     expect(create.mock.calls[0][0].id).toBe(`c-ok-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`)
   })
 
+  it("propagates backfill execution to the chained workflow", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
+    const callData = createEvaluateRequest({ call_id: "c-backfill", agent_email: "a@achieve.com" })
+
+    await routePartnerFollowup(env, db, callData, correlationId, {
+      ...ACHIEVE,
+      execution: { mode: "backfill", run_id: "regal-outage-2026-07" },
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(create.mock.calls[0][0].params.execution).toEqual({
+      mode: "backfill",
+      run_id: "regal-outage-2026-07",
+    })
+  })
+
   it("chains budget_inputs when agent is resolved to Beyond", async () => {
     env.ENVIRONMENT = "development"
     db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })

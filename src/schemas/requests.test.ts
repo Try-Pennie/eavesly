@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
+  BackfillEvaluateRequestSchema,
   EvaluateFromRecordingRequestSchema,
 } from "./requests"
 
@@ -55,11 +56,36 @@ describe("EvaluateRequestSchema", () => {
 })
 
 describe("BatchEvaluateRequestSchema", () => {
-  it("valid batch passes", () => {
+  it("defaults ordinary batches to live execution", () => {
     const result = BatchEvaluateRequestSchema.safeParse({
       calls: [validRequest],
     })
     expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.execution).toEqual({ mode: "live" })
+    }
+  })
+
+  it("accepts an auditable backfill execution mode", () => {
+    const result = BatchEvaluateRequestSchema.safeParse({
+      calls: [validRequest],
+      execution: { mode: "backfill", run_id: "regal-outage-2026-07" },
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.execution).toEqual({
+        mode: "backfill",
+        run_id: "regal-outage-2026-07",
+      })
+    }
+  })
+
+  it("rejects a backfill batch without a run id", () => {
+    const result = BatchEvaluateRequestSchema.safeParse({
+      calls: [validRequest],
+      execution: { mode: "backfill" },
+    })
+    expect(result.success).toBe(false)
   })
 
   it("batch with >10 items fails", () => {
@@ -82,6 +108,17 @@ describe("BatchEvaluateRequestSchema", () => {
       call_id: `call-${i}`,
     }))
     const result = BatchEvaluateRequestSchema.safeParse({ calls })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe("BackfillEvaluateRequestSchema", () => {
+  it("accepts up to ten call IDs with an auditable run ID", () => {
+    const result = BackfillEvaluateRequestSchema.safeParse({
+      call_ids: ["call-1", "call-2"],
+      run_id: "regal-outage-2026-07-smoke-1",
+    })
+
     expect(result.success).toBe(true)
   })
 })

@@ -8,11 +8,40 @@ import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow, callCompletedEventToCa
 import type { CallCompletedEvent } from "../schemas/regal-events"
 import { log } from "../utils/logger"
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function nonnegativeNumber(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function qaResultFields(
+  callData: EvaluateRequest,
+  qaResult: Record<string, any>,
+  managerEmail: string,
+): Record<string, unknown> {
+  return {
+    agent_email: callData.agent_email ?? null,
+    sfdc_lead_id: callData.sfdc_lead_id ?? null,
+    overall_score: qaResult.overall_call_rating?.overall_score ?? null,
+    compliance_rating: qaResult.overall_call_rating?.compliance_rating ?? null,
+    customer_satisfaction_likely: qaResult.overall_call_rating?.customer_satisfaction_likely ?? null,
+    manager_escalation: qaResult.call_overview?.manager_review_required ?? false,
+    call_summary: qaResult.call_overview?.call_outcome ?? null,
+    qa_json: qaResult,
+    transcription_link: callData.transcript_url ?? null,
+    recording_link: callData.recording_link ?? null,
+    manager_email: managerEmail || null,
+  }
+}
+
 export class DatabaseService {
   private client: SupabaseClient
 
-  constructor(env: Bindings) {
-    this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  constructor(env: Bindings, client?: SupabaseClient) {
+    this.client = client ?? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   }
 
   async storeModuleResult(
@@ -61,18 +90,8 @@ export class DatabaseService {
       .from("eavesly_transcription_qa")
       .insert({
         call_id: callData.call_id,
-        agent_email: callData.agent_email ?? null,
-        sfdc_lead_id: callData.sfdc_lead_id ?? null,
-        overall_score: qaResult.overall_call_rating?.overall_score ?? null,
-        compliance_rating: qaResult.overall_call_rating?.compliance_rating ?? null,
-        customer_satisfaction_likely: qaResult.overall_call_rating?.customer_satisfaction_likely ?? null,
-        manager_escalation: qaResult.call_overview?.manager_review_required ?? false,
-        call_summary: qaResult.call_overview?.call_outcome ?? null,
-        qa_json: qaResult,
+        ...qaResultFields(callData, qaResult, managerEmail),
         original_transcript: callData.transcript.transcript,
-        transcription_link: callData.transcript_url ?? null,
-        recording_link: callData.recording_link ?? null,
-        manager_email: managerEmail || null,
         created_at: new Date().toISOString(),
       })
 
@@ -81,6 +100,118 @@ export class DatabaseService {
         callId: callData.call_id,
         error: error.message,
       })
+    }
+  }
+
+  /**
+   * Rebuild workflow input from the two Phase A source projections. This keeps
+   * transcript text and contact data inside Eavesly rather than returning them to
+   * an operator that only needs to submit call IDs.
+   */
+  async getBackfillCallData(callId: string): Promise<EvaluateRequest> {
+    const [callQuery, transcriptQuery] = await Promise.all([
+      this.client
+        .from("eavesly_calls")
+        .select("call_id, agent_email, sfdc_lead_id, contact_phone, disposition, campaign_name, talk_time, started_at, completed_at")
+        .eq("call_id", callId)
+        .limit(1)
+        .maybeSingle(),
+      this.client
+        .from("eavesly_transcription_qa")
+        .select("created_at, original_transcript, agent_email, sfdc_lead_id, call_summary, recording_link, transcription_link, qa_json")
+        .eq("call_id", callId)
+        .not("original_transcript", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    if (callQuery.error) throw callQuery.error
+    if (transcriptQuery.error) throw transcriptQuery.error
+    if (!callQuery.data) throw new Error(`No call row found for backfill call ${callId}`)
+    if (!transcriptQuery.data) throw new Error(`No source transcript row found for backfill call ${callId}`)
+
+    const sourceTranscript = optionalString(transcriptQuery.data.original_transcript)
+    if (!sourceTranscript) throw new Error(`Source transcript is empty for backfill call ${callId}`)
+    if (sourceTranscript.length > 200_000) {
+      throw new Error(`Source transcript exceeds evaluation limit for backfill call ${callId}`)
+    }
+
+    const sourceMetadata = transcriptQuery.data.qa_json
+    const regalRecordingLink = sourceMetadata !== null && typeof sourceMetadata === "object" && !Array.isArray(sourceMetadata)
+      ? optionalString((sourceMetadata as Record<string, unknown>).regal_recording_link)
+      : undefined
+    const agentEmail = optionalString(transcriptQuery.data.agent_email) ?? optionalString(callQuery.data.agent_email)
+    const talkTime = nonnegativeNumber(callQuery.data.talk_time)
+
+    return {
+      call_id: callId,
+      regal_task_id: callId,
+      agent_id: agentEmail ?? "",
+      transcript: {
+        transcript: sourceTranscript,
+        metadata: {
+          duration: talkTime,
+          timestamp: optionalString(callQuery.data.started_at)
+            ?? optionalString(callQuery.data.completed_at)
+            ?? transcriptQuery.data.created_at,
+          talk_time: talkTime,
+          disposition: optionalString(callQuery.data.disposition),
+          campaign_name: optionalString(callQuery.data.campaign_name),
+        },
+      },
+      agent_email: agentEmail,
+      contact_phone: optionalString(callQuery.data.contact_phone),
+      recording_link: optionalString(transcriptQuery.data.recording_link) ?? regalRecordingLink,
+      call_summary: optionalString(transcriptQuery.data.call_summary),
+      transcript_url: optionalString(transcriptQuery.data.transcription_link),
+      sfdc_lead_id: optionalString(transcriptQuery.data.sfdc_lead_id) ?? optionalString(callQuery.data.sfdc_lead_id),
+    }
+  }
+
+  /**
+   * Backfill-only legacy projection. Phase A already created the transcript row,
+   * so Phase B must enrich that concrete row rather than inserting a duplicate.
+   * Missing source rows and write errors are fatal so the workflow can retry and
+   * the backfill cannot silently report success with incomplete legacy data.
+   */
+  async updateExistingQAResult(
+    callData: EvaluateRequest,
+    qaResult: Record<string, any>,
+    managerEmail: string,
+  ): Promise<void> {
+    const { data: sourceRow, error: selectError } = await this.client
+      .from("eavesly_transcription_qa")
+      .select("id")
+      .eq("call_id", callData.call_id)
+      .not("original_transcript", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (selectError) {
+      log("error", "Failed to find legacy transcript row for backfill", {
+        callId: callData.call_id,
+        error: selectError.message,
+      })
+      throw selectError
+    }
+    if (!sourceRow) {
+      throw new Error(`No legacy transcript row found for backfill call ${callData.call_id}`)
+    }
+
+    const { error: updateError } = await this.client
+      .from("eavesly_transcription_qa")
+      .update(qaResultFields(callData, qaResult, managerEmail))
+      .eq("id", sourceRow.id)
+
+    if (updateError) {
+      log("error", "Failed to update legacy QA result for backfill", {
+        callId: callData.call_id,
+        rowId: sourceRow.id,
+        error: updateError.message,
+      })
+      throw updateError
     }
   }
 

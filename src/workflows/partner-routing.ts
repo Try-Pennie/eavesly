@@ -1,5 +1,6 @@
 import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
+import { LIVE_EVALUATION_EXECUTION, type EvaluationExecution } from "../schemas/evaluation-execution"
 import type { DatabaseService } from "../services/database"
 import { log } from "../utils/logger"
 import { workflowRetentionForEnvironment } from "./workflow-retention"
@@ -100,9 +101,15 @@ export async function routePartnerFollowup(
     moduleName: string
     /** Optional per-call gate; when it returns not-eligible the follow-up is skipped. */
     eligibility?: (callData: EvaluateRequest) => { eligible: boolean; reason: string }
+    execution?: EvaluationExecution
   },
 ): Promise<void> {
-  const { partner, moduleName, eligibility } = opts
+  const {
+    partner,
+    moduleName,
+    eligibility,
+    execution = LIVE_EVALUATION_EXECUTION,
+  } = opts
 
   // Cheap, DB-free eligibility short-circuit (e.g. Achieve's disposition + duration gate).
   if (eligibility) {
@@ -163,7 +170,7 @@ export async function routePartnerFollowup(
   try {
     await env.EVALUATION_WORKFLOW.create({
       id: instanceId,
-      params: { moduleName, callData, correlationId },
+      params: { moduleName, callData, correlationId, execution },
       retention: workflowRetentionForEnvironment(env.ENVIRONMENT),
     })
     log("info", "Chained partner follow-up", { callId: callData.call_id, partner, moduleName, instanceId })

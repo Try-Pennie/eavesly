@@ -5,12 +5,19 @@ import type { AppEnv } from "../types/env"
 import {
   EvaluateRequestSchema,
   BatchEvaluateRequestSchema,
+  BackfillEvaluateRequestSchema,
   EvaluateFromRecordingRequestSchema,
 } from "../schemas/requests"
 import type { EvaluateRequest } from "../schemas/requests"
 import { DatabaseService } from "../services/database"
 import { auth } from "../middleware/auth"
 import { workflowRetentionForEnvironment } from "../workflows/workflow-retention"
+
+type EvalRouteDatabase = Pick<DatabaseService, "logRequest" | "getBackfillCallData">
+
+interface EvalRouteDependencies {
+  createDatabase: (env: AppEnv["Bindings"]) => EvalRouteDatabase
+}
 
 interface EvalRouteConfig {
   endpoint: string
@@ -21,7 +28,12 @@ interface EvalRouteConfig {
   requiredPartnerId?: string
 }
 
-export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: EvalRouteConfig): Hono<AppEnv> {
+export function createEvalRoutes(
+  { endpoint, moduleName, requiredPartnerId }: EvalRouteConfig,
+  dependencies: EvalRouteDependencies = {
+    createDatabase: (env) => new DatabaseService(env),
+  },
+): Hono<AppEnv> {
   const routes = new Hono<AppEnv>()
 
   routes.use("*", auth)
@@ -30,7 +42,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
   // Returns the parsed payload, or a 400 Response (already logged) to return as-is.
   async function parseAndLog(
     c: Context<AppEnv>,
-    db: DatabaseService,
+    db: EvalRouteDatabase,
     correlationId: string | undefined,
   ): Promise<{ rawBody: string; parsed: unknown } | Response> {
     let rawBody: string
@@ -81,7 +93,7 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
   }
 
   routes.post(`/evaluate/${endpoint}`, async (c) => {
-    const db = new DatabaseService(c.env)
+    const db = dependencies.createDatabase(c.env)
     const correlationId = c.get("correlationId")
 
     const parseResult = await parseAndLog(c, db, correlationId)
@@ -166,29 +178,105 @@ export function createEvalRoutes({ endpoint, moduleName, requiredPartnerId }: Ev
       if (!validation.success) {
         return c.json(validation, 400)
       }
-      const { calls } = validation.data
+      const { calls, execution } = validation.data
       const correlationId = c.get("correlationId") ?? crypto.randomUUID()
       const instances = await Promise.all(
-        calls.map(callData =>
-          c.env.EVALUATION_WORKFLOW.create({
-            id: `${callData.call_id}-${moduleName}`,
-            params: { moduleName, callData, correlationId },
-            retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
-          })
-        )
+        calls.map(async (callData) => {
+          const instanceId = `${callData.call_id}-${moduleName}`
+          try {
+            const instance = await c.env.EVALUATION_WORKFLOW.create({
+              id: instanceId,
+              params: { moduleName, callData, correlationId, execution },
+              retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
+            })
+            return { call_id: callData.call_id, id: instance.id, status: "queued" as const }
+          } catch (error) {
+            if (error instanceof Error && error.message.includes("already exists")) {
+              return { call_id: callData.call_id, id: instanceId, status: "already_exists" as const }
+            }
+            return { call_id: callData.call_id, id: instanceId, status: "error" as const }
+          }
+        }),
       )
+      const summary = {
+        queued: instances.filter((instance) => instance.status === "queued").length,
+        already_exists: instances.filter((instance) => instance.status === "already_exists").length,
+        errors: instances.filter((instance) => instance.status === "error").length,
+      }
       return c.json({
         correlation_id: correlationId,
+        execution,
         total: calls.length,
-        instances: instances.map(inst => ({ id: inst.id })),
-        status: "queued",
+        instances,
+        summary,
+        status: summary.errors > 0 ? "partially_queued" : "queued",
         timestamp: new Date().toISOString(),
       }, 202)
     },
   )
 
+  routes.post(`/evaluate/${endpoint}/backfill`, async (c) => {
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      throw new HTTPException(400, { message: "Malformed JSON in request body" })
+    }
+
+    const validation = BackfillEvaluateRequestSchema.safeParse(body)
+    if (!validation.success) return c.json(validation, 400)
+
+    const { call_ids: callIds, run_id: runId } = validation.data
+    const execution = { mode: "backfill" as const, run_id: runId }
+    const correlationId = c.get("correlationId") ?? crypto.randomUUID()
+    const db = dependencies.createDatabase(c.env)
+    const instances = await Promise.all(
+      callIds.map(async (callId) => {
+        const instanceId = `${callId}-${moduleName}`
+        try {
+          const callData = await db.getBackfillCallData(callId)
+          const instance = await c.env.EVALUATION_WORKFLOW.create({
+            id: instanceId,
+            params: { moduleName, callData, correlationId, execution },
+            retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
+          })
+          return { call_id: callId, id: instance.id, status: "queued" as const }
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("already exists")) {
+            return { call_id: callId, id: instanceId, status: "already_exists" as const }
+          }
+          await db.logRequest({
+            endpoint: `${endpoint}/backfill`,
+            callId,
+            status: "backfill_queue_error",
+            statusCode: 500,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorDetails: { run_id: runId },
+            correlationId,
+          })
+          return { call_id: callId, id: instanceId, status: "error" as const }
+        }
+      }),
+    )
+    const summary = {
+      queued: instances.filter((instance) => instance.status === "queued").length,
+      already_exists: instances.filter((instance) => instance.status === "already_exists").length,
+      errors: instances.filter((instance) => instance.status === "error").length,
+    }
+
+    return c.json({
+      correlation_id: correlationId,
+      execution,
+      total: callIds.length,
+      instances,
+      summary,
+      status: summary.errors > 0 ? "partially_queued" : "queued",
+      timestamp: new Date().toISOString(),
+    }, 202)
+  })
+
   routes.post(`/evaluate/${endpoint}/from-recording`, async (c) => {
-    const db = new DatabaseService(c.env)
+    const db = dependencies.createDatabase(c.env)
     const correlationId = c.get("correlationId")
 
     const parseResult = await parseAndLog(c, db, correlationId)

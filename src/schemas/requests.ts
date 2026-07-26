@@ -1,4 +1,9 @@
 import { z } from "zod"
+import {
+  EvaluationExecutionSchema,
+  LIVE_EVALUATION_EXECUTION,
+  RunIdSchema,
+} from "./evaluation-execution"
 
 const TranscriptMetadataSchema = z.object({
   duration: z.coerce.number().nonnegative(),
@@ -31,9 +36,15 @@ export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>
 
 export const BatchEvaluateRequestSchema = z.object({
   calls: z.array(EvaluateRequestSchema).min(1).max(10),
+  execution: EvaluationExecutionSchema.default(LIVE_EVALUATION_EXECUTION),
 })
 
 type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>
+
+export const BackfillEvaluateRequestSchema = z.strictObject({
+  call_ids: z.array(z.string().min(1)).min(1).max(10),
+  run_id: RunIdSchema,
+})
 
 const FromRecordingMetadataSchema = z.object({
   timestamp: z.string(),

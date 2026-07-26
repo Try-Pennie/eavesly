@@ -4,21 +4,21 @@ import type { AppEnv } from "../types/env"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
 import { MODULE_NAMES } from "../modules/constants"
 
-vi.mock("../services/database", () => ({
-  DatabaseService: class {
-    storeModuleResult = vi.fn().mockResolvedValue(undefined)
-    storeQAResult = vi.fn().mockResolvedValue(undefined)
-    logRequest = vi.fn().mockResolvedValue(undefined)
-  },
-}))
-
 import { createEvalRoutes } from "./create-eval-routes"
 
 const mockWorkflowCreate = vi.fn().mockResolvedValue({ id: "test-instance-id" })
+const mockLogRequest = vi.fn().mockResolvedValue(undefined)
+const mockGetBackfillCallData = vi.fn()
+const routeDependencies = {
+  createDatabase: () => ({
+    logRequest: mockLogRequest,
+    getBackfillCallData: mockGetBackfillCallData,
+  }),
+}
 
 function createApp(endpoint: string, moduleName: string) {
   const app = new Hono<AppEnv>()
-  app.route("/api/v1", createEvalRoutes({ endpoint, moduleName }))
+  app.route("/api/v1", createEvalRoutes({ endpoint, moduleName }, routeDependencies))
   return app
 }
 
@@ -50,6 +50,8 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
   beforeEach(() => {
     mockWorkflowCreate.mockClear()
     mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
+    mockLogRequest.mockClear()
+    mockGetBackfillCallData.mockReset()
   })
 
   describe(`POST /evaluate/${endpoint}`, () => {
@@ -137,6 +139,71 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
         successRetention: "1 day",
         errorRetention: "3 days",
       })
+    })
+
+    it("passes backfill execution context into every queued workflow", async () => {
+      const app = createApp(endpoint, moduleName)
+      const res = await app.request(`/api/v1/evaluate/${endpoint}/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify({
+          calls: [validBody],
+          execution: { mode: "backfill", run_id: "regal-outage-2026-07" },
+        }),
+      }, createEnvWithWorkflow("production"))
+
+      expect(res.status).toBe(202)
+      expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+      expect(mockWorkflowCreate.mock.calls[0][0].params.execution).toEqual({
+        mode: "backfill",
+        run_id: "regal-outage-2026-07",
+      })
+      expect((await res.json() as any).execution).toEqual({
+        mode: "backfill",
+        run_id: "regal-outage-2026-07",
+      })
+    })
+
+    it("reports already-existing workflow ids without failing the whole batch", async () => {
+      const calls = [
+        { ...validBody, call_id: "new-call" },
+        { ...validBody, call_id: "existing-call" },
+      ]
+      mockWorkflowCreate
+        .mockResolvedValueOnce({ id: `new-call-${moduleName}` })
+        .mockRejectedValueOnce(new Error("workflow instance already exists"))
+      const app = createApp(endpoint, moduleName)
+
+      const res = await app.request(`/api/v1/evaluate/${endpoint}/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TEST_API_KEY}`,
+        },
+        body: JSON.stringify({
+          calls,
+          execution: { mode: "backfill", run_id: "regal-outage-2026-07" },
+        }),
+      }, createEnvWithWorkflow("production"))
+
+      expect(res.status).toBe(202)
+      const body = (await res.json()) as any
+      expect(body.instances).toEqual([
+        {
+          call_id: "new-call",
+          id: `new-call-${moduleName}`,
+          status: "queued",
+        },
+        {
+          call_id: "existing-call",
+          id: `existing-call-${moduleName}`,
+          status: "already_exists",
+        },
+      ])
+      expect(body.summary).toEqual({ queued: 1, already_exists: 1, errors: 0 })
     })
 
     it("returns 400 with more than 10 calls", async () => {
@@ -236,10 +303,59 @@ describe.each(modules)("$endpoint routes", ({ endpoint, moduleName }) => {
   })
 })
 
+describe("backfill-by-ID route", () => {
+  beforeEach(() => {
+    mockWorkflowCreate.mockReset()
+    mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
+    mockGetBackfillCallData.mockReset()
+    mockGetBackfillCallData.mockImplementation(async (callId: string) => ({
+      ...validBody,
+      call_id: callId,
+    }))
+  })
+
+  it("loads restored source rows internally and queues a silent workflow", async () => {
+    const app = createApp("full-qa", MODULE_NAMES.FULL_QA)
+    const res = await app.request("/api/v1/evaluate/full-qa/backfill", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({
+        call_ids: ["call-1"],
+        run_id: "regal-outage-2026-07-smoke-1",
+      }),
+    }, createEnvWithWorkflow("production"))
+
+    expect(res.status).toBe(202)
+    expect(mockGetBackfillCallData).toHaveBeenCalledWith("call-1")
+    expect(mockWorkflowCreate).toHaveBeenCalledOnce()
+    expect(mockWorkflowCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
+      id: `call-1-${MODULE_NAMES.FULL_QA}`,
+      params: expect.objectContaining({
+        execution: {
+          mode: "backfill",
+          run_id: "regal-outage-2026-07-smoke-1",
+        },
+      }),
+    }))
+    const body = (await res.json()) as any
+    expect(body).not.toHaveProperty("calls")
+    expect(body.instances).toEqual([{
+      call_id: "call-1",
+      id: "test-instance-id",
+      status: "queued",
+    }])
+  })
+})
+
 describe("requiredPartnerId validation", () => {
   beforeEach(() => {
     mockWorkflowCreate.mockClear()
     mockWorkflowCreate.mockResolvedValue({ id: "test-instance-id" })
+    mockLogRequest.mockClear()
+    mockGetBackfillCallData.mockReset()
   })
 
   it("returns 400 when partner_id in body does not match requiredPartnerId", async () => {
@@ -248,7 +364,7 @@ describe("requiredPartnerId validation", () => {
       endpoint: "achieve-welcome-call-qa",
       moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
       requiredPartnerId: "achieve",
-    }))
+    }, routeDependencies))
 
     const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
       method: "POST",
@@ -270,7 +386,7 @@ describe("requiredPartnerId validation", () => {
       endpoint: "achieve-welcome-call-qa",
       moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
       requiredPartnerId: "achieve",
-    }))
+    }, routeDependencies))
 
     const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
       method: "POST",
@@ -290,7 +406,7 @@ describe("requiredPartnerId validation", () => {
       endpoint: "achieve-welcome-call-qa",
       moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
       requiredPartnerId: "achieve",
-    }))
+    }, routeDependencies))
 
     const res = await app.request("/api/v1/evaluate/achieve-welcome-call-qa", {
       method: "POST",

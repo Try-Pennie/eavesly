@@ -1,6 +1,7 @@
 import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from "cloudflare:workers"
 import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
+import { LIVE_EVALUATION_EXECUTION, type EvaluationExecution } from "../schemas/evaluation-execution"
 import { getModule } from "./module-registry"
 import type { ModuleResult, Alert } from "../modules/types"
 import { createLLMClient } from "../services/llm-client"
@@ -8,6 +9,7 @@ import { modelForModule } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
+import { deliverEvaluationAlerts } from "../services/evaluation-alerts"
 import { routePartnerFollowup, isAchieveWelcomeCallEligible, isAchieveGotaCheckEligible } from "./partner-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
@@ -17,11 +19,14 @@ type EvaluationParams = {
   callData: EvaluateRequest
   correlationId: string
   recording?: { url: string; source: "twilio" }
+  /** Optional so workflow instances queued before this field existed remain runnable. */
+  execution?: EvaluationExecution
 }
 
 export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationParams> {
   async run(event: WorkflowEvent<EvaluationParams>, step: WorkflowStep) {
     const { moduleName, callData, correlationId, recording } = event.payload
+    const execution = event.payload.execution ?? LIVE_EVALUATION_EXECUTION
     const mod = getModule(moduleName)
 
     // Step 0a: Transcribe recording (Twilio path only). The Regal path already
@@ -132,6 +137,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
           await routePartnerFollowup(this.env, db, callData, correlationId, {
             partner: "beyond",
             moduleName: MODULE_NAMES.BUDGET_INPUTS,
+            execution,
           })
         })
       } catch (err) {
@@ -166,6 +172,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
             partner: "achieve",
             moduleName: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
             eligibility: (cd: EvaluateRequest) => isAchieveWelcomeCallEligible(cd, policy),
+            execution,
           })
         })
       } catch (err) {
@@ -196,6 +203,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
             partner: "achieve",
             moduleName: MODULE_NAMES.GOTA_CHECK,
             eligibility: (cd: EvaluateRequest) => isAchieveGotaCheckEligible(cd, policy),
+            execution,
           })
         })
       } catch (err) {
@@ -217,17 +225,37 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
         const db = new DatabaseService(this.env)
         const r = result as any
         const managerEmail = await lookupManagerEmail(this.env, callData.agent_email)
-        await db.storeQAResult(callData, r.result, managerEmail)
+        if (execution.mode === "backfill") {
+          await db.updateExistingQAResult(callData, r.result, managerEmail)
+        } else {
+          await db.storeQAResult(callData, r.result, managerEmail)
+        }
       })
     }
 
-    // Step 3: Dispatch alerts (Slack webhook) — best-effort, non-fatal
-    if (alerts.length > 0) {
+    // Step 3: Dispatch alerts (Slack webhook) — best-effort, non-fatal for live
+    // traffic. Backfill mode records suppression without invoking the dispatcher.
+    if (alerts.length > 0 && execution.mode === "backfill") {
+      await step.do("suppress-alerts", async () => {
+        const outcome = await deliverEvaluationAlerts(
+          alerts,
+          execution,
+          async (alert) => processAlert(alert, this.env),
+        )
+        log("info", "Evaluation alerts suppressed for backfill", {
+          callId: callData.call_id,
+          module: moduleName,
+          runId: execution.run_id,
+          alertCount: outcome.alert_count,
+        })
+        return outcome
+      })
+    } else if (alerts.length > 0) {
       await step.do("dispatch-alerts", {
         retries: { limit: 2, delay: "3 seconds", backoff: "exponential" },
         timeout: "1 minute",
       }, async () => {
-        for (const alert of alerts) {
+        await deliverEvaluationAlerts(alerts, execution, async (alert) => {
           try {
             await processAlert(alert, this.env)
           } catch (err) {
@@ -237,7 +265,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
               error: err instanceof Error ? err.message : String(err),
             })
           }
-        }
+        })
       })
     }
 
@@ -250,8 +278,9 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       await db.logRequest({
         endpoint: moduleName.replace(/_/g, "-"),
         callId: callData.call_id,
-        status: "workflow_completed",
+        status: execution.mode === "backfill" ? "workflow_completed_backfill" : "workflow_completed",
         statusCode: 200,
+        errorDetails: execution.mode === "backfill" ? { run_id: execution.run_id } : undefined,
         correlationId,
       })
     })
