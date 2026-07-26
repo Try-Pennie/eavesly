@@ -361,6 +361,36 @@ describe("backfill-by-ID route", () => {
     }])
   })
 
+  it("queues a uniquely tagged backfill retry with the primary model strategy", async () => {
+    const app = createApp("disposition-review", MODULE_NAMES.DISPOSITION_REVIEW)
+
+    const res = await app.request("/api/v1/evaluate/disposition-review/backfill", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_KEY}`,
+      },
+      body: JSON.stringify({
+        call_ids: ["call-1"],
+        run_id: "regal-outage-2026-07-disposition-retry-1",
+        retry_tag: "primary-1",
+        model_strategy: "primary",
+      }),
+    }, createEnvWithWorkflow("production"))
+
+    expect(res.status).toBe(202)
+    expect(mockWorkflowCreate).toHaveBeenCalledWith(expect.objectContaining({
+      id: `call-1-${MODULE_NAMES.DISPOSITION_REVIEW}-primary-1`,
+      params: expect.objectContaining({
+        execution: {
+          mode: "backfill",
+          run_id: "regal-outage-2026-07-disposition-retry-1",
+          model_strategy: "primary",
+        },
+      }),
+    }))
+  })
+
   it("discovers and queues the next checkpointed source page", async () => {
     mockGetBackfillCandidatePage.mockResolvedValue({
       call_ids: ["call-1"],

@@ -16,6 +16,7 @@ export const EvaluationExecutionSchema = z.discriminatedUnion("mode", [
   z.strictObject({
     mode: z.literal("backfill"),
     run_id: RunIdSchema,
+    model_strategy: z.enum(["module_default", "primary"]).optional(),
   }),
 ])
 

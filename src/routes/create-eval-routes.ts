@@ -321,13 +321,24 @@ export function createEvalRoutes(
     const validation = BackfillEvaluateRequestSchema.safeParse(body)
     if (!validation.success) return c.json(validation, 400)
 
-    const { call_ids: callIds, run_id: runId } = validation.data
-    const execution = { mode: "backfill" as const, run_id: runId }
+    const {
+      call_ids: callIds,
+      run_id: runId,
+      retry_tag: retryTag,
+      model_strategy: modelStrategy,
+    } = validation.data
+    const execution = {
+      mode: "backfill" as const,
+      run_id: runId,
+      ...(modelStrategy === "primary" ? { model_strategy: modelStrategy } : {}),
+    }
     const correlationId = c.get("correlationId") ?? crypto.randomUUID()
     const db = dependencies.createDatabase(c.env)
     const instances = await Promise.all(
       callIds.map(async (callId) => {
-        const instanceId = `${callId}-${moduleName}`
+        const instanceId = retryTag
+          ? `${callId}-${moduleName}-${retryTag}`
+          : `${callId}-${moduleName}`
         try {
           const callData = await db.getBackfillCallData(callId)
           const instance = await c.env.EVALUATION_WORKFLOW.create({

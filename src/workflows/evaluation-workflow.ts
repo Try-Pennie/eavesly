@@ -5,7 +5,7 @@ import { LIVE_EVALUATION_EXECUTION, type EvaluationExecution } from "../schemas/
 import { getModule } from "./module-registry"
 import type { ModuleResult, Alert } from "../modules/types"
 import { createLLMClient } from "../services/llm-client"
-import { modelForModule } from "../services/model-selection"
+import { modelForEvaluation } from "../services/model-selection"
 import { transcribeRecording, needsTranscription } from "../services/transcription"
 import { DatabaseService } from "../services/database"
 import { processAlert, lookupManagerEmail } from "../services/alerts"
@@ -108,7 +108,7 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
-      const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
+      const llm = createLLMClient(this.env, modelForEvaluation(this.env, moduleName, execution))
       return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions, audience) as any
     })
 

@@ -44,6 +44,8 @@ type BatchEvaluateRequest = z.infer<typeof BatchEvaluateRequestSchema>
 export const BackfillEvaluateRequestSchema = z.strictObject({
   call_ids: z.array(z.string().min(1)).min(1).max(10),
   run_id: RunIdSchema,
+  retry_tag: RunIdSchema.optional(),
+  model_strategy: z.enum(["module_default", "primary"]).default("module_default"),
 })
 
 export const BackfillNextRequestSchema = z.strictObject({

@@ -1,5 +1,6 @@
 import type { Bindings } from "../types/env"
 import { MODULE_NAMES } from "../modules/constants"
+import type { EvaluationExecution } from "../schemas/evaluation-execution"
 
 /**
  * Per-module LLM model override.
@@ -18,4 +19,20 @@ export function modelForModule(
     return env.DISPOSITION_REVIEW_MODEL || undefined
   }
   return undefined
+}
+
+/**
+ * Backfill retries may opt into the primary model when a module-specific model
+ * repeatedly returns an unusable provider response. Live traffic and ordinary
+ * backfills retain normal per-module model selection.
+ */
+export function modelForEvaluation(
+  env: Bindings,
+  moduleName: string,
+  execution: EvaluationExecution,
+): string | undefined {
+  if (execution.mode === "backfill" && execution.model_strategy === "primary") {
+    return env.OPENROUTER_MODEL
+  }
+  return modelForModule(env, moduleName)
 }
