@@ -12,8 +12,8 @@ import { parseMonitoringSnapshot, type MonitoringSnapshot } from "./monitoring-h
 export class DatabaseService {
   private client: SupabaseClient
 
-  constructor(env: Bindings) {
-    this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  constructor(env: Bindings, client?: SupabaseClient) {
+    this.client = client ?? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   }
 
   async storeModuleResult(
