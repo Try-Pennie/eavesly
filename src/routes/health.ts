@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import type { AppEnv, Bindings } from "../types/env"
 import { DatabaseService } from "../services/database"
 import {
+  evaluateEventPairingHealth,
   evaluateIngestionHealth,
   evaluatePipelineHealth,
   type MonitoringSnapshot,
@@ -62,6 +63,32 @@ export function createHealthRoutes(
       log("error", "Ingestion health snapshot unavailable", {
         correlationId: c.get("correlationId"),
         operation: "ingestion_health",
+        error: "snapshot_unavailable",
+      })
+      return c.json({
+        status: "degraded",
+        version: VERSION,
+        environment: c.env.ENVIRONMENT,
+        checks: { monitoring: "unavailable" },
+      }, 503)
+    }
+  })
+
+  routes.get("/health/event-pairing", async (c) => {
+    try {
+      const snapshot = await createDatabase(c.env).getMonitoringSnapshot()
+      const health = evaluateEventPairingHealth(snapshot)
+      return c.json({
+        status: health.status,
+        version: VERSION,
+        environment: c.env.ENVIRONMENT,
+        policy: health.policy,
+        checks: health.checks,
+      }, statusCode(health.status))
+    } catch {
+      log("error", "Event-pairing health snapshot unavailable", {
+        correlationId: c.get("correlationId"),
+        operation: "event_pairing_health",
         error: "snapshot_unavailable",
       })
       return c.json({

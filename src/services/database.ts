@@ -788,10 +788,10 @@ export class DatabaseService {
 
   /** Loads the aggregate, PII-free snapshot used by public operational health routes. */
   async getMonitoringSnapshot(): Promise<MonitoringSnapshot> {
-    const { data, error } = await this.client.rpc("eavesly_monitoring_snapshot")
+    const { data, error } = await this.client.rpc("eavesly_monitoring_snapshot_v2")
     if (error) {
       log("error", "Monitoring snapshot RPC failed", {
-        operation: "eavesly_monitoring_snapshot",
+        operation: "eavesly_monitoring_snapshot_v2",
         error: "rpc_failed",
       })
       throw new Error("monitoring snapshot unavailable")
@@ -802,7 +802,7 @@ export class DatabaseService {
       return parseMonitoringSnapshot(row)
     } catch {
       log("error", "Monitoring snapshot RPC returned invalid data", {
-        operation: "eavesly_monitoring_snapshot",
+        operation: "eavesly_monitoring_snapshot_v2",
         error: "invalid_response",
       })
       throw new Error("monitoring snapshot unavailable")
