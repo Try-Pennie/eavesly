@@ -7,12 +7,13 @@ import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolv
 import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow, callCompletedEventToCallRow } from "./regal-events"
 import type { CallCompletedEvent } from "../schemas/regal-events"
 import { log } from "../utils/logger"
+import { parseMonitoringSnapshot, type MonitoringSnapshot } from "./monitoring-health"
 
 export class DatabaseService {
   private client: SupabaseClient
 
-  constructor(env: Bindings) {
-    this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  constructor(env: Bindings, client?: SupabaseClient) {
+    this.client = client ?? createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   }
 
   async storeModuleResult(
@@ -783,6 +784,29 @@ export class DatabaseService {
       throw error
     }
     return true
+  }
+
+  /** Loads the aggregate, PII-free snapshot used by public operational health routes. */
+  async getMonitoringSnapshot(): Promise<MonitoringSnapshot> {
+    const { data, error } = await this.client.rpc("eavesly_monitoring_snapshot_v2")
+    if (error) {
+      log("error", "Monitoring snapshot RPC failed", {
+        operation: "eavesly_monitoring_snapshot_v2",
+        error: "rpc_failed",
+      })
+      throw new Error("monitoring snapshot unavailable")
+    }
+
+    const row = Array.isArray(data) ? data[0] : undefined
+    try {
+      return parseMonitoringSnapshot(row)
+    } catch {
+      log("error", "Monitoring snapshot RPC returned invalid data", {
+        operation: "eavesly_monitoring_snapshot_v2",
+        error: "invalid_response",
+      })
+      throw new Error("monitoring snapshot unavailable")
+    }
   }
 
   async healthCheck(): Promise<boolean> {
