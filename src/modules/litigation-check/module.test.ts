@@ -74,7 +74,7 @@ describe("litigationCheckModule", () => {
     })
 
     it("server-side recount overrides LLM if it miscounts — forces violation when discussed but not communicated", async () => {
-      // LLM says violation=false, but litigation_discussed=true and agent_communicated_restriction=false
+      // LLM says violation=false, but the litigated account was enrolled without restriction.
       const badLLMResponse = {
         ...violationFixture,
         violation: false, // LLM got this wrong
@@ -94,9 +94,27 @@ describe("litigationCheckModule", () => {
       // LLM says violation=true, but agent_communicated_restriction=true
       const badLLMResponse = {
         ...noViolationFixture,
+        litigated_account_enrolled: true,
         violation: true, // LLM got this wrong
       }
       const llm = createMockLLM(badLLMResponse)
+      const request = createEvaluateRequest()
+      const result = await litigationCheckModule.evaluate(
+        request.transcript.transcript,
+        request,
+        llm as any,
+      )
+      expect(result.has_violation).toBe(false)
+      expect(result.violation_type).toBeNull()
+    })
+
+    it("does not flag when the litigated account was excluded from enrollment", async () => {
+      const excludedAccountResponse = {
+        ...violationFixture,
+        litigated_account_enrolled: false,
+        violation: true,
+      }
+      const llm = createMockLLM(excludedAccountResponse)
       const request = createEvaluateRequest()
       const result = await litigationCheckModule.evaluate(
         request.transcript.transcript,

@@ -747,6 +747,99 @@ describe("DatabaseService", () => {
     })
   })
 
+  describe("getPriorCallContext()", () => {
+    function queryBuilder(result: unknown) {
+      const builder: Record<string, ReturnType<typeof vi.fn> | ((resolve: (value: unknown) => void) => void)> = {}
+      for (const method of ["eq", "neq", "lt", "order", "limit", "in"] as const) {
+        builder[method] = vi.fn(() => builder)
+      }
+      builder.then = (resolve: (value: unknown) => void) => {
+        resolve(result)
+      }
+      return builder
+    }
+
+    function currentCallBuilder(row: unknown) {
+      return {
+        eq: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+          }),
+        }),
+      }
+    }
+
+    const priorCall = {
+      call_id: "prior-1",
+      started_at: "2026-07-20T10:00:00Z",
+      disposition: "Interested",
+      direction: "outbound",
+      talk_time: 1800,
+      agent_email: "agent@example.com",
+      campaign_name: "Pennie",
+      notes: null,
+    }
+
+    it("only returns calls before the current call", async () => {
+      const current = currentCallBuilder({
+        sfdc_lead_id: "lead-1",
+        contact_phone: "+15551234567",
+        started_at: "2026-07-21T10:00:00Z",
+      })
+      const calls = queryBuilder({ data: [priorCall], error: null })
+      const count = queryBuilder({ count: 1, error: null })
+      const qa = queryBuilder({ data: [], error: null })
+      mockSelect
+        .mockReturnValueOnce(current)
+        .mockReturnValueOnce(calls)
+        .mockReturnValueOnce(count)
+        .mockReturnValueOnce(qa)
+
+      const db = new DatabaseService(createEnv())
+      const result = await db.getPriorCallContext({
+        currentCallId: "current-1",
+        sfdcLeadId: "lead-1",
+        contactPhone: "+15551234567",
+      })
+
+      expect(result?.prior_calls.map((call) => call.call_id)).toEqual(["prior-1"])
+      expect(calls.lt).toHaveBeenCalledWith("started_at", "2026-07-21T10:00:00Z")
+      expect(calls.neq).toHaveBeenCalledWith("call_id", "current-1")
+    })
+
+    it("falls back to phone history when a changed lead id has no matches", async () => {
+      const current = currentCallBuilder({
+        sfdc_lead_id: "new-lead",
+        contact_phone: "+15551234567",
+        started_at: "2026-07-21T10:00:00Z",
+      })
+      const noLeadCalls = queryBuilder({ data: [], error: null })
+      const phoneCalls = queryBuilder({ data: [priorCall], error: null })
+      const count = queryBuilder({ count: 1, error: null })
+      const qa = queryBuilder({
+        data: [{ call_id: "prior-1", call_summary: "Program reviewed", overall_score: "good", compliance_rating: "pass" }],
+        error: null,
+      })
+      mockSelect
+        .mockReturnValueOnce(current)
+        .mockReturnValueOnce(noLeadCalls)
+        .mockReturnValueOnce(phoneCalls)
+        .mockReturnValueOnce(count)
+        .mockReturnValueOnce(qa)
+
+      const db = new DatabaseService(createEnv())
+      const result = await db.getPriorCallContext({
+        currentCallId: "current-1",
+        sfdcLeadId: "new-lead",
+        contactPhone: "+15551234567",
+      })
+
+      expect(result?.prior_calls).toHaveLength(1)
+      expect(result?.prior_calls[0].call_summary).toBe("Program reviewed")
+      expect(phoneCalls.eq).toHaveBeenCalledWith("contact_phone", "+15551234567")
+    })
+  })
+
   describe("getAgentRegalAssignment()", () => {
     function mockAssignmentRow(row: unknown, error: unknown = null) {
       mockSelect.mockReturnValue({

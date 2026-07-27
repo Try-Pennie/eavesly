@@ -32,7 +32,9 @@ export const litigationCheckModule: EvalModule = {
 
     // Server-side recount — don't trust LLM arithmetic
     const actualViolation =
-      result.litigation_discussed && !result.agent_communicated_restriction
+      result.litigation_discussed &&
+      result.litigated_account_enrolled &&
+      !result.agent_communicated_restriction
     result.violation = actualViolation
 
     return {

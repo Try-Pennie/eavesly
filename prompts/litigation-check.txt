@@ -33,8 +33,11 @@
         </step>
         <step name="evaluate_agent_response">
             <action>If any mentions remain after filtering (i.e., a specific account's litigation status was discussed), determine whether the AGENT clearly communicated that the account cannot be enrolled or needs to be removed from the program. "Communicating the restriction" includes the agent taking action to remove or exclude the account from the program (e.g., "I'll take that off", "let me remove that one", "we'll leave that one out") — the agent does not need to explicitly say "this account cannot be enrolled" if they are actively removing or excluding it.</action>
-            <action>Record the agent's response quote if they communicated the restriction, including quotes where the agent offers or confirms removal/exclusion of the account</action>
-            <action>If the agent did not address the restriction, note this as a violation</action>
+            <action>Also inspect the final creditor / Schedule A / enrolled-account list. Excluding the specifically litigated account from the final enrollment satisfies the restriction even if the agent did not narrate the removal. In that case set agent_communicated_restriction=true and quote the clearest final-list or exclusion evidence.</action>
+            <action>Do not infer that the litigated account was enrolled merely because the client enrolled in the overall program, because the agent discussed a total debt amount, or because another account from a related company was enrolled. Require exact-account inclusion evidence.</action>
+            <action>Match creditor identities carefully. A historical creditor account (for example, a Discover card) is not automatically the same account as a later consolidation or successor loan (for example, an Achieve personal loan) merely because the transcript describes a relationship between the companies. Do not treat a successor, sponsor, servicer, or replacement account as the litigated account without explicit evidence that it is the same debt.</action>
+            <action>Record the agent's response quote if they communicated the restriction, including quotes where the agent offers or confirms removal/exclusion of the account.</action>
+            <action>If the specific litigated account was included and the agent did not address the restriction, note this as a violation.</action>
         </step>
     </process>
 
@@ -53,7 +56,7 @@
         </litigation_terms>
 
         <violation_rule>
-            A violation occurs when a SPECIFIC account's litigation status (lawsuit, summons, judgment, garnishment, or court action) IS discussed on the call but the agent FAILS to clearly communicate that the affected account cannot be enrolled or must be removed from the program. Note: accounts in collections are NOT a violation trigger — collections is a normal debt lifecycle stage and is acceptable to enroll. Active settlement negotiations are NOT a violation trigger here — they are handled by the active_settlements module.
+            A violation occurs when a SPECIFIC account's litigation status (lawsuit, summons, judgment, garnishment, or court action) IS discussed, that exact account is included in the enrollment, and the agent FAILS to clearly communicate or act on the restriction. If the litigated account is absent from the final enrolled-account list, it was excluded and there is no violation. Do not claim inclusion without exact-account evidence. Note: accounts in collections are NOT a violation trigger — collections is a normal debt lifecycle stage and is acceptable to enroll. Active settlement negotiations are NOT a violation trigger here — they are handled by the active_settlements module.
         </violation_rule>
 
         <excluded_from_litigation_discussed>
@@ -83,6 +86,8 @@
             <case>A specific account is identified by name as being in collections (e.g., "that Midland Credit account is a collections") and the agent enrolls it — set litigation_discussed to false, no violation. Collections is a normal debt lifecycle stage and does not restrict enrollment.</case>
             <case>The only relevant language describes active settlement negotiations (e.g., "I'm negotiating with Discover", "they offered me a settlement") — set litigation_discussed to false, no violation. The active_settlements module handles these.</case>
             <case>Agent acknowledges an account's litigation/legal status (e.g., active garnishment, levy, judgment, lawsuit) and removes or excludes it from the program — this satisfies the restriction requirement even without an explicit verbal statement that the account "cannot be enrolled" (e.g., "I'll take that off for you", "let me remove that one", "we won't include that account")</case>
+            <case>The final enrolled-account / Schedule A list omits the specifically litigated account — treat the omission as exclusion, set agent_communicated_restriction=true, and do not flag.</case>
+            <case>A different successor, consolidation, or related-company account is enrolled, but the transcript does not establish that it is the same debt as the litigated account — do not conflate the accounts and do not flag.</case>
         </no_violation_cases>
     </evaluation_criteria>
 
@@ -95,7 +100,7 @@
            - Specific account discussions include: a contact or agent discussing a particular account that has been sued, served, has a judgment, or is subject to a garnishment / court action. Note: an account being "in collections" does NOT qualify as a specific account discussion for violation purposes. Active settlement negotiations do NOT qualify here either.
         4. If ALL mentions are standard disclosures or generic references, return litigation_discussed=false, empty mentions array, agent_communicated_restriction=false, violation=false
         5. If any mentions involve a SPECIFIC account's litigation status, include only those mentions, set litigation_discussed=true, and check whether the AGENT explicitly told the client that the account cannot be enrolled or needs to be removed
-        6. Set violation=true ONLY when litigation_discussed=true AND agent_communicated_restriction=false
+        6. Set violation=true ONLY when litigation_discussed=true, the exact litigated account is included in enrollment, AND agent_communicated_restriction=false. If the final enrolled-account list excludes that account, set agent_communicated_restriction=true and violation=false. Never infer exact-account inclusion from overall enrollment or a related-company account.
         7. Provide a clear violation_reason explaining what happened
         8. Select the most relevant quote as key_evidence_quote for alerts
         9. Do NOT flag calls where litigation is never mentioned — most calls will not discuss this topic
@@ -114,9 +119,10 @@ Respond with a valid JSON object using exactly these top-level keys:
 
 - "litigation_discussed": Whether litigation (lawsuit, summons, judgment, garnishment, or court action) on a specific account was mentioned on the call (boolean). Collections alone does NOT set this to true. Active settlement negotiations do NOT set this to true.
 - "mentions": Array of each mention found, each with term_used, speaker, quote, and context
-- "agent_communicated_restriction": Whether the agent clearly communicated that the account cannot be enrolled or must be removed (boolean)
+- "litigated_account_enrolled": Whether the exact account with litigation was included in the final enrolled-account / Schedule A list (boolean). False when it was omitted, explicitly removed, only a different related-company account was enrolled, or exact-account inclusion is not evidenced.
+- "agent_communicated_restriction": Whether the agent clearly communicated or acted on the restriction, including excluding the litigated account from the final enrolled-account list (boolean)
 - "agent_response_quote": Direct quote of the agent's response communicating the restriction (empty string if none)
-- "violation": Whether this is a violation — litigation_discussed=true AND agent_communicated_restriction=false (boolean)
+- "violation": Whether this is a violation — litigation_discussed=true AND litigated_account_enrolled=true AND agent_communicated_restriction=false (boolean)
 - "violation_reason": Human-readable explanation of the violation or why there is no violation
 - "key_evidence_quote": Most relevant quote for alerts (empty string if litigation not discussed)
 

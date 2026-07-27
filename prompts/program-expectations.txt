@@ -43,6 +43,15 @@
         </required_downsides>
     </program_expectations_page>
 
+    <manager_feedback_calibration>
+        Human reviewers have consistently overturned alerts where the agent covered the substance in natural language rather than reading the page verbatim. Apply these rules before marking an element missing:
+        - A continuous explanation of the client's journey can cover multiple phases. If the agent explains the beginning (setup / first negotiations), middle (settlements arriving / balances shrinking), and end (accounts resolved / program completed), mark the corresponding phases covered even when phase names and exact month boundaries are omitted. One coherent passage may support several phase flags.
+        - Do not require separate sentences for each phase. Approximate timing, sequence words ("first," "then," "after that," "by the end"), and substantive descriptions of what happens are enough.
+        - For accounts_may_close, count any clear statement that enrolled accounts cannot remain available for use: cards cannot be swiped, the client cannot keep using them, accounts are charged off, accounts go away, or balances are resolved and the accounts are closed out. The exact words "may close" are not required.
+        - Search the entire handling-agent conversation for paraphrased coverage before setting a flag false. Do not mark an item missing merely because the evidence does not resemble the Skyfall page wording.
+        These are wording-calibration rules, not a waiver. If the substance of a phase or downside is genuinely absent, mark it uncovered.
+    </manager_feedback_calibration>
+
     <enrollment_definition>
         An enrollment is "completed" on this call when the client agrees to the program AND one or more of the following concrete enrollment steps happen DURING THIS CALL:
         - DocuSign enrollment agreement sent and signed on this call, OR
@@ -61,7 +70,7 @@
         <step name="evaluate_phase_coverage">
             <action>For each of the four phases (activation, traction, momentum, graduation), determine whether the handling agent covered that phase's content with the client.</action>
             <action>A phase is "covered" when the agent clearly describes what that phase is and when it happens. The agent does NOT need to use the exact phase name — e.g., "the first 3 months is when we set up your account" covers activation; "by month 10 is when you really hit momentum, balances actively shrinking" covers momentum.</action>
-            <action>Slide-walkthrough leniency: when the agent is clearly walking the client through the Program Expectations page (screen share cues, "as you can see here," reading through the timeline) and narrates the program journey end to end — setup, negotiations beginning, settlements resolving balances, finishing debt-free — treat the corresponding phases as covered even if the agent does not separately articulate each phase's month boundaries. Approximate or missing month numbers are fine when the journey's substance and sequence are conveyed.</action>
+            <action>Slide-walkthrough leniency: when the agent is clearly walking the client through the Program Expectations page (screen share cues, "as you can see here," reading through the timeline) and narrates the program journey end to end — setup, negotiations beginning, settlements resolving balances, finishing debt-free — treat all four phases as covered even if the agent does not separately articulate each phase or its month boundaries. The same substance-over-labels rule applies when the agent gives that coherent journey explanation without explicit screen-share cues. Approximate or missing month numbers are fine when the journey's substance and sequence are conveyed.</action>
             <action>A phase is NOT covered by a passing reference without content, e.g., "there are 4 phases" with no walkthrough of any phase content and no narration of the program journey.</action>
             <action>Record a direct quote as evidence for each phase that is covered. Leave the evidence empty string if the phase was not covered.</action>
         </step>

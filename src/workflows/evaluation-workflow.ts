@@ -78,9 +78,14 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
       timeout: "30 seconds",
     }, async () => {
-      if (!callData.sfdc_lead_id) return null
+      if (!callData.sfdc_lead_id && !callData.contact_phone) return null
       const db = new DatabaseService(this.env)
-      return await db.getPriorCallContext(callData.sfdc_lead_id, callData.call_id)
+      return await db.getPriorCallContext({
+        currentCallId: callData.call_id,
+        sfdcLeadId: callData.sfdc_lead_id,
+        contactPhone: callData.contact_phone,
+        currentStartedAt: callData.transcript.metadata.timestamp,
+      })
     })
 
     // Step 0c: Disposition-review only. Load the live CRM disposition catalog so

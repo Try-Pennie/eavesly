@@ -9,6 +9,14 @@ import type { CallCompletedEvent } from "../schemas/regal-events"
 import { log } from "../utils/logger"
 import { parseMonitoringSnapshot, type MonitoringSnapshot } from "./monitoring-health"
 
+/** Identity and ordering data used to find calls that happened before an evaluation. */
+export interface PriorCallLookup {
+  readonly currentCallId: string
+  readonly sfdcLeadId?: string
+  readonly contactPhone?: string
+  readonly currentStartedAt?: string
+}
+
 export class DatabaseService {
   private client: SupabaseClient
 
@@ -195,42 +203,95 @@ export class DatabaseService {
     }))
   }
 
+  /**
+   * Loads calls that happened before the current evaluation. SFDC lead id is
+   * preferred; phone is a fallback for multi-call journeys whose lead id changed
+   * or was absent on an earlier call.
+   */
   async getPriorCallContext(
-    sfdcLeadId: string,
-    currentCallId: string,
+    lookup: PriorCallLookup,
   ): Promise<CallHistoryContext | null> {
-    const { count, error: countError } = await this.client
+    const { data: currentCall, error: currentCallError } = await this.client
+      .from("eavesly_calls")
+      .select("sfdc_lead_id, contact_phone, started_at")
+      .eq("call_id", lookup.currentCallId)
+      .limit(1)
+      .maybeSingle()
+
+    if (currentCallError) {
+      log("warn", "Failed to fetch current call identity for history", {
+        callId: lookup.currentCallId,
+        error: currentCallError.message,
+      })
+    }
+
+    const sfdcLeadId = lookup.sfdcLeadId ?? currentCall?.sfdc_lead_id ?? undefined
+    const contactPhone = lookup.contactPhone ?? currentCall?.contact_phone ?? undefined
+    const currentStartedAt = currentCall?.started_at ?? lookup.currentStartedAt ?? undefined
+
+    type IdentityColumn = "sfdc_lead_id" | "contact_phone"
+    const callColumns = "call_id, started_at, disposition, direction, talk_time, agent_email, campaign_name, notes"
+
+    const loadCalls = async (column: IdentityColumn, value: string) => {
+      let query = this.client
+        .from("eavesly_calls")
+        .select(callColumns)
+        .eq(column, value)
+        .neq("call_id", lookup.currentCallId)
+
+      if (currentStartedAt) query = query.lt("started_at", currentStartedAt)
+
+      return await query.order("started_at", { ascending: false }).limit(5)
+    }
+
+    let identity: { column: IdentityColumn; value: string } | null = null
+    let callData: any[] | null = null
+
+    if (sfdcLeadId) {
+      const leadResult = await loadCalls("sfdc_lead_id", sfdcLeadId)
+      if (leadResult.error) {
+        log("warn", "Failed to fetch prior calls by lead id", {
+          callId: lookup.currentCallId,
+          error: leadResult.error.message,
+        })
+      } else if (leadResult.data && leadResult.data.length > 0) {
+        identity = { column: "sfdc_lead_id", value: sfdcLeadId }
+        callData = leadResult.data
+      }
+    }
+
+    if (!callData && contactPhone) {
+      const phoneResult = await loadCalls("contact_phone", contactPhone)
+      if (phoneResult.error) {
+        log("warn", "Failed to fetch prior calls by phone", {
+          callId: lookup.currentCallId,
+          error: phoneResult.error.message,
+        })
+        return null
+      }
+      if (phoneResult.data && phoneResult.data.length > 0) {
+        identity = { column: "contact_phone", value: contactPhone }
+        callData = phoneResult.data
+      }
+    }
+
+    if (!identity || !callData || callData.length === 0) return null
+
+    let countQuery = this.client
       .from("eavesly_calls")
       .select("call_id", { count: "exact", head: true })
-      .eq("sfdc_lead_id", sfdcLeadId)
-      .neq("call_id", currentCallId)
+      .eq(identity.column, identity.value)
+      .neq("call_id", lookup.currentCallId)
+    if (currentStartedAt) countQuery = countQuery.lt("started_at", currentStartedAt)
 
+    const { count, error: countError } = await countQuery
     if (countError) {
       log("warn", "Failed to fetch prior call count", {
-        sfdcLeadId,
+        callId: lookup.currentCallId,
+        identity: identity.column,
         error: countError.message,
       })
     }
-
-    const totalPriorCalls = count ?? 0
-
-    const { data: callData, error: callError } = await this.client
-      .from("eavesly_calls")
-      .select("call_id, started_at, disposition, direction, talk_time, agent_email, campaign_name, notes")
-      .eq("sfdc_lead_id", sfdcLeadId)
-      .neq("call_id", currentCallId)
-      .order("started_at", { ascending: false })
-      .limit(5)
-
-    if (callError) {
-      log("warn", "Failed to fetch prior call context", {
-        sfdcLeadId,
-        error: callError.message,
-      })
-      return null
-    }
-
-    if (!callData || callData.length === 0) return null
 
     const callIds = callData.map((row: any) => row.call_id)
 
@@ -241,7 +302,7 @@ export class DatabaseService {
 
     if (qaError) {
       log("warn", "Failed to fetch prior call QA data", {
-        sfdcLeadId,
+        callId: lookup.currentCallId,
         error: qaError.message,
       })
     }
@@ -268,7 +329,7 @@ export class DatabaseService {
     })
 
     return {
-      total_prior_calls: totalPriorCalls || priorCalls.length,
+      total_prior_calls: count ?? priorCalls.length,
       prior_calls: priorCalls,
     }
   }

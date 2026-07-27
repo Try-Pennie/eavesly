@@ -8,6 +8,7 @@
       "context": "Client brings up legal action during credit review."
     }
   ],
+  "litigated_account_enrolled": false,
   "agent_communicated_restriction": true,
   "agent_response_quote": "Because that account has a lawsuit filed against it, we won't be able to include it in the program. We'll need to remove that one from enrollment.",
   "violation": false,
