@@ -12,7 +12,11 @@ function healthySnapshot(overrides: Partial<MonitoringSnapshot> = {}): Monitorin
     latestTranscriptAvailableAt: new Date("2026-07-27T12:14:00Z"),
     eventsMissingPlan: 0,
     completedEventsMissingCallProjection: 0,
-    triggeredPlansMissingResults: 0,
+    completedEventsSampled: 100,
+    completedEventsMissingTranscript: 0,
+    transcriptEventsSampled: 100,
+    transcriptEventsMissingCompletion: 0,
+    launchedPlansMissingResults: 0,
     ...overrides,
   }
 }
@@ -85,8 +89,44 @@ describe("health routes", () => {
     })
   })
 
+  it("returns 200 when recent Regal events have their counterparts", async () => {
+    const res = await createApp().request("/health/event-pairing", {}, createEnv())
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get("cache-control")).toBe("no-store")
+    expect(await res.json()).toMatchObject({
+      status: "healthy",
+      policy: {
+        window_minutes: 120,
+        grace_minutes: 15,
+        minimum_sample_size: 25,
+      },
+      checks: {
+        completed_without_transcript: { status: "healthy", affected: 0 },
+        transcript_without_completion: { status: "healthy", affected: 0 },
+      },
+    })
+  })
+
+  it("returns event-pairing gaps independently from pipeline execution failures", async () => {
+    const database = new FakeHealthDatabase(true, healthySnapshot({
+      completedEventsMissingTranscript: 61,
+      transcriptEventsMissingCompletion: 16,
+    }))
+    const res = await createApp(database).request("/health/event-pairing", {}, createEnv())
+
+    expect(res.status).toBe(503)
+    expect(await res.json()).toMatchObject({
+      status: "degraded",
+      checks: {
+        completed_without_transcript: { status: "degraded", affected: 61, rate_percent: 61 },
+        transcript_without_completion: { status: "degraded", affected: 16, rate_percent: 16 },
+      },
+    })
+  })
+
   it("returns 503 with aggregate pipeline failures", async () => {
-    const database = new FakeHealthDatabase(true, healthySnapshot({ triggeredPlansMissingResults: 2 }))
+    const database = new FakeHealthDatabase(true, healthySnapshot({ launchedPlansMissingResults: 2 }))
     const res = await createApp(database).request("/health/pipeline", {}, createEnv())
 
     expect(res.status).toBe(503)

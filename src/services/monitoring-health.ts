@@ -6,7 +6,11 @@ export interface MonitoringSnapshot {
   readonly latestTranscriptAvailableAt: Date | null
   readonly eventsMissingPlan: number
   readonly completedEventsMissingCallProjection: number
-  readonly triggeredPlansMissingResults: number
+  readonly completedEventsSampled: number
+  readonly completedEventsMissingTranscript: number
+  readonly transcriptEventsSampled: number
+  readonly transcriptEventsMissingCompletion: number
+  readonly launchedPlansMissingResults: number
 }
 
 export type StreamHealth =
@@ -27,6 +31,27 @@ export type PipelineStageHealth =
   | { readonly status: "healthy"; readonly affected: 0 }
   | { readonly status: "degraded"; readonly affected: number }
 
+export type PairingStageHealth = {
+  readonly status: "healthy" | "degraded" | "insufficient_data"
+  readonly affected: number
+  readonly sampled: number
+  readonly rate_percent: number | null
+  readonly threshold_percent: number
+}
+
+export interface EventPairingHealth {
+  readonly status: "healthy" | "degraded"
+  readonly policy: {
+    readonly window_minutes: 120
+    readonly grace_minutes: 15
+    readonly minimum_sample_size: 25
+  }
+  readonly checks: {
+    readonly completed_without_transcript: PairingStageHealth
+    readonly transcript_without_completion: PairingStageHealth
+  }
+}
+
 export interface PipelineHealth {
   readonly status: "healthy" | "degraded"
   readonly checks: {
@@ -37,14 +62,36 @@ export interface PipelineHealth {
 }
 
 const RpcTimestampSchema = z.string().datetime({ offset: true }).transform((value) => new Date(value))
-const RpcCountSchema = z.coerce.number().int().nonnegative()
+const RpcCountSchema = z.union([
+  z.number(),
+  z.string().regex(/^\d+$/).transform((value) => Number(value)),
+]).pipe(z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER))
 const MonitoringSnapshotRowSchema = z.object({
   observed_at: RpcTimestampSchema,
   latest_call_completed_at: RpcTimestampSchema.nullable(),
   latest_transcript_available_at: RpcTimestampSchema.nullable(),
   events_missing_plan: RpcCountSchema,
   completed_events_missing_call_projection: RpcCountSchema,
-  triggered_plans_missing_results: RpcCountSchema,
+  completed_events_sampled: RpcCountSchema,
+  completed_events_missing_transcript: RpcCountSchema,
+  transcript_events_sampled: RpcCountSchema,
+  transcript_events_missing_completion: RpcCountSchema,
+  launched_plans_missing_results: RpcCountSchema,
+}).superRefine((row, context) => {
+  if (row.completed_events_missing_transcript > row.completed_events_sampled) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "completed pairing count exceeds sample",
+      path: ["completed_events_missing_transcript"],
+    })
+  }
+  if (row.transcript_events_missing_completion > row.transcript_events_sampled) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "transcript pairing count exceeds sample",
+      path: ["transcript_events_missing_completion"],
+    })
+  }
 })
 
 /** Parses the untrusted Supabase RPC row before it enters health policy. */
@@ -57,7 +104,11 @@ export function parseMonitoringSnapshot(value: unknown): MonitoringSnapshot {
     latestTranscriptAvailableAt: parsed.data.latest_transcript_available_at,
     eventsMissingPlan: parsed.data.events_missing_plan,
     completedEventsMissingCallProjection: parsed.data.completed_events_missing_call_projection,
-    triggeredPlansMissingResults: parsed.data.triggered_plans_missing_results,
+    completedEventsSampled: parsed.data.completed_events_sampled,
+    completedEventsMissingTranscript: parsed.data.completed_events_missing_transcript,
+    transcriptEventsSampled: parsed.data.transcript_events_sampled,
+    transcriptEventsMissingCompletion: parsed.data.transcript_events_missing_completion,
+    launchedPlansMissingResults: parsed.data.launched_plans_missing_results,
   }
 }
 
@@ -99,11 +150,63 @@ function pipelineStage(affected: number): PipelineStageHealth {
   return affected === 0 ? { status: "healthy", affected: 0 } : { status: "degraded", affected }
 }
 
-/** Derives a PII-free integrity result for recent event, projection, and evaluation stages. */
+const PAIRING_POLICY = {
+  window_minutes: 120,
+  grace_minutes: 15,
+  minimum_sample_size: 25,
+} as const
+
+function pairingStage(affected: number, sampled: number, thresholdPercent: number): PairingStageHealth {
+  const rawRatePercent = sampled === 0 ? null : (affected / sampled) * 100
+  const ratePercent = rawRatePercent === null ? null : Math.round(rawRatePercent * 10) / 10
+  if (sampled < PAIRING_POLICY.minimum_sample_size) {
+    return {
+      status: "insufficient_data",
+      affected,
+      sampled,
+      rate_percent: ratePercent,
+      threshold_percent: thresholdPercent,
+    }
+  }
+  return {
+    status: rawRatePercent !== null && rawRatePercent > thresholdPercent ? "degraded" : "healthy",
+    affected,
+    sampled,
+    rate_percent: ratePercent,
+    threshold_percent: thresholdPercent,
+  }
+}
+
+/** Separates anomalous source-event counterpart rates from downstream evaluation health. */
+export function evaluateEventPairingHealth(snapshot: MonitoringSnapshot): EventPairingHealth {
+  const completedWithoutTranscript = pairingStage(
+    snapshot.completedEventsMissingTranscript,
+    snapshot.completedEventsSampled,
+    60,
+  )
+  const transcriptWithoutCompletion = pairingStage(
+    snapshot.transcriptEventsMissingCompletion,
+    snapshot.transcriptEventsSampled,
+    15,
+  )
+  return {
+    status: completedWithoutTranscript.status === "degraded" ||
+      transcriptWithoutCompletion.status === "degraded"
+      ? "degraded"
+      : "healthy",
+    policy: PAIRING_POLICY,
+    checks: {
+      completed_without_transcript: completedWithoutTranscript,
+      transcript_without_completion: transcriptWithoutCompletion,
+    },
+  }
+}
+
+/** Derives a PII-free integrity result for recent plan, projection, and launched evaluation stages. */
 export function evaluatePipelineHealth(snapshot: MonitoringSnapshot): PipelineHealth {
   const resolverPlans = pipelineStage(snapshot.eventsMissingPlan)
   const callProjection = pipelineStage(snapshot.completedEventsMissingCallProjection)
-  const moduleResults = pipelineStage(snapshot.triggeredPlansMissingResults)
+  const moduleResults = pipelineStage(snapshot.launchedPlansMissingResults)
   return {
     status: resolverPlans.status === "healthy" &&
       callProjection.status === "healthy" &&

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  evaluateEventPairingHealth,
   evaluateIngestionHealth,
   evaluatePipelineHealth,
   parseMonitoringSnapshot,
@@ -13,7 +14,11 @@ function snapshot(overrides: Partial<MonitoringSnapshot> = {}): MonitoringSnapsh
     latestTranscriptAvailableAt: new Date("2026-07-27T12:14:00Z"),
     eventsMissingPlan: 0,
     completedEventsMissingCallProjection: 0,
-    triggeredPlansMissingResults: 0,
+    completedEventsSampled: 100,
+    completedEventsMissingTranscript: 0,
+    transcriptEventsSampled: 100,
+    transcriptEventsMissingCompletion: 0,
+    launchedPlansMissingResults: 0,
     ...overrides,
   }
 }
@@ -60,12 +65,84 @@ describe("Eavesly ingestion health", () => {
   })
 })
 
+describe("Eavesly event pairing health", () => {
+  it("keeps normal source-event gap rates healthy", () => {
+    expect(evaluateEventPairingHealth(snapshot({
+      completedEventsMissingTranscript: 50,
+      transcriptEventsMissingCompletion: 10,
+    }))).toEqual({
+      status: "healthy",
+      policy: {
+        window_minutes: 120,
+        grace_minutes: 15,
+        minimum_sample_size: 25,
+      },
+      checks: {
+        completed_without_transcript: {
+          status: "healthy",
+          affected: 50,
+          sampled: 100,
+          rate_percent: 50,
+          threshold_percent: 60,
+        },
+        transcript_without_completion: {
+          status: "healthy",
+          affected: 10,
+          sampled: 100,
+          rate_percent: 10,
+          threshold_percent: 15,
+        },
+      },
+    })
+  })
+
+  it("degrades when either source-event gap rate exceeds policy", () => {
+    expect(evaluateEventPairingHealth(snapshot({
+      completedEventsMissingTranscript: 61,
+      transcriptEventsMissingCompletion: 16,
+    }))).toMatchObject({
+      status: "degraded",
+      checks: {
+        completed_without_transcript: { status: "degraded", rate_percent: 61 },
+        transcript_without_completion: { status: "degraded", rate_percent: 16 },
+      },
+    })
+  })
+
+  it("uses the unrounded rate at the alert boundary", () => {
+    expect(evaluateEventPairingHealth(snapshot({
+      completedEventsSampled: 10_000,
+      completedEventsMissingTranscript: 6_001,
+    }))).toMatchObject({
+      status: "degraded",
+      checks: {
+        completed_without_transcript: { status: "degraded", rate_percent: 60 },
+      },
+    })
+  })
+
+  it("does not alert on a low-volume pairing sample", () => {
+    expect(evaluateEventPairingHealth(snapshot({
+      completedEventsSampled: 20,
+      completedEventsMissingTranscript: 20,
+      transcriptEventsSampled: 0,
+      transcriptEventsMissingCompletion: 0,
+    }))).toMatchObject({
+      status: "healthy",
+      checks: {
+        completed_without_transcript: { status: "insufficient_data", rate_percent: 100 },
+        transcript_without_completion: { status: "insufficient_data", rate_percent: null },
+      },
+    })
+  })
+})
+
 describe("Eavesly pipeline health", () => {
   it("identifies every degraded pipeline stage without exposing records", () => {
     expect(evaluatePipelineHealth(snapshot({
       eventsMissingPlan: 2,
       completedEventsMissingCallProjection: 1,
-      triggeredPlansMissingResults: 3,
+      launchedPlansMissingResults: 3,
     }))).toEqual({
       status: "degraded",
       checks: {
@@ -85,15 +162,51 @@ describe("monitoring snapshot parsing", () => {
       latest_transcript_available_at: null,
       events_missing_plan: 0,
       completed_events_missing_call_projection: "1",
-      triggered_plans_missing_results: 2,
+      completed_events_sampled: 100,
+      completed_events_missing_transcript: 3,
+      transcript_events_sampled: 100,
+      transcript_events_missing_completion: "4",
+      launched_plans_missing_results: 2,
     })).toEqual(snapshot({
       latestTranscriptAvailableAt: null,
       completedEventsMissingCallProjection: 1,
-      triggeredPlansMissingResults: 2,
+      completedEventsMissingTranscript: 3,
+      transcriptEventsMissingCompletion: 4,
+      launchedPlansMissingResults: 2,
     }))
   })
 
   it("rejects malformed persisted snapshots", () => {
     expect(() => parseMonitoringSnapshot({ observed_at: "not-a-date" })).toThrow("monitoring snapshot")
+  })
+
+  it("fails closed instead of coercing null counts to zero", () => {
+    expect(() => parseMonitoringSnapshot({
+      observed_at: "2026-07-27T12:20:00+00:00",
+      latest_call_completed_at: null,
+      latest_transcript_available_at: null,
+      events_missing_plan: null,
+      completed_events_missing_call_projection: 0,
+      completed_events_sampled: 0,
+      completed_events_missing_transcript: 0,
+      transcript_events_sampled: 0,
+      transcript_events_missing_completion: 0,
+      launched_plans_missing_results: 0,
+    })).toThrow("monitoring snapshot")
+  })
+
+  it("rejects pairing counts that exceed their sample", () => {
+    expect(() => parseMonitoringSnapshot({
+      observed_at: "2026-07-27T12:20:00+00:00",
+      latest_call_completed_at: null,
+      latest_transcript_available_at: null,
+      events_missing_plan: 0,
+      completed_events_missing_call_projection: 0,
+      completed_events_sampled: 0,
+      completed_events_missing_transcript: 1,
+      transcript_events_sampled: 0,
+      transcript_events_missing_completion: 0,
+      launched_plans_missing_results: 0,
+    })).toThrow("monitoring snapshot")
   })
 })

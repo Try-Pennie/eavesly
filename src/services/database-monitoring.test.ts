@@ -28,19 +28,27 @@ describe("DatabaseService monitoring snapshot", () => {
         latest_transcript_available_at: "2026-07-27T12:14:00+00:00",
         events_missing_plan: 0,
         completed_events_missing_call_projection: 0,
-        triggered_plans_missing_results: 0,
+        completed_events_sampled: 100,
+        completed_events_missing_transcript: 0,
+        transcript_events_sampled: 50,
+        transcript_events_missing_completion: 0,
+        launched_plans_missing_results: 0,
       }],
       error: null,
     })
 
     const result = await database(client).getMonitoringSnapshot()
 
-    expect(client.calls).toEqual(["eavesly_monitoring_snapshot"])
+    expect(client.calls).toEqual(["eavesly_monitoring_snapshot_v2"])
     expect(result).toMatchObject({
       observedAt: new Date("2026-07-27T12:20:00Z"),
       eventsMissingPlan: 0,
       completedEventsMissingCallProjection: 0,
-      triggeredPlansMissingResults: 0,
+      completedEventsSampled: 100,
+      completedEventsMissingTranscript: 0,
+      transcriptEventsSampled: 50,
+      transcriptEventsMissingCompletion: 0,
+      launchedPlansMissingResults: 0,
     })
   })
 
