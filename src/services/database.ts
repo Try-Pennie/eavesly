@@ -7,6 +7,7 @@ import type { RegalCallEvent, JoinedRegalEvents, ModuleTriggerPlan, ActiveResolv
 import { DEFAULT_RESOLVER_POLICY, parseResolverPolicyRow, callCompletedEventToCallRow } from "./regal-events"
 import type { CallCompletedEvent } from "../schemas/regal-events"
 import { log } from "../utils/logger"
+import { parseMonitoringSnapshot, type MonitoringSnapshot } from "./monitoring-health"
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
@@ -983,6 +984,29 @@ export class DatabaseService {
       throw error
     }
     return true
+  }
+
+  /** Loads the aggregate, PII-free snapshot used by public operational health routes. */
+  async getMonitoringSnapshot(): Promise<MonitoringSnapshot> {
+    const { data, error } = await this.client.rpc("eavesly_monitoring_snapshot")
+    if (error) {
+      log("error", "Monitoring snapshot RPC failed", {
+        operation: "eavesly_monitoring_snapshot",
+        error: "rpc_failed",
+      })
+      throw new Error("monitoring snapshot unavailable")
+    }
+
+    const row = Array.isArray(data) ? data[0] : undefined
+    try {
+      return parseMonitoringSnapshot(row)
+    } catch {
+      log("error", "Monitoring snapshot RPC returned invalid data", {
+        operation: "eavesly_monitoring_snapshot",
+        error: "invalid_response",
+      })
+      throw new Error("monitoring snapshot unavailable")
+    }
   }
 
   async healthCheck(): Promise<boolean> {
