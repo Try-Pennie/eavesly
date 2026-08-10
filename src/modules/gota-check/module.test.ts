@@ -258,22 +258,7 @@ describe("gotaCheckModule", () => {
       expect(gotaCheckModule.extractAlerts(result, "call-1", "agent-1")).toEqual([])
     })
 
-    it("returns alert with gota_check violation type", () => {
-      const result = {
-        module_name: MODULE_NAMES.GOTA_CHECK,
-        result: violationFixture,
-        has_violation: true,
-        violation_type: VIOLATION_TYPES.GOTA_CHECK,
-        processing_time_ms: 50,
-      }
-      const alerts = gotaCheckModule.extractAlerts(result, "call-2", "agent-2")
-      expect(alerts).toHaveLength(1)
-      expect(alerts[0].violation_type).toBe(VIOLATION_TYPES.GOTA_CHECK)
-      expect(alerts[0].module_name).toBe(MODULE_NAMES.GOTA_CHECK)
-      expect(alerts[0].call_id).toBe("call-2")
-    })
-
-    it("includes Regal context fields when callData provided", () => {
+    it("stores violations for soft-launch review without creating manager alerts", () => {
       const result = {
         module_name: MODULE_NAMES.GOTA_CHECK,
         result: violationFixture,
@@ -286,11 +271,9 @@ describe("gotaCheckModule", () => {
         contact_name: "Jane Smith",
         recording_link: "https://recordings.example.com/call-2",
       })
-      const alerts = gotaCheckModule.extractAlerts(result, "call-2", "agent-2", callData)
-      expect(alerts).toHaveLength(1)
-      expect(alerts[0].agent_email).toBe("agent@test.com")
-      expect(alerts[0].contact_name).toBe("Jane Smith")
-      expect(alerts[0].recording_link).toBe("https://recordings.example.com/call-2")
+
+      expect(result.has_violation).toBe(true)
+      expect(gotaCheckModule.extractAlerts(result, "call-2", "agent-2", callData)).toEqual([])
     })
   })
 })

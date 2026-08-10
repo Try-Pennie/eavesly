@@ -1,5 +1,5 @@
 import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
-import { extractAlerts, buildUserPrompt } from "../types"
+import { buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { GotaCheckModelResponseSchema } from "../../schemas/gota-check"
@@ -64,6 +64,10 @@ export const gotaCheckModule: EvalModule = {
     }
   },
 
-  extractAlerts: (result, callId, agentId, callData) =>
-    extractAlerts(MODULE_NAMES.GOTA_CHECK, VIOLATION_TYPES.GOTA_CHECK, result, callId, agentId, callData),
+  // Soft launch: persist every assessment (including has_violation) for internal
+  // accuracy review, but create no Alert objects. EvaluationWorkflow therefore
+  // stores alert_sent=false and neither manager queues nor Slack receive GOTA.
+  // Restore alert extraction only after the rollout cohort is fully onboarded
+  // and stored results have been validated.
+  extractAlerts: () => [],
 }
