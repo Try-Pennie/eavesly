@@ -163,6 +163,11 @@ describe("transcriptEventToCallData", () => {
         transcript_url: "https://t/1",
         originalTimestamp: "2026-01-01T00:00:00Z",
         contact_phone: "+15550000000",
+        customProperties: {
+          LegalState: "No",
+          clientState: "CA",
+          collectionsBalance: 2,
+        },
       }),
     )
     expect(data.call_id).toBe("task-1")
@@ -171,6 +176,10 @@ describe("transcriptEventToCallData", () => {
     expect(data.recording_link).toBe("https://rec/1")
     expect(data.transcript.metadata.duration).toBe(900)
     expect(data.transcript.metadata.timestamp).toBe("2026-01-01T00:00:00Z")
+    expect(data.lead_context).toEqual({
+      legal_state: "No",
+      client_state: "CA",
+    })
   })
 
   it("enriches callData with task-scoped completed-event metadata when present", () => {
@@ -185,6 +194,11 @@ describe("transcriptEventToCallData", () => {
         disposition: "1.4 - Converted/Won > END CAMPAIGNS",
         campaign_name: "End Campaigns",
         originalTimestamp: "2026-01-02T00:00:00Z",
+        customProperties: {
+          LegalState: "Yes",
+          clientState: "NY",
+          collectionsBalance: 3,
+        },
       }),
     )
 
@@ -196,6 +210,10 @@ describe("transcriptEventToCallData", () => {
     expect(data.transcript.metadata.disposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
     expect(data.transcript.metadata.campaign_name).toBe("End Campaigns")
     expect(data.transcript.metadata.timestamp).toBe("2026-01-02T00:00:00Z")
+    expect(data.lead_context).toEqual({
+      legal_state: "Yes",
+      client_state: "NY",
+    })
   })
 })
 

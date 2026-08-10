@@ -665,6 +665,25 @@ describe("buildSlackPayload — gota_check", () => {
     expect(payload.detail).toContain("- SSN verification")
   })
 
+  it("detail shows required-disclosure compliance and missing disclosures", () => {
+    const payload = buildSlackPayload(
+      gotaAlert({
+        ...gotaViolationFixture,
+        missing_required_disclosures: ["Tax consequences / IRS reporting"],
+      }),
+    )
+    expect(payload.detail).toContain("Required disclosures compliant: NO")
+    expect(payload.detail).toContain("Missing/noncompliant required disclosures:")
+    expect(payload.detail).toContain("- Tax consequences / IRS reporting")
+  })
+
+  it("detail labels the California packet", () => {
+    const payload = buildSlackPayload(
+      gotaAlert({ ...gotaViolationFixture, gota_type: "fdr_california" }),
+    )
+    expect(payload.detail).toContain("Freedom Debt Relief (California two-step)")
+  })
+
   it("detail labels the Turnbull packet for red-state walkthroughs", () => {
     const payload = buildSlackPayload(gotaAlert({ ...gotaViolationFixture, gota_type: "turnbull_red" }))
     expect(payload.detail).toContain("Turnbull Law Group (red / legal-model state)")
