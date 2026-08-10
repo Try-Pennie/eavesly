@@ -23,8 +23,10 @@ const RegalBooleanSchema = z.preprocess((value) => {
 
 const CustomPropertiesSchema = z
   .object({
-    // Warm-transfer gate: LegalState === 'No'
-    LegalState: z.string().optional(),
+    // Warm-transfer gate and red/green GOTA guide selector.
+    LegalState: z.string().max(32).optional(),
+    // California takes precedence over LegalState for the GOTA guide.
+    clientState: z.string().max(32).optional(),
     // Litigation/collections gate: collectionsBalance > 1
     collectionsBalance: z.coerce.number().optional(),
   })
@@ -69,6 +71,7 @@ export const CallCompletedEventSchema = z.object({
   started_at: z.union([z.string(), z.number()]).optional(),
   ended_at: z.union([z.string(), z.number()]).optional(),
   completed_at: z.union([z.string(), z.number()]).optional(),
+  customProperties: CustomPropertiesSchema.optional(),
   source_event_id: z.string().optional(),
   originalTimestamp: z.string().optional(),
   raw_event: z.unknown().optional(),

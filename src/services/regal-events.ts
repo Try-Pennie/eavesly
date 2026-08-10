@@ -105,6 +105,9 @@ export function transcriptEventToCallData(
   e: TranscriptAvailableEvent,
   completed?: CallCompletedEvent,
 ): EvaluateRequest {
+  const legalState = e.customProperties?.LegalState || completed?.customProperties?.LegalState
+  const clientState = e.customProperties?.clientState || completed?.customProperties?.clientState
+
   return {
     call_id: e.regal_task_id,
     regal_task_id: e.regal_task_id,
@@ -126,6 +129,13 @@ export function transcriptEventToCallData(
     recording_link: e.recording_link,
     call_summary: e.call_summary,
     transcript_url: e.transcript_url,
+    lead_context:
+      legalState || clientState
+        ? {
+            legal_state: legalState,
+            client_state: clientState,
+          }
+        : undefined,
   }
 }
 

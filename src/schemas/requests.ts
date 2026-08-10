@@ -13,6 +13,11 @@ const TranscriptDataSchema = z.object({
   metadata: TranscriptMetadataSchema,
 })
 
+const LeadContextSchema = z.object({
+  legal_state: z.string().max(32).optional(),
+  client_state: z.string().max(32).optional(),
+})
+
 export const EvaluateRequestSchema = z.object({
   call_id: z.string().min(1),
   regal_task_id: z.string().optional(),
@@ -25,6 +30,7 @@ export const EvaluateRequestSchema = z.object({
   call_summary: z.string().optional(),
   transcript_url: z.string().optional(),
   sfdc_lead_id: z.string().optional(),
+  lead_context: LeadContextSchema.optional(),
 })
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>
