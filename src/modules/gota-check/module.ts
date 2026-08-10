@@ -2,10 +2,18 @@ import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
 import { extractAlerts, buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
-import { GotaCheckModelResponseSchema } from "../../schemas/gota-check"
+import { GotaCheckSchema } from "../../schemas/gota-check"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
-import { finalizeGotaCheck, resolveGotaTypeFromLeadContext } from "./logic"
 import systemPrompt from "../../../prompts/gota-check.txt"
+
+export const BEAT_LABELS: Record<string, string> = {
+  fee_structure: "Fee structure (performance-based fees)",
+  cancellation_rights: "Cancellation rights (cancel window + cancel anytime)",
+  do_not_sign_page: "Cancellation notice DO-NOT-SIGN page",
+  banking_readback: "Banking details read-back",
+  ssn_verification: "SSN verification",
+  wc_transfer_brief: "Warm-transfer brief to welcome team",
+}
 
 /**
  * Achieve GOTA (Going Over The Agreement) check — internal Pennie compliance
@@ -24,24 +32,35 @@ export const gotaCheckModule: EvalModule = {
   ): Promise<ModuleResult> {
     const start = Date.now()
 
-    const expectedGotaType = resolveGotaTypeFromLeadContext(callData.lead_context)
-    const guideContext = expectedGotaType
-      ? `\n\nRegal lead metadata identifies the authoritative guide variant as ${expectedGotaType}. Use that gota_type even if transcript wording is ambiguous. For California, this metadata does not identify whether this is the initial or Day-4 call; classify call_stage only from the transcript and prior-call history.`
-      : ""
     const userPrompt = buildUserPrompt(
-      `Please evaluate the following Achieve enrollment call transcript for GOTA (Going Over The Agreement) signing-walkthrough compliance:${guideContext}`,
+      "Please evaluate the following Achieve enrollment call transcript for GOTA (Going Over The Agreement) signing-walkthrough compliance:",
       transcript,
       callHistory,
     )
 
-    const modelResult = await llm.getStructuredResponse(
+    const result = await llm.getStructuredResponse(
       systemPrompt,
       userPrompt,
-      GotaCheckModelResponseSchema,
+      GotaCheckSchema,
       "gota_check_evaluation",
     )
-    const result = finalizeGotaCheck(modelResult, transcript, expectedGotaType)
-    const actualViolation = result.violation
+
+    // Server-side recount — don't trust LLM arithmetic. Rebuild missing_beats
+    // from the per-beat flags and recompute the violation from its definition:
+    // signed on this call without a guided GOTA walkthrough. Missing beats are
+    // informational only and never flip the violation.
+    const missing: string[] = []
+    if (!result.fee_structure_beat_covered) missing.push(BEAT_LABELS.fee_structure)
+    if (!result.cancellation_rights_beat_covered) missing.push(BEAT_LABELS.cancellation_rights)
+    if (!result.do_not_sign_page_beat_covered) missing.push(BEAT_LABELS.do_not_sign_page)
+    if (!result.banking_readback_beat_covered) missing.push(BEAT_LABELS.banking_readback)
+    if (!result.ssn_verification_beat_covered) missing.push(BEAT_LABELS.ssn_verification)
+    if (!result.wc_transfer_brief_beat_covered) missing.push(BEAT_LABELS.wc_transfer_brief)
+
+    const actualViolation = result.enrollment_completed && !result.gota_conducted
+
+    result.missing_beats = missing
+    result.violation = actualViolation
 
     return {
       module_name: MODULE_NAMES.GOTA_CHECK,
