@@ -178,13 +178,13 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       }
     }
 
-    // Step 2d: Achieve GOTA follow-up (disposition_review only). GOTA applies to
-    // every Achieve enrollment regardless of LegalState, and disposition_review is
-    // guaranteed to run with transcript + completed-event data joined regardless
-    // of webhook arrival order. Gated by enrollment disposition + duration before
-    // the partner-assignment lookup. Best-effort: routing must never fail the
-    // disposition_review workflow.
-    if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW && callData.transcript.metadata.disposition) {
+    // Step 2d: Achieve GOTA follow-up (full_qa only). The GOTA signing walkthrough
+    // is mandatory on every Achieve enrollment regardless of LegalState — red/Turnbull
+    // legal-model states never reach warm_transfer — so it chains off full_qa, which
+    // fires on every transcript. Gated by the enrollment disposition + duration
+    // (cheap, DB-free) before the partner-assignment lookup. Best-effort: routing
+    // must never fail the full_qa workflow.
+    if (moduleName === MODULE_NAMES.FULL_QA && callData.transcript.metadata.disposition) {
       try {
         await step.do(`route-${MODULE_NAMES.GOTA_CHECK}`, {
           retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
