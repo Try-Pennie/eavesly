@@ -519,8 +519,12 @@ function extractDetail(alert: Alert): string {
           ? "Turnbull Law Group (red / legal-model state)"
           : r?.gota_type === "fdr_green"
             ? "Freedom Debt Relief (green state)"
-            : "Unknown"
+            : r?.gota_type === "fdr_california"
+              ? "Freedom Debt Relief (California two-step)"
+              : "Unknown"
       const lines: string[] = [
+        `Required disclosures compliant: ${r?.required_disclosures_compliant ? "yes" : "NO"}`,
+        `Required disclosures in order: ${r?.required_disclosures_in_order ? "yes" : "NO"}`,
         `GOTA walkthrough conducted: ${r?.gota_conducted ? "yes" : "NO"}`,
         `Agreement packet: ${gotaTypeLabel}`,
         `Welcome-call transfer on this call: ${r?.wc_transfer_occurred ? "yes" : "no"}`,
@@ -528,6 +532,13 @@ function extractDetail(alert: Alert): string {
       if (r?.enrollment_evidence_quote) {
         lines.push("")
         lines.push(`Signing confirmed: "${r.enrollment_evidence_quote}"`)
+      }
+      if (r?.missing_required_disclosures?.length > 0) {
+        lines.push("")
+        lines.push("Missing/noncompliant required disclosures:")
+        for (const disclosure of r.missing_required_disclosures) {
+          lines.push(`- ${disclosure}`)
+        }
       }
       if (r?.missing_beats?.length > 0) {
         lines.push("")

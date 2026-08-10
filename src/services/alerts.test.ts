@@ -665,9 +665,27 @@ describe("buildSlackPayload — gota_check", () => {
     expect(payload.detail).toContain("- SSN verification")
   })
 
+  it("detail shows required-disclosure compliance and lists missing disclosures", () => {
+    const payload = buildSlackPayload(
+      gotaAlert({
+        ...gotaViolationFixture,
+        missing_required_disclosures: ["Tax consequences / IRS reporting"],
+      }),
+    )
+    expect(payload.detail).toContain("Required disclosures compliant: NO")
+    expect(payload.detail).toContain("Required disclosures in order: NO")
+    expect(payload.detail).toContain("Missing/noncompliant required disclosures:")
+    expect(payload.detail).toContain("- Tax consequences / IRS reporting")
+  })
+
   it("detail labels the Turnbull packet for red-state walkthroughs", () => {
     const payload = buildSlackPayload(gotaAlert({ ...gotaViolationFixture, gota_type: "turnbull_red" }))
     expect(payload.detail).toContain("Turnbull Law Group (red / legal-model state)")
+  })
+
+  it("detail labels the California two-step FDR packet", () => {
+    const payload = buildSlackPayload(gotaAlert({ ...gotaViolationFixture, gota_type: "fdr_california" }))
+    expect(payload.detail).toContain("Freedom Debt Relief (California two-step)")
   })
 })
 
@@ -977,6 +995,35 @@ describe("Achieve module alert suppression", () => {
 
     await dispatchAlerts([alert], ctx, env)
     await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  // Regression guard: the combined PSC + GOTA work must NOT unmute either
+  // Achieve mute. Both the gota_check soft-launch mute and the external
+  // achieve_welcome_call_qa mute must keep suppressing Slack.
+  it("keeps BOTH the gota_check and achieve_welcome_call_qa Slack mutes", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alerts = [
+      createAlert({
+        module_name: MODULE_NAMES.GOTA_CHECK,
+        violation_type: VIOLATION_TYPES.GOTA_CHECK,
+        agent_email: "agent@trypennie.com",
+        result: gotaViolationFixture,
+      }),
+      createAlert({
+        module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+        violation_type: VIOLATION_TYPES.ACHIEVE_WELCOME_CALL,
+        agent_email: "agent@achieve.com",
+        result: {},
+      }),
+    ]
+
+    await dispatchAlerts(alerts, ctx, env)
+    for (const call of (ctx.waitUntil as any).mock.calls) {
+      await call[0]
+    }
 
     expect(fetch).not.toHaveBeenCalled()
   })

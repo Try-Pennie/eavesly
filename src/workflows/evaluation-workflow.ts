@@ -178,13 +178,18 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
       }
     }
 
-    // Step 2d: Achieve GOTA follow-up (full_qa only). The GOTA signing walkthrough
-    // is mandatory on every Achieve enrollment regardless of LegalState — red/Turnbull
-    // legal-model states never reach warm_transfer — so it chains off full_qa, which
-    // fires on every transcript. Gated by the enrollment disposition + duration
-    // (cheap, DB-free) before the partner-assignment lookup. Best-effort: routing
-    // must never fail the full_qa workflow.
-    if (moduleName === MODULE_NAMES.FULL_QA && callData.transcript.metadata.disposition) {
+    // Step 2c3: Achieve combined PSC + GOTA follow-up (disposition_review only).
+    // GOTA applies to every Achieve enrollment regardless of LegalState (red/
+    // Turnbull legal-model states never reach warm_transfer), and
+    // disposition_review is the one module guaranteed to run exactly once with
+    // BOTH the transcript and completed event joined regardless of webhook
+    // arrival order — and with lead_context (LegalState/clientState) carried on
+    // callData for deterministic guide selection. It chains independently of the
+    // achieve_welcome_call_qa follow-up above (distinct module name => distinct
+    // workflow instance id, so idempotency is preserved). Gated by the enrollment
+    // disposition + duration (cheap, DB-free) before the partner-assignment
+    // lookup. Best-effort: routing must never fail the disposition_review workflow.
+    if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW && callData.transcript.metadata.disposition) {
       try {
         await step.do(`route-${MODULE_NAMES.GOTA_CHECK}`, {
           retries: { limit: 2, delay: "2 seconds", backoff: "constant" },
