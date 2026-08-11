@@ -59,10 +59,12 @@ export function isAchieveWelcomeCallEligible(
 }
 
 /**
- * Eligibility gate for the Achieve GOTA check. The GOTA (Going Over The Agreement)
- * signing walkthrough is mandatory on every Achieve enrollment — red/Turnbull
- * legal-model states AND green/FDR states — so this follow-up chains off full_qa
- * (which fires on every transcript) rather than warm_transfer (LegalState == "No"
+ * Eligibility gate for the Achieve combined PSC + GOTA check. The GOTA (Going
+ * Over The Agreement) signing walkthrough is mandatory on every Achieve
+ * enrollment — red/Turnbull legal-model states AND green/FDR states — so this
+ * follow-up chains off disposition_review, the one module guaranteed to run with
+ * transcript + completed-event data (and lead_context) joined regardless of
+ * webhook arrival order. It cannot chain from warm_transfer (LegalState == "No"
  * only, which would silently exclude red states). Gate on the enrollment
  * disposition + the standard enrollment duration threshold so LLM time is only
  * spent on genuine enrollment/signing calls.

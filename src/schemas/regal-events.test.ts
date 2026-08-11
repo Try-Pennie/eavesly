@@ -13,7 +13,7 @@ describe("TranscriptAvailableEventSchema", () => {
     recording_duration: "1500",
     recording_link: "https://example.com/rec.mp3",
     transcript_is_truncated: "false",
-    customProperties: { LegalState: "No", collectionsBalance: "2.5" },
+    customProperties: { LegalState: "No", clientState: "CA", collectionsBalance: "2.5" },
   }
 
   it("parses a valid payload and coerces numbers", () => {
@@ -22,6 +22,7 @@ describe("TranscriptAvailableEventSchema", () => {
     expect(r.transcript_is_truncated).toBe(false)
     expect(r.customProperties?.collectionsBalance).toBe(2.5)
     expect(r.customProperties?.LegalState).toBe("No")
+    expect(r.customProperties?.clientState).toBe("CA")
   })
 
   it("rejects wrong event_type", () => {
@@ -60,6 +61,7 @@ describe("CallCompletedEventSchema", () => {
     started_at: 1657855046,
     ended_at: 1657855053,
     completed_at: 1657855059,
+    customProperties: { LegalState: "Yes", clientState: "NY", collectionsBalance: "3" },
   }
 
   it("parses a valid payload and coerces numbers", () => {
@@ -71,6 +73,7 @@ describe("CallCompletedEventSchema", () => {
     expect(r.handle_time).toBe(1206)
     expect(r.completed_at).toBe(1657855059)
     expect(r.disposition).toBe("1.4 - Converted/Won > END CAMPAIGNS")
+    expect(r.customProperties).toEqual({ LegalState: "Yes", clientState: "NY", collectionsBalance: 3 })
   })
 
   it("rejects wrong event_type", () => {

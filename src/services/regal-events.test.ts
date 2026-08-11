@@ -163,6 +163,7 @@ describe("transcriptEventToCallData", () => {
         transcript_url: "https://t/1",
         originalTimestamp: "2026-01-01T00:00:00Z",
         contact_phone: "+15550000000",
+        customProperties: { LegalState: "No", clientState: "CA", collectionsBalance: 2 },
       }),
     )
     expect(data.call_id).toBe("task-1")
@@ -171,6 +172,20 @@ describe("transcriptEventToCallData", () => {
     expect(data.recording_link).toBe("https://rec/1")
     expect(data.transcript.metadata.duration).toBe(900)
     expect(data.transcript.metadata.timestamp).toBe("2026-01-01T00:00:00Z")
+    expect(data.lead_context).toEqual({ legal_state: "No", client_state: "CA" })
+  })
+
+  it("falls back to completed-event customProperties for lead context", () => {
+    const data = transcriptEventToCallData(
+      transcript({ customProperties: undefined }),
+      completed({ customProperties: { LegalState: "Yes", clientState: "NY", collectionsBalance: 3 } }),
+    )
+    expect(data.lead_context).toEqual({ legal_state: "Yes", client_state: "NY" })
+  })
+
+  it("omits lead_context when neither event carries lead state", () => {
+    const data = transcriptEventToCallData(transcript({ customProperties: undefined }), completed())
+    expect(data.lead_context).toBeUndefined()
   })
 
   it("enriches callData with task-scoped completed-event metadata when present", () => {

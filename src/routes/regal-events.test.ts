@@ -54,7 +54,7 @@ const transcriptBody = {
   regal_task_id: "task-1",
   transcript: "hello",
   recording_duration: 1500,
-  customProperties: { LegalState: "No", collectionsBalance: 2 },
+  customProperties: { LegalState: "No", clientState: "CA", collectionsBalance: 2 },
 }
 
 const completedBody = {
@@ -177,6 +177,7 @@ describe("Regal event routes", () => {
       expect(call[0].params.callData.call_id).toBe("task-1")
       expect(call[0].params.callData.transcript.metadata.disposition).toBe(completedBody.disposition)
       expect(call[0].params.callData.transcript.metadata.duration).toBe(transcriptBody.recording_duration)
+      expect(call[0].params.callData.lead_context).toEqual({ legal_state: "No", client_state: "CA" })
       expect(call[0].retention).toEqual({
         successRetention: "7 days",
         errorRetention: "14 days",

@@ -86,7 +86,10 @@ src/
 | `POST` | `/api/v1/batch` | Batch evaluate multiple calls |
 | `POST` | `/api/v1/evaluate/{module}/from-recording` | Transcribe a call recording, then evaluate |
 | `POST` | `/api/v1/profile-recap` | Read one lead's profile recap for Skyfall |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` | API and database health |
+| `GET` | `/health/ingestion` | Scheduled Regal event-stream freshness |
+| `GET` | `/health/event-pairing` | Aged completion/transcript counterpart rates against operational thresholds |
+| `GET` | `/health/pipeline` | Resolver, call projection, and launched-workflow result integrity |
 
 ### Skyfall profile recap
 

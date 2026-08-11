@@ -13,6 +13,19 @@ const TranscriptDataSchema = z.object({
   metadata: TranscriptMetadataSchema,
 })
 
+/**
+ * Deterministic Regal lead metadata carried inward from customProperties. Drives
+ * server-owned Achieve guide selection (California > red/green) independently of
+ * the model's transcript read. Both fields are optional because older Regal
+ * events predate them.
+ */
+export const LeadContextSchema = z.object({
+  legal_state: z.string().max(32).optional(),
+  client_state: z.string().max(32).optional(),
+})
+
+export type LeadContext = z.infer<typeof LeadContextSchema>
+
 export const EvaluateRequestSchema = z.object({
   call_id: z.string().min(1),
   regal_task_id: z.string().optional(),
@@ -25,6 +38,7 @@ export const EvaluateRequestSchema = z.object({
   call_summary: z.string().optional(),
   transcript_url: z.string().optional(),
   sfdc_lead_id: z.string().optional(),
+  lead_context: LeadContextSchema.optional(),
 })
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>
