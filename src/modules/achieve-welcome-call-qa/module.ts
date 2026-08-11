@@ -1,12 +1,12 @@
-import { z } from "zod"
 import type { EvalModule, ModuleResult, CallHistoryContext } from "../types"
 import { extractAlerts, buildUserPrompt } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
-import { AchieveWelcomeCallQASchema } from "../../schemas/achieve-welcome-call-qa"
+import { AchieveWelcomeCallQAModelResponseSchema } from "../../schemas/achieve-welcome-call-qa"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
 import { segmentWelcomeCall } from "./segment"
 import { analyzeTransferExperience } from "./transfer-experience"
+import { finalizeScriptAdherence } from "./script-adherence"
 import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 
 // partner_id and script_version are not columns in eavesly_module_results;
@@ -14,16 +14,6 @@ import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
 const PARTNER_ID = "achieve" as const
 const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v1" as const
 const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
-
-// Partner, segmentation, and transfer-quality fields are stamped deterministically
-// after the model returns, so the model may omit them.
-const EvalSchema = AchieveWelcomeCallQASchema.extend({
-  partner_id: z.string().optional(),
-  script_version: z.string().optional(),
-  agent_identity_check: AchieveWelcomeCallQASchema.shape.agent_identity_check.optional(),
-  transfer_experience: AchieveWelcomeCallQASchema.shape.transfer_experience.optional(),
-  transcript_segment: AchieveWelcomeCallQASchema.shape.transcript_segment.optional(),
-})
 
 export const achieveWelcomeCallQAModule: EvalModule = {
   name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
@@ -85,7 +75,7 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     const result = await llm.getStructuredResponse(
       systemPrompt,
       userPrompt,
-      EvalSchema,
+      AchieveWelcomeCallQAModelResponseSchema,
       "achieve_welcome_call_qa_evaluation",
     )
 
@@ -106,7 +96,10 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     const transferExperience = analyzeTransferExperience(seg)
     const stamped = {
       ...result,
-      script_adherence: { ...result.script_adherence, key_evidence_quotes: verifiedQuotes },
+      script_adherence: finalizeScriptAdherence({
+        ...result.script_adherence,
+        key_evidence_quotes: verifiedQuotes,
+      }),
       partner_id: PARTNER_ID,
       script_version: SCRIPT_VERSION,
       transfer_experience: transferExperience,

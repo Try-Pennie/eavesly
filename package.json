@@ -13,6 +13,7 @@
     "smoke-test": "tsx scripts/smoke-test.ts",
     "eval:disposition": "tsx scripts/eval-disposition-models.ts",
     "eval:achieve-wc": "tsx scripts/eval-achieve-wc-qa.ts",
+    "eval:achieve-wc:cf": "cfp env pennie -- bash -c 'CF_ACCOUNT_ID=3e7f907a9c19e51417873e2cce4fbc5c CF_GATEWAY_ID=eavesly CF_AIG_TOKEN=$CLOUDFLARE_API_TOKEN npm run eval:achieve-wc'",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

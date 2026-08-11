@@ -478,6 +478,30 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
     expect(r.script_adherence).toBeUndefined()
   })
 
+  it("recomputes a script violation when both high-risk elements are missing", async () => {
+    const llm = createMockLLM({
+      ...mockResponse,
+      script_adherence: {
+        ...mockResponse.script_adherence,
+        dedicated_account_deposits_explained: false,
+        settlement_authorizations_explained: false,
+        missing_elements: ["dedicated_account_deposits", "settlement_authorizations"],
+        violation: false,
+        violation_reason: "",
+      },
+    })
+    const request = createEvaluateRequest()
+
+    const result = await achieveWelcomeCallQAModule.evaluate(FULL, request, llm as any)
+    const r = result.result as any
+
+    expect(result.has_violation).toBe(true)
+    expect(r.script_adherence.violation).toBe(true)
+    expect(r.script_adherence.violation_reason).toContain(
+      "dedicated-account deposits and settlement authorizations",
+    )
+  })
+
   it("persists poor transfer as a violation while preserving full script adherence", async () => {
     const llm = createMockLLM(mockResponse)
     const request = createEvaluateRequest()

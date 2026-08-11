@@ -26,12 +26,13 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs"
 import OpenAI from "openai"
 import { zodResponseFormat } from "openai/helpers/zod"
 import type { z } from "zod"
-import { AchieveWelcomeCallQASchema } from "../src/schemas/achieve-welcome-call-qa"
+import { AchieveWelcomeCallQAModelResponseSchema } from "../src/schemas/achieve-welcome-call-qa"
 import { buildUserPrompt } from "../src/modules/types"
 import {
   segmentWelcomeCall,
   type WelcomeCallSegment,
 } from "../src/modules/achieve-welcome-call-qa/segment"
+import { finalizeScriptAdherence } from "../src/modules/achieve-welcome-call-qa/script-adherence"
 import { EVAL_CASES, type EvalCase } from "./eval-cases/achieve-welcome-call-qa-cases"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -60,19 +61,7 @@ const SYSTEM_PROMPT = readFileSync(
   "utf8",
 )
 
-// ── Mirrors of src/modules/achieve-welcome-call-qa/module.ts ────────────────
-// module.ts can't be imported here (it imports the .txt prompt, which only the
-// Workers build resolves), so the preamble and EvalSchema are kept in sync
-// manually — same approach as eval-disposition-models.ts.
-
-const EvalSchema = AchieveWelcomeCallQASchema.extend({
-  partner_id: AchieveWelcomeCallQASchema.shape.partner_id.optional(),
-  script_version: AchieveWelcomeCallQASchema.shape.script_version.optional(),
-  agent_identity_check: AchieveWelcomeCallQASchema.shape.agent_identity_check.optional(),
-  transfer_experience: AchieveWelcomeCallQASchema.shape.transfer_experience.optional(),
-  transcript_segment: AchieveWelcomeCallQASchema.shape.transcript_segment.optional(),
-})
-type Analysis = z.infer<typeof EvalSchema>
+type Analysis = z.infer<typeof AchieveWelcomeCallQAModelResponseSchema>
 
 function preamble(seg: WelcomeCallSegment): string {
   return [
@@ -115,7 +104,7 @@ async function runOne(model: string, seg: WelcomeCallSegment): Promise<RunResult
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      response_format: zodResponseFormat(EvalSchema, "achieve_welcome_call_qa_evaluation"),
+      response_format: zodResponseFormat(AchieveWelcomeCallQAModelResponseSchema, "achieve_welcome_call_qa_evaluation"),
       temperature: 0.3,
     })
     const latencyMs = Date.now() - t0
@@ -132,12 +121,22 @@ async function runOne(model: string, seg: WelcomeCallSegment): Promise<RunResult
     } catch (e) {
       return { latencyMs, promptTokens, completionTokens, analysis: null, parseError: `invalid json: ${(e as Error).message}`, error: null }
     }
-    const r = EvalSchema.safeParse(parsed)
+    const r = AchieveWelcomeCallQAModelResponseSchema.safeParse(parsed)
     if (!r.success) {
       const detail = r.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
       return { latencyMs, promptTokens, completionTokens, analysis: null, parseError: `schema: ${detail}`, error: null }
     }
-    return { latencyMs, promptTokens, completionTokens, analysis: r.data, parseError: null, error: null }
+    return {
+      latencyMs,
+      promptTokens,
+      completionTokens,
+      analysis: {
+        ...r.data,
+        script_adherence: finalizeScriptAdherence(r.data.script_adherence),
+      },
+      parseError: null,
+      error: null,
+    }
   } catch (e) {
     return { latencyMs: Date.now() - t0, promptTokens: 0, completionTokens: 0, analysis: null, parseError: null, error: (e as Error).message }
   }
