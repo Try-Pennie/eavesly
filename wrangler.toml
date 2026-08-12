@@ -42,6 +42,11 @@ name = "eavesly-achieve-backfill-canary"
 binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
 class_name = "AchieveBackfillCanaryWorkflow"
 
+[[workflows]]
+name = "eavesly-achieve-backfill-remaining56"
+binding = "ACHIEVE_BACKFILL_REMAINING56_WORKFLOW"
+class_name = "AchieveBackfillRemaining56Workflow"
+
 [observability]
 [observability.logs]
 enabled = false
@@ -61,6 +66,11 @@ name = "eavesly-achieve-backfill-canary-staging"
 binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
 class_name = "AchieveBackfillCanaryWorkflow"
 
+[[env.staging.workflows]]
+name = "eavesly-achieve-backfill-remaining56-staging"
+binding = "ACHIEVE_BACKFILL_REMAINING56_WORKFLOW"
+class_name = "AchieveBackfillRemaining56Workflow"
+
 [env.production]
 name = "eavesly-production"
 vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
@@ -77,3 +87,8 @@ class_name = "EvaluationWorkflow"
 name = "eavesly-achieve-backfill-canary-production"
 binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
 class_name = "AchieveBackfillCanaryWorkflow"
+
+[[env.production.workflows]]
+name = "eavesly-achieve-backfill-remaining56-production"
+binding = "ACHIEVE_BACKFILL_REMAINING56_WORKFLOW"
+class_name = "AchieveBackfillRemaining56Workflow"
