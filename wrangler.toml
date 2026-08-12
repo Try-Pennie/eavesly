@@ -37,6 +37,11 @@ name = "eavesly-evaluation"
 binding = "EVALUATION_WORKFLOW"
 class_name = "EvaluationWorkflow"
 
+[[workflows]]
+name = "eavesly-achieve-backfill-canary"
+binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
+class_name = "AchieveBackfillCanaryWorkflow"
+
 [observability]
 [observability.logs]
 enabled = false
@@ -51,6 +56,11 @@ name = "eavesly-evaluation-staging"
 binding = "EVALUATION_WORKFLOW"
 class_name = "EvaluationWorkflow"
 
+[[env.staging.workflows]]
+name = "eavesly-achieve-backfill-canary-staging"
+binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
+class_name = "AchieveBackfillCanaryWorkflow"
+
 [env.production]
 name = "eavesly-production"
 vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
@@ -62,3 +72,8 @@ routes = [
 name = "eavesly-evaluation-production"
 binding = "EVALUATION_WORKFLOW"
 class_name = "EvaluationWorkflow"
+
+[[env.production.workflows]]
+name = "eavesly-achieve-backfill-canary-production"
+binding = "ACHIEVE_BACKFILL_CANARY_WORKFLOW"
+class_name = "AchieveBackfillCanaryWorkflow"

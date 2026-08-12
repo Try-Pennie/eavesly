@@ -7,7 +7,11 @@ import { log } from "../utils/logger"
 
 export type LLMClient = ReturnType<typeof createLLMClient>
 
-export function createLLMClient(env: Bindings, modelOverride?: string) {
+export function createLLMClient(
+  env: Bindings,
+  modelOverride?: string,
+  privacy: { readonly invalidResponseLogging?: "default" | "categorical_only" } = {},
+) {
   const model = modelOverride ?? env.OPENROUTER_MODEL
   const client = new OpenAI({
     apiKey: env.CF_AIG_TOKEN,
@@ -54,6 +58,10 @@ export function createLLMClient(env: Bindings, modelOverride?: string) {
       try {
         parsed = JSON.parse(content)
       } catch (parseError) {
+        if (privacy.invalidResponseLogging === "categorical_only") {
+          log("error", "LLM returned invalid JSON", { errorTag: "invalid_json" })
+          throw new Error("LLM returned invalid JSON")
+        }
         log("error", "LLM returned invalid JSON", {
           contentPreview: content.substring(0, 500),
           error: parseError instanceof Error ? parseError.message : String(parseError),
@@ -64,6 +72,13 @@ export function createLLMClient(env: Bindings, modelOverride?: string) {
       const result = schema.safeParse(parsed)
 
       if (!result.success) {
+        if (privacy.invalidResponseLogging === "categorical_only") {
+          log("warn", "Zod validation failed, retrying", {
+            errorTag: "schema_validation_failed",
+            issueCount: result.error.issues.length,
+          })
+          throw new Error("Schema validation failed")
+        }
         const topKeys = Object.keys(parsed as object)
         log("warn", "Zod validation failed, retrying", {
           errors: result.error.issues.slice(0, 5),

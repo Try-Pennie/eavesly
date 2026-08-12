@@ -21,6 +21,8 @@ export interface Bindings {
   TWILIO_ACCOUNT_SID?: string
   TWILIO_AUTH_TOKEN?: string
   EVALUATION_WORKFLOW: Workflow
+  /** Dedicated deterministic PSAI-245 one-call canary Workflow binding. */
+  ACHIEVE_BACKFILL_CANARY_WORKFLOW: Workflow
 }
 
 export interface Variables {
