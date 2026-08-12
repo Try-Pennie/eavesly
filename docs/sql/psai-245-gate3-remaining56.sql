@@ -71,7 +71,7 @@ begin
 end;
 $function$;
 
-revoke all on function public.eavesly_reject_psai245_remaining56_result_mutation_v1() from public;
+revoke all on function public.eavesly_reject_psai245_remaining56_result_mutation_v1() from public, anon, authenticated, service_role;
 
 drop trigger if exists eavesly_module_results_psai245_remaining56_guard on public.eavesly_module_results;
 create trigger eavesly_module_results_psai245_remaining56_guard

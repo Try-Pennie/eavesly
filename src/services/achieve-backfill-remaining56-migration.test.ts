@@ -21,6 +21,7 @@ describe("PSAI-245 Gate 3 PostgreSQL migration contract", () => {
 
   it("plain-inserts metadata-free immutable audit rows and never exposes a reset transition", () => {
     expect(sql).toContain("PSAI-245 remaining-56 audit result is immutable")
+    expect(sql).toContain("revoke all on function public.eavesly_reject_psai245_remaining56_result_mutation_v1() from public, anon, authenticated, service_role")
     expect(sql).toContain("PSAI-245 remaining-56 call is reserved for audit-only finalization")
     expect(sql).toContain("and new.module_name = 'achieve_welcome_call_qa'")
     expect(sql).toContain("current_setting('eavesly.psai245_remaining_finalize', true) is not distinct from 'on'")

@@ -6,6 +6,10 @@ import { AchieveBackfillDryRunRequestSchema } from "../schemas/achieve-backfill-
 import { AchieveBackfillCanaryRequestSchema } from "../schemas/achieve-backfill-canary"
 import { AchieveBackfillRemaining56RequestSchema } from "../schemas/achieve-backfill-remaining56"
 import {
+  AchieveBackfillResume27RequestSchema,
+  type AchieveBackfillResume27Request,
+} from "../schemas/achieve-backfill-resume27"
+import {
   runAchieveBackfillDryRun,
   type AchieveBackfillInspector,
 } from "../services/achieve-backfill-dry-run"
@@ -24,6 +28,13 @@ import {
 } from "../services/achieve-backfill-remaining56"
 import type { AchieveBackfillRemaining56Request } from "../schemas/achieve-backfill-remaining56"
 import { achieveBackfillRemaining56WorkflowInstanceId } from "../workflows/achieve-backfill-remaining56-workflow"
+import {
+  ACHIEVE_BACKFILL_RESUME27_PROGRESS_FINGERPRINT,
+  authorizeAchieveBackfillResume27,
+  type AchieveBackfillResume27Approval,
+  type AchieveBackfillResume27Authorization,
+} from "../services/achieve-backfill-resume27"
+import { achieveBackfillResume27WorkflowInstanceId } from "../workflows/achieve-backfill-resume27-workflow"
 import { workflowRetentionForEnvironment } from "../workflows/workflow-retention"
 import { log } from "../utils/logger"
 
@@ -32,6 +43,10 @@ type AuthorizeAchieveBackfillRemaining56 = (
   command: AchieveBackfillRemaining56Request,
   approval: AchieveBackfillCanaryApproval,
 ) => Promise<AchieveBackfillRemaining56Authorization>
+type AuthorizeAchieveBackfillResume27 = (
+  command: AchieveBackfillResume27Request,
+  approval: AchieveBackfillResume27Approval,
+) => Promise<AchieveBackfillResume27Authorization>
 
 export { ACHIEVE_BACKFILL_APPROVED_DIGEST }
 
@@ -42,6 +57,11 @@ export function createAchieveBackfillAdminRoutes(
     approvedDigest: ACHIEVE_BACKFILL_APPROVED_DIGEST,
   },
   authorizeRemaining56: AuthorizeAchieveBackfillRemaining56 = authorizeAchieveBackfillRemaining56,
+  authorizeResume27: AuthorizeAchieveBackfillResume27 = authorizeAchieveBackfillResume27,
+  resume27Approval: AchieveBackfillResume27Approval = {
+    approvedDigest: ACHIEVE_BACKFILL_APPROVED_DIGEST,
+    approvedProgressStateFingerprint: ACHIEVE_BACKFILL_RESUME27_PROGRESS_FINGERPRINT,
+  },
 ): Hono<AppEnv> {
   const routes = new Hono<AppEnv>()
   routes.use("*", auth)
@@ -282,6 +302,90 @@ export function createAchieveBackfillAdminRoutes(
         candidate_count: 57,
         remaining_count: 56,
         approved_digest: request.data.digest.value,
+      }, 202)
+    },
+  )
+
+  routes.post(
+    "/admin/achieve-welcome-call-qa/backfill/resume-27",
+    bodyLimit({
+      maxSize: 16_384,
+      onError: (c) => c.json({ error: "Request body too large" }, 413),
+    }),
+    async (c) => {
+      const contentType = c.req.header("Content-Type")
+      const mediaType = contentType?.split(";", 1)[0]?.trim().toLowerCase()
+      if (mediaType !== "application/json") {
+        return c.json({ error: "Content-Type must be application/json" }, 415)
+      }
+
+      let body: unknown
+      try {
+        body = await c.req.json()
+      } catch (cause: unknown) {
+        if (cause instanceof Error && cause.name === "BodyLimitError") {
+          return c.json({ error: "Request body too large" }, 413)
+        }
+        return c.json({ error: "Invalid request" }, 400)
+      }
+
+      const request = AchieveBackfillResume27RequestSchema.safeParse(body)
+      if (!request.success) return c.json({ error: "Invalid request" }, 400)
+
+      const authorization = await authorizeResume27(request.data, resume27Approval)
+      c.header("Cache-Control", "no-store")
+      if (authorization._tag !== "authorized") {
+        const unavailable = authorization._tag === "unavailable"
+        return c.json({
+          ...(unavailable ? { error: "Resume-27 unavailable" } : { status: "rejected" }),
+          reason: authorization.reason,
+          candidate_count: 57,
+          resume_count: 27,
+          approved_digest: request.data.digest.value,
+          progress_state_fingerprint: request.data.progress_state_fingerprint.value,
+        }, unavailable ? 503 : 409)
+      }
+
+      const instanceId = achieveBackfillResume27WorkflowInstanceId(
+        request.data.digest.value,
+        request.data.progress_state_fingerprint.value,
+      )
+      let status: "queued" | "already_queued" = "queued"
+      try {
+        await c.env.ACHIEVE_BACKFILL_RESUME27_WORKFLOW.create({
+          id: instanceId,
+          params: request.data,
+          retention: workflowRetentionForEnvironment(c.env.ENVIRONMENT),
+        })
+      } catch (cause: unknown) {
+        if (cause instanceof Error && cause.message.includes("already exists")) {
+          status = "already_queued"
+        } else {
+          log("error", "Achieve backfill resume-27 enqueue failed", {
+            correlationId: c.get("correlationId"),
+            errorTag: "resume27_enqueue_failed",
+            candidateCount: 57,
+            resumeCount: 27,
+            approvedDigest: request.data.digest.value,
+            progressStateFingerprint: request.data.progress_state_fingerprint.value,
+          })
+          return c.json({
+            error: "Resume-27 unavailable",
+            reason: "enqueue_unavailable",
+            candidate_count: 57,
+            resume_count: 27,
+            approved_digest: request.data.digest.value,
+            progress_state_fingerprint: request.data.progress_state_fingerprint.value,
+          }, 503)
+        }
+      }
+
+      return c.json({
+        status,
+        candidate_count: 57,
+        resume_count: 27,
+        approved_digest: request.data.digest.value,
+        progress_state_fingerprint: request.data.progress_state_fingerprint.value,
       }, 202)
     },
   )
