@@ -23,6 +23,7 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     TWILIO_ACCOUNT_SID: "ACtest",
     TWILIO_AUTH_TOKEN: "test-twilio-token",
     EVALUATION_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
+    ACHIEVE_BACKFILL_CANARY_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
     ...overrides,
   }
 }

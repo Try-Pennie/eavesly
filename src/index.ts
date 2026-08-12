@@ -66,3 +66,4 @@ app.onError((err, c) => {
 
 export default app
 export { EvaluationWorkflow } from "./workflows/evaluation-workflow"
+export { AchieveBackfillCanaryWorkflow } from "./workflows/achieve-backfill-canary-workflow"
