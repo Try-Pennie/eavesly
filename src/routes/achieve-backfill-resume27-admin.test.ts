@@ -80,7 +80,7 @@ describe("PSAI-245 resume-27 admin route", () => {
     })
     expect(text).not.toContain(callIds[29])
     expect(env.ACHIEVE_BACKFILL_RESUME27_WORKFLOW.create).toHaveBeenCalledWith({
-      id: `psai-245-gate-3-resume-pending-after-30-once-${digest}-${fingerprint}`,
+      id: "psai245-r27-298d6e8202117910-ce2f6acc1fe56eea",
       params: body(),
       retention: { successRetention: "7 days", errorRetention: "14 days" },
     })

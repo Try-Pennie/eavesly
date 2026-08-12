@@ -61,13 +61,13 @@ The claim RPC locks that lowest unfinished row before deciding. If it is `attemp
 
 The one-shot settings are unchanged: no application retry, OpenAI SDK `maxRetries: 0`, OpenRouter `provider.allow_fallbacks: false`, Workflow `retries.limit: 0`, and `NonRetryableError` step translation. The durable database claim remains the replay authority. A crash after claim can leave terminal `attempted` with unknown provider outcome; never regrade it.
 
-The distinct deterministic Workflow ID is:
+The distinct deterministic Workflow ID is compact enough for Cloudflare's 64-character limit:
 
 ```text
-psai-245-gate-3-resume-pending-after-30-once-<approved-digest>-<state-fingerprint>
+psai245-r27-<first-16-of-approved-digest>-<first-16-of-state-fingerprint>
 ```
 
-A repeated POST resolves only to that same ID.
+Both complete hashes remain required and independently validated in the request and database authorization. The compact ID is only a deterministic replay key. A repeated POST resolves only to that same ID.
 
 ## Pre-deployment verification (safe/local only)
 

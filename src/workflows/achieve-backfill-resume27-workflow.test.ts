@@ -82,9 +82,9 @@ function dependencies() {
 describe("dedicated PSAI-245 resume-27 Workflow", () => {
   it("uses a deterministic identity distinct from Gate 3 and preserves no retries", () => {
     expect(ACHIEVE_BACKFILL_RESUME27_RETRY_LIMIT).toBe(0)
-    expect(achieveBackfillResume27WorkflowInstanceId(digest, fingerprint)).toBe(
-      `psai-245-gate-3-resume-pending-after-30-once-${digest}-${fingerprint}`,
-    )
+    const instanceId = achieveBackfillResume27WorkflowInstanceId(digest, fingerprint)
+    expect(instanceId).toBe("psai245-r27-298d6e8202117910-ce2f6acc1fe56eea")
+    expect(instanceId.length).toBeLessThanOrEqual(64)
   })
 
   it("processes exactly ordinals 31 through 57 sequentially and never touches ordinal 30", async () => {

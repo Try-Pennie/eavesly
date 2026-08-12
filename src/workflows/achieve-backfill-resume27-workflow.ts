@@ -7,7 +7,6 @@ import {
 import { ACHIEVE_BACKFILL_APPROVED_DIGEST } from "../services/achieve-backfill-canary"
 import {
   ACHIEVE_BACKFILL_RESUME27_AFTER_ORDINAL,
-  ACHIEVE_BACKFILL_RESUME27_ID,
   ACHIEVE_BACKFILL_RESUME27_PROGRESS_FINGERPRINT,
   authorizeAchieveBackfillResume27,
   initializeAchieveBackfillResume27,
@@ -22,12 +21,20 @@ import type { Bindings } from "../types/env"
 /** No Workflow retry is allowed around an at-most-once grading attempt. */
 export const ACHIEVE_BACKFILL_RESUME27_RETRY_LIMIT = 0 as const
 
-/** Derive the distinct deterministic identity from both approved immutable artifacts. */
+/** Cloudflare Workflow instance IDs must be no longer than 64 characters. */
+export const ACHIEVE_BACKFILL_RESUME27_INSTANCE_ID_PREFIX = "psai245-r27" as const
+export const ACHIEVE_BACKFILL_RESUME27_INSTANCE_ID_HASH_LENGTH = 16 as const
+
+/** Derive a compact deterministic identity from both server-approved immutable artifacts. */
 export function achieveBackfillResume27WorkflowInstanceId(
   approvedDigest: string,
   progressStateFingerprint: string,
 ): string {
-  return `${ACHIEVE_BACKFILL_RESUME27_ID}-${approvedDigest}-${progressStateFingerprint}`
+  return [
+    ACHIEVE_BACKFILL_RESUME27_INSTANCE_ID_PREFIX,
+    approvedDigest.slice(0, ACHIEVE_BACKFILL_RESUME27_INSTANCE_ID_HASH_LENGTH),
+    progressStateFingerprint.slice(0, ACHIEVE_BACKFILL_RESUME27_INSTANCE_ID_HASH_LENGTH),
+  ].join("-")
 }
 
 type InitializationResult =
