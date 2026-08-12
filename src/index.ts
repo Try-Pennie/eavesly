@@ -11,6 +11,7 @@ import { regalEventRoutes } from "./routes/regal-events"
 import { regalAdminRoutes } from "./routes/regal-admin"
 import { promptAdminRoutes } from "./routes/prompt-admin"
 import { createProfileRecapRoutes } from "./routes/profile-recap"
+import { createAchieveBackfillAdminRoutes } from "./routes/achieve-backfill-admin"
 
 // Per-module evaluation endpoints. Each mounts /evaluate/<endpoint>,
 // /evaluate/<endpoint>/batch, and /evaluate/<endpoint>/from-recording under /api/v1.
@@ -48,6 +49,7 @@ for (const config of EVAL_ROUTE_CONFIGS) {
 app.route("/api/v1", statusRoutes)
 app.route("/api/v1", regalEventRoutes)
 app.route("/api/v1", regalAdminRoutes)
+app.route("/api/v1", createAchieveBackfillAdminRoutes())
 app.route("/api/v1", promptAdminRoutes)
 
 app.onError((err, c) => {
