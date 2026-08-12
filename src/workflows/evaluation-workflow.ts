@@ -148,13 +148,13 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     // disposition_review is the one module guaranteed to run exactly once with BOTH
     // the transcript and the completed event joined regardless of webhook arrival
     // order (63% of calls receive transcript_available before call_completed), and
-    // step 0a2 above has already injected the authoritative CRM disposition into
-    // callData. Chaining here (rather than off warm_transfer) also includes
-    // legal-model clients (LegalState != "No"), whose welcome calls are just as
-    // real — field review 2026-07-21. Gated by the enrollment disposition + a token
-    // duration floor (cheap, DB-free) before the partner-assignment lookup.
+    // step 0a2 above injects the CRM disposition when one exists. Chaining here
+    // (rather than off warm_transfer) also includes legal-model clients
+    // (LegalState != "No"), whose welcome calls are just as real — field review
+    // 2026-07-21. Always attempt routing from disposition_review: a missing/stale
+    // disposition must not suppress authoritative bounded transcript evidence.
     // Best-effort: routing must never fail the disposition_review workflow.
-    if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW && callData.transcript.metadata.disposition) {
+    if (moduleName === MODULE_NAMES.DISPOSITION_REVIEW) {
       try {
         await step.do(`route-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`, {
           retries: { limit: 2, delay: "2 seconds", backoff: "constant" },

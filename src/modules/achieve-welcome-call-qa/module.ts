@@ -32,7 +32,7 @@ export const achieveWelcomeCallQAModule: EvalModule = {
     transcript: string,
     _callData: EvaluateRequest,
     llm: LLMClient,
-    callHistory?: CallHistoryContext | null,
+    _callHistory?: CallHistoryContext | null,
   ): Promise<ModuleResult> {
     const start = Date.now()
 
@@ -80,7 +80,10 @@ export const achieveWelcomeCallQAModule: EvalModule = {
       "Please evaluate the following Achieve/FDR segment for script adherence:",
     ].join(" ")
 
-    const userPrompt = buildUserPrompt(preamble, seg.segment, callHistory)
+    // External-partner privacy boundary: prior-call summaries and notes may come
+    // from unrelated partners. This module intentionally sends only the bounded
+    // Achieve/FDR segment, regardless of history supplied by the workflow.
+    const userPrompt = buildUserPrompt(preamble, seg.segment)
 
     const result = await llm.getStructuredResponse(
       systemPrompt,

@@ -90,6 +90,26 @@ describe("buildModuleTriggerPlan", () => {
     expect(plan.triggered).toEqual([MODULE_NAMES.FULL_QA])
   })
 
+  it("surfaces when strong welcome evidence is blocked on the missing disposition-review prerequisite", () => {
+    const welcomeTranscript = [
+      "[handling agent]: I will connect you to the welcome team now.",
+      "[transfer agent]: My name is Sam with Freedom Debt Relief.",
+      "[contact]: Yes, I am ready.",
+      "[transfer agent]: Welcome to your program. Let us get you started.",
+    ].join("\n")
+
+    const plan = buildModuleTriggerPlan(
+      { transcript: transcript({ transcript: welcomeTranscript }) },
+      DEFAULT_RESOLVER_POLICY,
+    )
+
+    expect(plan.decisions).toContainEqual({
+      module: MODULE_NAMES.DISPOSITION_REVIEW,
+      trigger: false,
+      reason: "strong_welcome_evidence_awaiting_completed_event",
+    })
+  })
+
   it("completion timeout triggers disposition_review without a completed event", () => {
     const t = triggered({ transcript: transcript(), completionTimedOut: true })
     expect(t.has(MODULE_NAMES.DISPOSITION_REVIEW)).toBe(true)

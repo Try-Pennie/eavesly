@@ -1,10 +1,61 @@
 import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { DatabaseService } from "../services/database"
+import { segmentWelcomeCall, type SegmentSkipReason, type SegmentationConfidence } from "../modules/achieve-welcome-call-qa/segment"
 import { log } from "../utils/logger"
 import { workflowRetentionForEnvironment } from "./workflow-retention"
 
 type Assignment = { partner_assignment: string | null; assignment_status: string | null } | null
+
+type WelcomeCallSegmentEvidence = {
+  readonly found: boolean
+  readonly skipReason: SegmentSkipReason | null
+  readonly confidence: SegmentationConfidence
+  readonly marker: string | null
+}
+
+/** Structured Achieve welcome-call eligibility used by the routing shell. */
+export type AchieveWelcomeCallEligibility =
+  | {
+      readonly eligible: true
+      readonly reason: "strong_transcript_evidence" | "metadata_eligible"
+      readonly assignment: "override" | "require_match"
+      readonly segment: WelcomeCallSegmentEvidence
+    }
+  | {
+      readonly eligible: false
+      readonly reason: "disposition_ineligible" | "duration_ineligible"
+      readonly assignment: "require_match"
+      readonly segment: WelcomeCallSegmentEvidence
+    }
+
+const TURNBULL_PENDING_DISPOSITION = "1.3B - Turnbull Pending"
+
+type FollowupEligibility = {
+  readonly eligible: boolean
+  readonly reason: string
+  readonly assignment?: "override" | "require_match"
+}
+
+/** Structured outcome emitted by partner follow-up routing. */
+export type PartnerRoutingResult =
+  | {
+      readonly status: "routed"
+      readonly reason: "assignment_override" | "assignment_match"
+      readonly eligibilityReason?: string
+      readonly instanceId: string
+    }
+  | {
+      readonly status: "skipped"
+      readonly reason:
+        | "call_ineligible"
+        | "agent_email_missing"
+        | "assignment_missing"
+        | "assignment_unresolved"
+        | "assignment_mismatch"
+        | "already_enqueued"
+      readonly eligibilityReason?: string
+    }
 
 /**
  * Conservative partner routing gate. Only agents whose scalar partner_assignment
@@ -37,25 +88,64 @@ export function shouldRouteToPartner(assignment: Assignment, partner: string): b
  * for LegalState == "No", which excluded legal-model clients whose welcome calls
  * are just as real — field review 2026-07-21).
  *
- * Gate: enrollment disposition + a token duration floor (`achieveMinDurationSeconds`,
- * ~5 min) that filters dial legs and instant hangups. The module's own deterministic
- * segmentation gate (live welcome-rep detection) is the real filter for
- * servicing/IVR-only/non-welcome calls, so no LegalState or long-duration
- * pre-filtering is applied here.
+ * A gradeable result from the production segmenter is authoritative and may
+ * override stale disposition, duration, and assignment metadata. Otherwise the
+ * metadata path requires an enrollment/Turnbull-Pending disposition plus a token
+ * duration floor (`achieveMinDurationSeconds`, ~5 min). Metadata eligibility still
+ * routes failed handoffs so the QA module can persist a deterministic skip, while
+ * competitor and unbounded/no-evidence calls without eligible metadata fail closed.
  */
 export function isAchieveWelcomeCallEligible(
   callData: EvaluateRequest,
   policy: { enrollmentDisposition: string; achieveMinDurationSeconds: number },
-): { eligible: boolean; reason: string } {
+): AchieveWelcomeCallEligibility {
+  const segment = segmentWelcomeCall(callData.transcript.transcript)
+  const segmentEvidence: WelcomeCallSegmentEvidence = {
+    found: segment.segment_found,
+    skipReason: segment.skip_reason,
+    confidence: segment.segmentation_confidence,
+    marker: segment.marker,
+  }
+
+  // segment_found is the production segmenter's gradeable, partner-bounded
+  // contract. It is authoritative when mutable routing metadata is stale.
+  if (segment.segment_found) {
+    return {
+      eligible: true,
+      reason: "strong_transcript_evidence",
+      assignment: "override",
+      segment: segmentEvidence,
+    }
+  }
+
   const disposition = callData.transcript.metadata.disposition
+  const metadataDispositionEligible =
+    disposition === policy.enrollmentDisposition || disposition === TURNBULL_PENDING_DISPOSITION
+  if (!metadataDispositionEligible) {
+    return {
+      eligible: false,
+      reason: "disposition_ineligible",
+      assignment: "require_match",
+      segment: segmentEvidence,
+    }
+  }
+
   const duration = callData.transcript.metadata.duration ?? 0
-  if (disposition !== policy.enrollmentDisposition) {
-    return { eligible: false, reason: `disposition '${disposition ?? ""}' != enrollment disposition` }
-  }
   if (duration <= policy.achieveMinDurationSeconds) {
-    return { eligible: false, reason: `duration ${duration}s <= ${policy.achieveMinDurationSeconds}s` }
+    return {
+      eligible: false,
+      reason: "duration_ineligible",
+      assignment: "require_match",
+      segment: segmentEvidence,
+    }
   }
-  return { eligible: true, reason: "eligible" }
+
+  return {
+    eligible: true,
+    reason: "metadata_eligible",
+    assignment: "require_match",
+    segment: segmentEvidence,
+  }
 }
 
 /**
@@ -85,12 +175,12 @@ export function isAchieveGotaCheckEligible(
 }
 
 /**
- * After a warm_transfer eval is stored, deterministically chain a partner-specific
- * follow-up module (achieve_welcome_call_qa, budget_inputs, ...) when the completing
- * agent is resolved to `partner` in agent_regal_assignments. Keyed by agent_email
- * (callData, falling back to eavesly_calls). Idempotent on `${call_id}-${moduleName}`;
- * a duplicate ("already exists") is logged and ignored so warm_transfer retries don't
- * double-enqueue. Unexpected errors rethrow so EvaluationWorkflow logs them non-fatally.
+ * Deterministically chain a partner-specific follow-up module. The default path
+ * requires the completing agent to be resolved to `partner`; a caller-owned
+ * eligibility decision may explicitly override assignment when it has authoritative
+ * bounded evidence. Keyed by agent_email (callData, falling back to eavesly_calls).
+ * Idempotent on `${call_id}-${moduleName}`; a duplicate is logged and returned as a
+ * structured skip. Unexpected errors rethrow for the workflow boundary to report.
  */
 export async function routePartnerFollowup(
   env: Bindings,
@@ -101,23 +191,40 @@ export async function routePartnerFollowup(
     partner: string
     moduleName: string
     /** Optional per-call gate; when it returns not-eligible the follow-up is skipped. */
-    eligibility?: (callData: EvaluateRequest) => { eligible: boolean; reason: string }
+    eligibility?: (callData: EvaluateRequest) => FollowupEligibility
   },
-): Promise<void> {
+): Promise<PartnerRoutingResult> {
   const { partner, moduleName, eligibility } = opts
 
-  // Cheap, DB-free eligibility short-circuit (e.g. Achieve's disposition + duration gate).
-  if (eligibility) {
-    const check = eligibility(callData)
-    if (!check.eligible) {
-      log("info", "Partner routing skipped: call not eligible", {
-        callId: callData.call_id,
-        partner,
-        moduleName,
-        reason: check.reason,
-      })
-      return
+  // Cheap, DB-free eligibility short-circuit (e.g. Achieve's transcript/metadata gate).
+  const eligibilityCheck = eligibility?.(callData)
+  if (eligibilityCheck && !eligibilityCheck.eligible) {
+    log("info", "Partner routing skipped: call not eligible", {
+      callId: callData.call_id,
+      partner,
+      moduleName,
+      routingStatus: "skipped",
+      routingReason: "call_ineligible",
+      eligibilityReason: eligibilityCheck.reason,
+    })
+    return {
+      status: "skipped",
+      reason: "call_ineligible",
+      eligibilityReason: eligibilityCheck.reason,
     }
+  }
+
+  const assignmentOverridden = eligibilityCheck?.assignment === "override"
+  if (assignmentOverridden) {
+    return await enqueuePartnerFollowup(
+      env,
+      callData,
+      correlationId,
+      partner,
+      moduleName,
+      "assignment_override",
+      eligibilityCheck.reason,
+    )
   }
 
   let agentEmail = normalizeAgentEmail(callData.agent_email)
@@ -126,8 +233,14 @@ export async function routePartnerFollowup(
     agentEmail = normalizeAgentEmail(ctx?.agent_email ?? undefined)
   }
   if (!agentEmail) {
-    log("info", "Partner routing skipped: no agent_email", { callId: callData.call_id, partner, moduleName })
-    return
+    log("info", "Partner routing skipped: no agent_email", {
+      callId: callData.call_id,
+      partner,
+      moduleName,
+      routingStatus: "skipped",
+      routingReason: "agent_email_missing",
+    })
+    return { status: "skipped", reason: "agent_email_missing" }
   }
 
   const assignment = await db.getAgentRegalAssignment(agentEmail)
@@ -137,8 +250,10 @@ export async function routePartnerFollowup(
       agentEmail,
       partner,
       moduleName,
+      routingStatus: "skipped",
+      routingReason: "assignment_missing",
     })
-    return
+    return { status: "skipped", reason: "assignment_missing" }
   }
   if (assignment.assignment_status !== "resolved") {
     log("info", "Partner routing skipped: agent assignment not resolved", {
@@ -147,8 +262,10 @@ export async function routePartnerFollowup(
       partner,
       moduleName,
       assignmentStatus: assignment.assignment_status,
+      routingStatus: "skipped",
+      routingReason: "assignment_unresolved",
     })
-    return
+    return { status: "skipped", reason: "assignment_unresolved" }
   }
   if (assignment.partner_assignment !== partner) {
     log("info", "Partner routing skipped: agent assigned to different partner", {
@@ -157,10 +274,32 @@ export async function routePartnerFollowup(
       partner,
       moduleName,
       actualPartnerAssignment: assignment.partner_assignment,
+      routingStatus: "skipped",
+      routingReason: "assignment_mismatch",
     })
-    return
+    return { status: "skipped", reason: "assignment_mismatch" }
   }
 
+  return await enqueuePartnerFollowup(
+    env,
+    callData,
+    correlationId,
+    partner,
+    moduleName,
+    "assignment_match",
+    eligibilityCheck?.reason,
+  )
+}
+
+async function enqueuePartnerFollowup(
+  env: Bindings,
+  callData: EvaluateRequest,
+  correlationId: string,
+  partner: string,
+  moduleName: string,
+  routingReason: "assignment_override" | "assignment_match",
+  eligibilityReason?: string,
+): Promise<PartnerRoutingResult> {
   const instanceId = `${callData.call_id}-${moduleName}`
   try {
     await env.EVALUATION_WORKFLOW.create({
@@ -168,11 +307,26 @@ export async function routePartnerFollowup(
       params: { moduleName, callData, correlationId },
       retention: workflowRetentionForEnvironment(env.ENVIRONMENT),
     })
-    log("info", "Chained partner follow-up", { callId: callData.call_id, partner, moduleName, instanceId })
+    log("info", "Chained partner follow-up", {
+      callId: callData.call_id,
+      partner,
+      moduleName,
+      instanceId,
+      routingStatus: "routed",
+      routingReason,
+      eligibilityReason,
+    })
+    return { status: "routed", reason: routingReason, eligibilityReason, instanceId }
   } catch (e) {
     if (e instanceof Error && e.message.includes("already exists")) {
-      log("info", "Partner follow-up already enqueued; ignoring", { callId: callData.call_id, moduleName, instanceId })
-      return
+      log("info", "Partner follow-up already enqueued; ignoring", {
+        callId: callData.call_id,
+        moduleName,
+        instanceId,
+        routingStatus: "skipped",
+        routingReason: "already_enqueued",
+      })
+      return { status: "skipped", reason: "already_enqueued" }
     }
     throw e
   }
