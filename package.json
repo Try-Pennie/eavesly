@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:psai245-gate2-db": "bash scripts/test-psai245-gate2-migration.sh",
+    "test:psai245-gate3-db": "bash scripts/test-psai245-gate3-migration.sh",
     "smoke-test": "tsx scripts/smoke-test.ts",
     "eval:disposition": "tsx scripts/eval-disposition-models.ts",
     "eval:achieve-wc": "tsx scripts/eval-achieve-wc-qa.ts",

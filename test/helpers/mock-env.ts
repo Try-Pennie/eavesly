@@ -3,6 +3,10 @@ import type { Bindings } from "../../src/types/env"
 
 export const TEST_API_KEY = "test-api-key-12345"
 
+function createWorkflowBinding(): Workflow {
+  return { create: vi.fn(), createBatch: vi.fn(), get: vi.fn() }
+}
+
 export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
   return {
     ENVIRONMENT: "test",
@@ -22,8 +26,9 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     DEEPGRAM_MODEL: "nova-3",
     TWILIO_ACCOUNT_SID: "ACtest",
     TWILIO_AUTH_TOKEN: "test-twilio-token",
-    EVALUATION_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
-    ACHIEVE_BACKFILL_CANARY_WORKFLOW: { create: vi.fn(), get: vi.fn() } as any,
+    EVALUATION_WORKFLOW: createWorkflowBinding(),
+    ACHIEVE_BACKFILL_CANARY_WORKFLOW: createWorkflowBinding(),
+    ACHIEVE_BACKFILL_REMAINING56_WORKFLOW: createWorkflowBinding(),
     ...overrides,
   }
 }

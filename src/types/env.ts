@@ -23,6 +23,8 @@ export interface Bindings {
   EVALUATION_WORKFLOW: Workflow
   /** Dedicated deterministic PSAI-245 one-call canary Workflow binding. */
   ACHIEVE_BACKFILL_CANARY_WORKFLOW: Workflow
+  /** Separately gated deterministic PSAI-245 remaining-56 Workflow binding. */
+  ACHIEVE_BACKFILL_REMAINING56_WORKFLOW: Workflow
 }
 
 export interface Variables {
