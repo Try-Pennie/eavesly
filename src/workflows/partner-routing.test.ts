@@ -8,10 +8,28 @@ const ACHIEVE_POLICY = {
   enrollmentDisposition: "1.4 - Converted/Won > END CAMPAIGNS",
   achieveMinDurationSeconds: 300,
 }
-const withCallMeta = (duration: number, disposition?: string) =>
+const withCallMeta = (duration: number, disposition?: string, transcript = "x") =>
   createEvaluateRequest({
-    transcript: { transcript: "x", metadata: { duration, timestamp: "2025-01-01T00:00:00Z", disposition } },
+    transcript: { transcript, metadata: { duration, timestamp: "2025-01-01T00:00:00Z", disposition } },
   })
+
+const GRADEABLE_WELCOME_CALL = [
+  "[handling agent]: I will connect you to the welcome team now.",
+  "[transfer agent]: My name is Sam with Freedom Debt Relief.",
+  "[contact]: Yes, I am ready.",
+  "[transfer agent]: Welcome to your program. Let us get you started.",
+].join("\n")
+
+const COMPETITOR_TRANSFER = [
+  "[handling agent]: I will connect you to the welcome team now.",
+  "[transfer agent]: Thank you for calling Beyond Finance.",
+].join("\n")
+
+const UNBOUNDED_WELCOME_CALL = [
+  "IVR: Thank you for calling the Freedom Debt Relief disclosure line.",
+  "Rep: My name is Sam with Freedom Debt Relief.",
+  "Rep: Welcome to your program. Let us get you started.",
+].join("\n")
 
 describe("shouldRouteToPartner()", () => {
   it("routes when scalar partner matches and resolved", () => {
@@ -41,9 +59,39 @@ describe("shouldRouteToPartner()", () => {
 })
 
 describe("isAchieveWelcomeCallEligible()", () => {
+  it("uses a gradeable production segment as authoritative over stale disposition and duration", () => {
+    const result = isAchieveWelcomeCallEligible(
+      withCallMeta(45, "2.1 - Something else", GRADEABLE_WELCOME_CALL),
+      ACHIEVE_POLICY,
+    )
+
+    expect(result).toEqual({
+      eligible: true,
+      reason: "strong_transcript_evidence",
+      assignment: "override",
+      segment: {
+        found: true,
+        skipReason: null,
+        confidence: "high",
+        marker: "live_welcome_agent",
+      },
+    })
+  })
+
   it("eligible: enrollment disposition and duration over the minimum", () => {
     const r = isAchieveWelcomeCallEligible(withCallMeta(301, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY)
     expect(r.eligible).toBe(true)
+  })
+
+  it("treats Turnbull Pending as metadata eligible", () => {
+    const result = isAchieveWelcomeCallEligible(
+      withCallMeta(301, "1.3B - Turnbull Pending"),
+      ACHIEVE_POLICY,
+    )
+
+    expect(result.eligible).toBe(true)
+    expect(result.reason).toBe("metadata_eligible")
+    expect(result.assignment).toBe("require_match")
   })
 
   it("eligible: 13-minute welcome-call transfers (previously excluded by the 30-min floor)", () => {
@@ -51,14 +99,38 @@ describe("isAchieveWelcomeCallEligible()", () => {
     expect(isAchieveWelcomeCallEligible(withCallMeta(1109, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(true)
   })
 
-  it("ineligible: duration at or below the minimum (dial legs / instant hangups)", () => {
-    expect(isAchieveWelcomeCallEligible(withCallMeta(300, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
-    expect(isAchieveWelcomeCallEligible(withCallMeta(45, ACHIEVE_POLICY.enrollmentDisposition), ACHIEVE_POLICY).eligible).toBe(false)
+  it("returns duration_ineligible at or below the minimum (dial legs / instant hangups)", () => {
+    const atThreshold = isAchieveWelcomeCallEligible(
+      withCallMeta(300, ACHIEVE_POLICY.enrollmentDisposition),
+      ACHIEVE_POLICY,
+    )
+
+    expect(atThreshold.eligible).toBe(false)
+    expect(atThreshold.reason).toBe("duration_ineligible")
+    expect(isAchieveWelcomeCallEligible(
+      withCallMeta(45, ACHIEVE_POLICY.enrollmentDisposition),
+      ACHIEVE_POLICY,
+    ).reason).toBe("duration_ineligible")
   })
 
   it("ineligible: wrong or missing disposition even when long enough", () => {
     expect(isAchieveWelcomeCallEligible(withCallMeta(3000, "2.1 - Something else"), ACHIEVE_POLICY).eligible).toBe(false)
     expect(isAchieveWelcomeCallEligible(withCallMeta(3000, undefined), ACHIEVE_POLICY).eligible).toBe(false)
+  })
+
+  it.each([
+    ["competitor transfer", COMPETITOR_TRANSFER, "competitor_transfer"],
+    ["unbounded welcome call", UNBOUNDED_WELCOME_CALL, "unbounded_label_less"],
+    ["no welcome evidence", "ordinary Pennie call", "no_transfer_leg"],
+  ])("fails closed for %s when metadata is not eligible", (_label, transcript, skipReason) => {
+    const result = isAchieveWelcomeCallEligible(
+      withCallMeta(45, "2.1 - Something else", transcript),
+      ACHIEVE_POLICY,
+    )
+
+    expect(result.eligible).toBe(false)
+    expect(result.reason).toBe("disposition_ineligible")
+    expect(result.segment).toEqual(expect.objectContaining({ found: false, skipReason }))
   })
 })
 
@@ -142,6 +214,51 @@ describe("routePartnerFollowup()", () => {
 
     expect(create).toHaveBeenCalledOnce()
     expect(create.mock.calls[0][0].id).toBe(`c-ok-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`)
+  })
+
+  it("routes strong transcript evidence without disposition despite a stale current partner assignment", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })
+    const callData = withCallMeta(45, undefined, GRADEABLE_WELCOME_CALL)
+    const eligibility = (request: typeof callData) => isAchieveWelcomeCallEligible(request, ACHIEVE_POLICY)
+
+    const result = await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
+
+    expect(result).toEqual({
+      status: "routed",
+      reason: "assignment_override",
+      eligibilityReason: "strong_transcript_evidence",
+      instanceId: `test-call-123-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`,
+    })
+    expect(db.getAgentRegalAssignment).not.toHaveBeenCalled()
+    expect(create).toHaveBeenCalledOnce()
+  })
+
+  it("routes a metadata-eligible failed handoff so the QA module can record its deterministic skip", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "achieve", assignment_status: "resolved" })
+    const callData = withCallMeta(301, ACHIEVE_POLICY.enrollmentDisposition, COMPETITOR_TRANSFER)
+    const eligibility = (request: typeof callData) => isAchieveWelcomeCallEligible(request, ACHIEVE_POLICY)
+
+    const result = await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
+
+    expect(result).toEqual({
+      status: "routed",
+      reason: "assignment_match",
+      eligibilityReason: "metadata_eligible",
+      instanceId: `test-call-123-${MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA}`,
+    })
+    expect(db.getAgentRegalAssignment).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledOnce()
+  })
+
+  it("does not let competitor evidence override a different partner assignment", async () => {
+    db.getAgentRegalAssignment.mockResolvedValue({ partner_assignment: "beyond", assignment_status: "resolved" })
+    const callData = withCallMeta(301, ACHIEVE_POLICY.enrollmentDisposition, COMPETITOR_TRANSFER)
+    const eligibility = (request: typeof callData) => isAchieveWelcomeCallEligible(request, ACHIEVE_POLICY)
+
+    const result = await routePartnerFollowup(env, db, callData, correlationId, { ...ACHIEVE, eligibility })
+
+    expect(result).toEqual({ status: "skipped", reason: "assignment_mismatch" })
+    expect(create).not.toHaveBeenCalled()
   })
 
   it("chains budget_inputs when agent is resolved to Beyond", async () => {
@@ -276,7 +393,10 @@ describe("routePartnerFollowup()", () => {
     create.mockRejectedValue(new Error("instance with id ... already exists"))
     const callData = createEvaluateRequest({ agent_email: "b@beyond.com" })
 
-    await expect(routePartnerFollowup(env, db, callData, correlationId, BEYOND)).resolves.toBeUndefined()
+    await expect(routePartnerFollowup(env, db, callData, correlationId, BEYOND)).resolves.toEqual({
+      status: "skipped",
+      reason: "already_enqueued",
+    })
   })
 
   it("rethrows unexpected create errors", async () => {

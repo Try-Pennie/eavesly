@@ -419,6 +419,38 @@ describe("achieveWelcomeCallQAModule.evaluate", () => {
     expect(userPrompt).toContain("Do NOT give credit")
   })
 
+  it("excludes prior call history from the partner prompt while retaining the bounded segment", async () => {
+    const llm = createMockLLM(mockResponse)
+    const request = createEvaluateRequest()
+    const callHistory = {
+      total_prior_calls: 1,
+      prior_calls: [{
+        call_id: "prior-call",
+        started_at: "2025-01-01T00:00:00Z",
+        disposition: "Competitor servicing",
+        direction: "outbound",
+        talk_time: 120,
+        agent_email: "private-agent@example.com",
+        campaign_name: "Non-Achieve campaign",
+        notes: "PRIVATE PRIOR NOTES MUST NOT LEAVE PENNIE",
+        call_summary: "PRIVATE PRIOR SUMMARY MUST NOT LEAVE PENNIE",
+        overall_score: null,
+        compliance_rating: null,
+      }],
+    }
+
+    await achieveWelcomeCallQAModule.evaluate(FULL, request, llm as any, callHistory)
+
+    const [, userPrompt] = llm.getStructuredResponse.mock.calls[0]
+    expect(userPrompt).not.toContain("<prior_call_history>")
+    expect(userPrompt).not.toContain("PRIVATE PRIOR NOTES")
+    expect(userPrompt).not.toContain("PRIVATE PRIOR SUMMARY")
+    expect(userPrompt).not.toContain("Non-Achieve campaign")
+    expect(userPrompt).not.toContain("soft credit check")
+    expect(userPrompt).toContain("Freedom Debt Relief")
+    expect(userPrompt).toContain("dedicated account")
+  })
+
   it("stamps transcript_segment metadata and partner/script version", async () => {
     const llm = createMockLLM(mockResponse)
     const request = createEvaluateRequest()

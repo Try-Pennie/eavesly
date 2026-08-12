@@ -5,6 +5,7 @@ import type {
   CallCompletedEvent,
 } from "../schemas/regal-events"
 import { MODULE_NAMES } from "../modules/constants"
+import { segmentWelcomeCall } from "../modules/achieve-welcome-call-qa/segment"
 
 export type RegalCallEvent = TranscriptAvailableEvent | CallCompletedEvent
 
@@ -217,7 +218,15 @@ export function buildModuleTriggerPlan(
   } else if (joined.completionTimedOut) {
     decisions.push({ module: MODULE_NAMES.DISPOSITION_REVIEW, trigger: true, reason: "completion timed out" })
   } else {
-    decisions.push({ module: MODULE_NAMES.DISPOSITION_REVIEW, trigger: false, reason: "no completed event" })
+    const strongWelcomeEvidence =
+      transcript !== undefined && segmentWelcomeCall(transcript.transcript ?? "").segment_found
+    decisions.push({
+      module: MODULE_NAMES.DISPOSITION_REVIEW,
+      trigger: false,
+      reason: strongWelcomeEvidence
+        ? "strong_welcome_evidence_awaiting_completed_event"
+        : "no completed event",
+    })
   }
 
   // Enrollment gate: exact disposition + duration > threshold + campaign allowed.
