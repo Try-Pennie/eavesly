@@ -25,6 +25,8 @@ export interface Bindings {
   ACHIEVE_BACKFILL_CANARY_WORKFLOW: Workflow
   /** Separately gated deterministic PSAI-245 remaining-56 Workflow binding. */
   ACHIEVE_BACKFILL_REMAINING56_WORKFLOW: Workflow
+  /** Forward-only deterministic PSAI-245 resume of pending ordinals after 30. */
+  ACHIEVE_BACKFILL_RESUME27_WORKFLOW: Workflow
 }
 
 export interface Variables {

@@ -44,6 +44,11 @@ sed 's/01e4a469234e5271bc28c3f92022fd929e073b1d4926a162067d96ceddb2b86e/298d6e82
 psql_exec < "$tmp_dir/gate2.sql"
 psql_exec < "$tmp_dir/gate3.sql"
 
+# Trigger execution does not require direct API-role EXECUTE privilege.
+for role in anon authenticated service_role; do
+  test "$(psql_exec -Atc "select has_function_privilege('$role','public.eavesly_reject_psai245_remaining56_result_mutation_v1()','EXECUTE')")" = f
+done
+
 # The documented rollback is executable only while progress is empty.
 psql_exec <<'SQL'
 begin;

@@ -68,3 +68,4 @@ export default app
 export { EvaluationWorkflow } from "./workflows/evaluation-workflow"
 export { AchieveBackfillCanaryWorkflow } from "./workflows/achieve-backfill-canary-workflow"
 export { AchieveBackfillRemaining56Workflow } from "./workflows/achieve-backfill-remaining56-workflow"
+export { AchieveBackfillResume27Workflow } from "./workflows/achieve-backfill-resume27-workflow"
