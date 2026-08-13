@@ -15,7 +15,11 @@ import type {
   AchieveQaRecoveryInspector,
 } from "./achieve-qa-recovery"
 import { DatabaseService } from "./database"
-import { createAchieveBackfillOneShotLlm } from "./achieve-backfill-one-shot-llm"
+import type { ResolverPolicy } from "./regal-events"
+import {
+  ACHIEVE_QA_RECOVERY_ONE_SHOT_LLM_PROFILE,
+  createAchieveBackfillOneShotLlm,
+} from "./achieve-backfill-one-shot-llm"
 
 const CallRowsSchema = z.array(z.object({
   call_id: AchieveQaRecoveryCallIdSchema,
@@ -29,6 +33,7 @@ const CallRowsSchema = z.array(z.object({
 const TranscriptRowsSchema = z.array(z.object({
   call_id: AchieveQaRecoveryCallIdSchema,
   original_transcript: z.string().nullable(),
+  created_at: z.string().datetime({ offset: true }),
 }).strict())
 
 const ResultRowsSchema = z.array(z.object({
@@ -44,6 +49,7 @@ type RecoveryReads = {
 type ExecuteRecoveryReads = (
   callIds: ReadonlyArray<AchieveQaRecoveryCallId>,
 ) => Promise<RecoveryReads>
+type LoadResolverPolicy = () => Promise<ResolverPolicy>
 
 function createInput(
   call: z.infer<typeof CallRowsSchema>[number],
@@ -77,6 +83,7 @@ function createInput(
 export function createSupabaseAchieveQaRecoveryInspector(
   env: Bindings,
   executeReads?: ExecuteRecoveryReads,
+  loadResolverPolicy?: LoadResolverPolicy,
 ): AchieveQaRecoveryInspector {
   const client: SupabaseClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   const execute: ExecuteRecoveryReads = executeReads ?? (async (callIds) => {
@@ -85,7 +92,7 @@ export function createSupabaseAchieveQaRecoveryInspector(
         .select("call_id,disposition,talk_time,campaign_name,sfdc_lead_id,started_at")
         .in("call_id", [...callIds]),
       client.from("eavesly_transcription_qa")
-        .select("call_id,original_transcript")
+        .select("call_id,original_transcript,created_at")
         .in("call_id", [...callIds])
         .order("created_at", { ascending: false }),
       client.from("eavesly_module_results")
@@ -124,21 +131,45 @@ export function createSupabaseAchieveQaRecoveryInspector(
         return { _tag: "failure", reason: "invalid_response" }
       }
 
-      const transcriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
+      const newestTranscriptByCallId = new Map<AchieveQaRecoveryCallId, {
+        readonly createdAtMs: number
+        readonly transcript: string
+        readonly ambiguousTie: boolean
+      }>()
       const invalidTranscriptIds = new Set<AchieveQaRecoveryCallId>()
       for (const row of transcripts.data) {
         const normalized = row.original_transcript?.trim()
-        if (normalized && !transcriptByCallId.has(row.call_id)) {
-          transcriptByCallId.set(row.call_id, row.original_transcript ?? normalized)
-        } else if (row.original_transcript !== null) {
-          invalidTranscriptIds.add(row.call_id)
+        if (!normalized) {
+          if (row.original_transcript !== null) invalidTranscriptIds.add(row.call_id)
+          continue
+        }
+
+        const createdAtMs = Date.parse(row.created_at)
+        const current = newestTranscriptByCallId.get(row.call_id)
+        if (current === undefined || createdAtMs > current.createdAtMs) {
+          newestTranscriptByCallId.set(row.call_id, {
+            createdAtMs,
+            transcript: row.original_transcript ?? normalized,
+            ambiguousTie: false,
+          })
+          continue
+        }
+        if (createdAtMs === current.createdAtMs && row.original_transcript !== current.transcript) {
+          newestTranscriptByCallId.set(row.call_id, { ...current, ambiguousTie: true })
         }
       }
       const existingResultIds = new Set(results.data.map((row) => row.call_id))
       const candidates = calls.data.map((call): AchieveQaRecoveryCandidate => {
-        const transcript = transcriptByCallId.get(call.call_id)
+        const selected = newestTranscriptByCallId.get(call.call_id)
         let candidate: AchieveQaRecoveryCandidate
-        if (transcript === undefined) {
+        if (selected?.ambiguousTie) {
+          candidate = {
+            callId: call.call_id,
+            existingResult: false,
+            input: null,
+            inputStatus: "invalid_input",
+          }
+        } else if (selected === undefined) {
           candidate = {
             callId: call.call_id,
             existingResult: false,
@@ -148,13 +179,15 @@ export function createSupabaseAchieveQaRecoveryInspector(
               : "transcript_unavailable",
           }
         } else {
-          candidate = createInput(call, transcript)
+          candidate = createInput(call, selected.transcript)
         }
         return { ...candidate, existingResult: existingResultIds.has(call.call_id) }
       })
 
       try {
-        const { policy } = await new DatabaseService(env, client).getResolverPolicy()
+        const policy = loadResolverPolicy === undefined
+          ? (await new DatabaseService(env, client).getResolverPolicy()).policy
+          : await loadResolverPolicy()
         return { _tag: "success", policy, candidates }
       } catch {
         return { _tag: "failure", reason: "read_unavailable" }
@@ -212,7 +245,11 @@ export function createSupabaseAchieveQaRecoveryDependencies(
 ): AchieveQaRecoveryExecutionDependencies {
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   const inspector = createSupabaseAchieveQaRecoveryInspector(env)
-  const llm = createAchieveBackfillOneShotLlm(env)
+  const llm = createAchieveBackfillOneShotLlm(
+    env,
+    undefined,
+    ACHIEVE_QA_RECOVERY_ONE_SHOT_LLM_PROFILE,
+  )
 
   const finalize = createAchieveQaRecoveryInsertOnlyFinalizer(async (record) => {
     return client.from("eavesly_module_results").insert(record)

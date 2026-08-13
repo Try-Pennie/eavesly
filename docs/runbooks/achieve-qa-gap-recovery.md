@@ -71,6 +71,7 @@ The route recomputes the full private snapshot and requires both the submitted d
 
 - The dedicated Workflow has `retries.limit = 0` and uses the one-shot OpenAI client (`maxRetries = 0`, provider fallback disabled).
 - Inputs are processed sequentially and execution stops on the first read, state, grading, or write anomaly.
+- The newest stored QA transcript is selected by `created_at`. The repository has no verified stable unique transcript-row field for breaking equal-`created_at` ties, so differing newest rows at the same timestamp fail closed as `invalid_input` rather than choosing nondeterministically.
 - Immediately before each grade, the Workflow rechecks exact-module result absence.
 - Finalization is a plain `INSERT`, never an upsert. Production enforces `UNIQUE(call_id,module_name)`; SQLSTATE `23505` is classified as `already_exists`, preserving the winning ordinary or frozen audit row without update.
 - Inserted `result_json` is the ordinary production module result. No `backfill.audit_only` or recovery marker is added.
@@ -86,4 +87,15 @@ A safe dry run should account for all 17 as a categorical partition. Current sou
 - `transcript_unavailable_count = 12` (clearly unprocessable by this capability);
 - `processable_count <= 5`, determined only by the production eligibility and exact segment preflight.
 
-Do not execute if counts, digest, existing-result state, or expected segment classification are not privately reviewed. Never add transcript text to the request, logs, ticket, shell history, or runbook. Never set a new approved digest to bypass a stopped or partially completed instance. A retry resolves to the same digest-derived Workflow ID.
+Do not execute if counts, digest, existing-result state, or expected segment classification are not privately reviewed. Never add transcript text to the request, logs, ticket, shell history, or runbook.
+
+## Safe partial-stop re-drive
+
+A digest-derived Workflow instance is terminal after it stops; do not delete it, invent another ID for the same digest, or try to restart it. First investigate and resolve the categorical failure without changing or deleting any completed ordinary result or frozen audit row. Then:
+
+1. Run a fresh dry run with the same exact 17 private IDs. Rows completed by the prior instance must now classify as `existing_result`; remaining eligible rows may still classify as `processable`.
+2. Privately compare all new aggregates and the new digest with the investigated database state. Stop if completed counts, `existing_result_count`, transcript/segment classifications, or any other category are unexpected.
+3. Obtain separate execution approval for this newly computed exact manifest and configure only its exact digest as `ACHIEVE_QA_RECOVERY_APPROVED_DIGEST`.
+4. Submit a new execution command with the same 17 IDs and newly approved digest. Its new deterministic instance ID is legitimate only because completed rows and therefore the reviewed manifest changed.
+
+This is a re-drive of the remaining reviewed gaps, not a bypass. Never approve an unchanged/new digest merely to route around a terminal instance, never delete an old Workflow instance, and never skip the fresh dry run and private review.
