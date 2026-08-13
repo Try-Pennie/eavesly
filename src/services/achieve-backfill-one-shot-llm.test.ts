@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createEnv } from "../../test/helpers/mock-env"
 import {
   ACHIEVE_BACKFILL_OPENAI_MAX_RETRIES,
+  ACHIEVE_QA_RECOVERY_ONE_SHOT_LLM_PROFILE,
   createAchieveBackfillOneShotLlm,
   type OneShotSdkResponse,
   type OneShotStructuredSender,
@@ -44,6 +45,31 @@ describe("PSAI-245 dedicated one-shot LLM client", () => {
 
     await expect(invoke(sender)).rejects.toThrow()
     expect(sender.inputs).toHaveLength(1)
+  })
+
+  it("preserves the frozen PSAI-245 request title by default", async () => {
+    const sender = new RecordingSender({
+      choices: [{ message: { content: JSON.stringify({ categorical: true }) } }],
+    })
+
+    await invoke(sender)
+
+    expect(sender.inputs[0].requestTitle).toBe("Pennie PSAI-245 one-shot audit")
+  })
+
+  it("uses an explicit ordinary-recovery title without PSAI-245 label bleed", async () => {
+    const sender = new RecordingSender({
+      choices: [{ message: { content: JSON.stringify({ categorical: true }) } }],
+    })
+
+    await createAchieveBackfillOneShotLlm(
+      createEnv(),
+      sender,
+      ACHIEVE_QA_RECOVERY_ONE_SHOT_LLM_PROFILE,
+    ).getStructuredResponse("system", "private bounded segment", schema, "one_shot_test")
+
+    expect(sender.inputs[0].requestTitle).toBe("Pennie Achieve QA gap recovery")
+    expect(sender.inputs[0].requestTitle).not.toContain("PSAI-245")
   })
 
   it("sends OpenRouter fallback disabled and returns a valid categorical response", async () => {

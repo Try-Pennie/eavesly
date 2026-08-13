@@ -18,6 +18,7 @@ export interface OneShotStructuredSender {
   /** Send one request. Implementations must not retry or fall back. */
   send<T>(input: {
     readonly model: string
+    readonly requestTitle: string
     readonly systemPrompt: string
     readonly userPrompt: string
     readonly schema: z.ZodType<T>
@@ -35,7 +36,6 @@ function createOpenAiSender(env: Bindings): OneShotStructuredSender {
     maxRetries: ACHIEVE_BACKFILL_OPENAI_MAX_RETRIES,
     defaultHeaders: {
       "HTTP-Referer": "https://trypennie.com",
-      "X-Title": "Pennie PSAI-245 one-shot audit",
     },
   })
   return {
@@ -52,13 +52,34 @@ function createOpenAiSender(env: Bindings): OneShotStructuredSender {
         temperature: input.temperature,
         provider: input.provider,
       }
-      return client.chat.completions.create(request)
+      return client.chat.completions.create(request, {
+        headers: { "X-Title": input.requestTitle },
+      })
     },
   }
 }
 
+/** Capability-specific labels for one-shot request headers and categorical logs. */
+export type AchieveOneShotLlmProfile = {
+  readonly requestTitle: string
+  readonly logLabel: string
+}
+
+/** Frozen PSAI-245 labels retained as the default for every historical caller. */
+export const PSAI245_ONE_SHOT_LLM_PROFILE: AchieveOneShotLlmProfile = {
+  requestTitle: "Pennie PSAI-245 one-shot audit",
+  logLabel: "PSAI-245 one-shot LLM",
+}
+
+/** Ordinary Achieve QA recovery labels, intentionally separate from PSAI-245. */
+export const ACHIEVE_QA_RECOVERY_ONE_SHOT_LLM_PROFILE: AchieveOneShotLlmProfile = {
+  requestTitle: "Pennie Achieve QA gap recovery",
+  logLabel: "Achieve QA recovery one-shot LLM",
+}
+
 /**
- * Build the PSAI-245 one-shot LLM client.
+ * Build an Achieve one-shot LLM client. Historical callers retain exact PSAI-245
+ * labels by default; newer capabilities must supply their own explicit profile.
  *
  * It performs one sender invocation and never uses application retry helpers.
  * AI Gateway/provider retry and fallback must also be disabled operationally;
@@ -66,9 +87,11 @@ function createOpenAiSender(env: Bindings): OneShotStructuredSender {
  */
 export function createAchieveBackfillOneShotLlm(
   env: Bindings,
-  sender: OneShotStructuredSender = createOpenAiSender(env),
+  sender: OneShotStructuredSender | undefined = undefined,
+  profile: AchieveOneShotLlmProfile = PSAI245_ONE_SHOT_LLM_PROFILE,
 ): LLMClient {
   const model = env.OPENROUTER_MODEL
+  const oneShotSender = sender ?? createOpenAiSender(env)
   return {
     async getStructuredResponse<T>(
       systemPrompt: string,
@@ -79,8 +102,9 @@ export function createAchieveBackfillOneShotLlm(
     ): Promise<T> {
       let response: OneShotSdkResponse
       try {
-        response = await sender.send({
+        response = await oneShotSender.send({
           model,
+          requestTitle: profile.requestTitle,
           systemPrompt,
           userPrompt,
           schema,
@@ -89,14 +113,14 @@ export function createAchieveBackfillOneShotLlm(
           provider: { allow_fallbacks: false },
         })
       } catch {
-        log("error", "PSAI-245 one-shot LLM send failed", { errorTag: "sdk_send_failed" })
+        log("error", `${profile.logLabel} send failed`, { errorTag: "sdk_send_failed" })
         throw new Error("One-shot LLM send failed")
       }
-      log("info", "PSAI-245 one-shot LLM send completed", { outcome: "response_received" })
+      log("info", `${profile.logLabel} send completed`, { outcome: "response_received" })
 
       const content = response.choices[0]?.message?.content
       if (!content) {
-        log("error", "PSAI-245 one-shot LLM response invalid", { errorTag: "empty_response" })
+        log("error", `${profile.logLabel} response invalid`, { errorTag: "empty_response" })
         throw new Error("One-shot LLM response invalid")
       }
 
@@ -104,12 +128,12 @@ export function createAchieveBackfillOneShotLlm(
       try {
         decoded = JSON.parse(content)
       } catch {
-        log("error", "PSAI-245 one-shot LLM response invalid", { errorTag: "invalid_json" })
+        log("error", `${profile.logLabel} response invalid`, { errorTag: "invalid_json" })
         throw new Error("One-shot LLM response invalid")
       }
       const parsed = schema.safeParse(decoded)
       if (!parsed.success) {
-        log("error", "PSAI-245 one-shot LLM response invalid", {
+        log("error", `${profile.logLabel} response invalid`, {
           errorTag: "schema_validation_failed",
           issueCount: parsed.error.issues.length,
         })

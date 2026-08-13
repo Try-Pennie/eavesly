@@ -4,6 +4,8 @@ export interface Bindings {
   /** Optional per-module override; disposition-review uses this when set, else OPENROUTER_MODEL. */
   DISPOSITION_REVIEW_MODEL?: string
   INTERNAL_API_KEY: string
+  /** Server-owned allowlist digest for the one approved 17-call Achieve QA recovery artifact. */
+  ACHIEVE_QA_RECOVERY_APPROVED_DIGEST?: string
   /** Dedicated 32+ character server-to-server credential for the Skyfall profile recap endpoint. */
   SKYFALL_PROFILE_RECAP_AUTH_KEY?: string
   SUPABASE_URL: string
@@ -27,6 +29,8 @@ export interface Bindings {
   ACHIEVE_BACKFILL_REMAINING56_WORKFLOW: Workflow
   /** Forward-only deterministic PSAI-245 resume of pending ordinals after 30. */
   ACHIEVE_BACKFILL_RESUME27_WORKFLOW: Workflow
+  /** Dedicated, digest-bound, no-alert recovery for ordinary Achieve QA gaps. */
+  ACHIEVE_QA_RECOVERY_WORKFLOW: Workflow
 }
 
 export interface Variables {

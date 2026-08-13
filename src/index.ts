@@ -12,6 +12,7 @@ import { regalAdminRoutes } from "./routes/regal-admin"
 import { promptAdminRoutes } from "./routes/prompt-admin"
 import { createProfileRecapRoutes } from "./routes/profile-recap"
 import { createAchieveBackfillAdminRoutes } from "./routes/achieve-backfill-admin"
+import { createAchieveQaRecoveryAdminRoutes } from "./routes/achieve-qa-recovery-admin"
 
 // Per-module evaluation endpoints. Each mounts /evaluate/<endpoint>,
 // /evaluate/<endpoint>/batch, and /evaluate/<endpoint>/from-recording under /api/v1.
@@ -50,6 +51,7 @@ app.route("/api/v1", statusRoutes)
 app.route("/api/v1", regalEventRoutes)
 app.route("/api/v1", regalAdminRoutes)
 app.route("/api/v1", createAchieveBackfillAdminRoutes())
+app.route("/api/v1", createAchieveQaRecoveryAdminRoutes())
 app.route("/api/v1", promptAdminRoutes)
 
 app.onError((err, c) => {
@@ -69,3 +71,4 @@ export { EvaluationWorkflow } from "./workflows/evaluation-workflow"
 export { AchieveBackfillCanaryWorkflow } from "./workflows/achieve-backfill-canary-workflow"
 export { AchieveBackfillRemaining56Workflow } from "./workflows/achieve-backfill-remaining56-workflow"
 export { AchieveBackfillResume27Workflow } from "./workflows/achieve-backfill-resume27-workflow"
+export { AchieveQaRecoveryWorkflow } from "./workflows/achieve-qa-recovery-workflow"

@@ -30,6 +30,7 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     ACHIEVE_BACKFILL_CANARY_WORKFLOW: createWorkflowBinding(),
     ACHIEVE_BACKFILL_REMAINING56_WORKFLOW: createWorkflowBinding(),
     ACHIEVE_BACKFILL_RESUME27_WORKFLOW: createWorkflowBinding(),
+    ACHIEVE_QA_RECOVERY_WORKFLOW: createWorkflowBinding(),
     ...overrides,
   }
 }
