@@ -1,0 +1,255 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { z } from "zod"
+import { MODULE_NAMES } from "../modules/constants"
+import type { ModuleResult } from "../modules/types"
+import { achieveWelcomeCallQAModule } from "../modules/achieve-welcome-call-qa/module"
+import {
+  AchieveQaRecoveryCallIdSchema,
+  type AchieveQaRecoveryCallId,
+} from "../schemas/achieve-qa-recovery"
+import { EvaluateRequestSchema } from "../schemas/requests"
+import type { Bindings } from "../types/env"
+import type {
+  AchieveQaRecoveryCandidate,
+  AchieveQaRecoveryExecutionDependencies,
+  AchieveQaRecoveryInspector,
+} from "./achieve-qa-recovery"
+import { DatabaseService } from "./database"
+import { createAchieveBackfillOneShotLlm } from "./achieve-backfill-one-shot-llm"
+
+const CallRowsSchema = z.array(z.object({
+  call_id: AchieveQaRecoveryCallIdSchema,
+  disposition: z.string().nullable(),
+  talk_time: z.number().nonnegative().nullable(),
+  campaign_name: z.string().nullable(),
+  sfdc_lead_id: z.string().min(1).nullable(),
+  started_at: z.string().nullable(),
+}).strict())
+
+const TranscriptRowsSchema = z.array(z.object({
+  call_id: AchieveQaRecoveryCallIdSchema,
+  original_transcript: z.string().nullable(),
+}).strict())
+
+const ResultRowsSchema = z.array(z.object({
+  call_id: AchieveQaRecoveryCallIdSchema,
+}).strict())
+
+type BoundaryResponse = { readonly data: unknown; readonly error: unknown | null }
+type RecoveryReads = {
+  readonly calls: BoundaryResponse
+  readonly transcripts: BoundaryResponse
+  readonly results: BoundaryResponse
+}
+type ExecuteRecoveryReads = (
+  callIds: ReadonlyArray<AchieveQaRecoveryCallId>,
+) => Promise<RecoveryReads>
+
+function createInput(
+  call: z.infer<typeof CallRowsSchema>[number],
+  transcript: string,
+): AchieveQaRecoveryCandidate {
+  if (call.sfdc_lead_id === null) {
+    return { callId: call.call_id, existingResult: false, input: null, inputStatus: "invalid_input" }
+  }
+  const parsed = EvaluateRequestSchema.safeParse({
+    call_id: call.call_id,
+    agent_id: "",
+    transcript: {
+      transcript,
+      metadata: {
+        duration: call.talk_time ?? 0,
+        timestamp: call.started_at ?? "",
+        talk_time: call.talk_time ?? undefined,
+        disposition: call.disposition ?? undefined,
+        campaign_name: call.campaign_name ?? undefined,
+      },
+    },
+    sfdc_lead_id: call.sfdc_lead_id,
+  })
+  if (!parsed.success) {
+    return { callId: call.call_id, existingResult: false, input: null, inputStatus: "invalid_input" }
+  }
+  return { callId: call.call_id, existingResult: false, input: parsed.data }
+}
+
+/** Build the parsed Supabase inspector for the exact 17-call recovery artifact. */
+export function createSupabaseAchieveQaRecoveryInspector(
+  env: Bindings,
+  executeReads?: ExecuteRecoveryReads,
+): AchieveQaRecoveryInspector {
+  const client: SupabaseClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  const execute: ExecuteRecoveryReads = executeReads ?? (async (callIds) => {
+    const [calls, transcripts, results] = await Promise.all([
+      client.from("eavesly_calls")
+        .select("call_id,disposition,talk_time,campaign_name,sfdc_lead_id,started_at")
+        .in("call_id", [...callIds]),
+      client.from("eavesly_transcription_qa")
+        .select("call_id,original_transcript")
+        .in("call_id", [...callIds])
+        .order("created_at", { ascending: false }),
+      client.from("eavesly_module_results")
+        .select("call_id")
+        .eq("module_name", MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)
+        .in("call_id", [...callIds]),
+    ])
+    return { calls, transcripts, results }
+  })
+
+  return {
+    async inspect(callIds) {
+      let reads: RecoveryReads
+      try {
+        reads = await execute(callIds)
+      } catch {
+        return { _tag: "failure", reason: "read_unavailable" }
+      }
+      if (reads.calls.error !== null || reads.transcripts.error !== null || reads.results.error !== null) {
+        return { _tag: "failure", reason: "read_unavailable" }
+      }
+
+      const calls = CallRowsSchema.safeParse(reads.calls.data)
+      const transcripts = TranscriptRowsSchema.safeParse(reads.transcripts.data)
+      const results = ResultRowsSchema.safeParse(reads.results.data)
+      if (!calls.success || !transcripts.success || !results.success) {
+        return { _tag: "failure", reason: "invalid_response" }
+      }
+
+      const requested = new Set(callIds)
+      if (
+        calls.data.some((row) => !requested.has(row.call_id))
+        || transcripts.data.some((row) => !requested.has(row.call_id))
+        || results.data.some((row) => !requested.has(row.call_id))
+      ) {
+        return { _tag: "failure", reason: "invalid_response" }
+      }
+
+      const transcriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
+      const invalidTranscriptIds = new Set<AchieveQaRecoveryCallId>()
+      for (const row of transcripts.data) {
+        const normalized = row.original_transcript?.trim()
+        if (normalized && !transcriptByCallId.has(row.call_id)) {
+          transcriptByCallId.set(row.call_id, row.original_transcript ?? normalized)
+        } else if (row.original_transcript !== null) {
+          invalidTranscriptIds.add(row.call_id)
+        }
+      }
+      const existingResultIds = new Set(results.data.map((row) => row.call_id))
+      const candidates = calls.data.map((call): AchieveQaRecoveryCandidate => {
+        const transcript = transcriptByCallId.get(call.call_id)
+        let candidate: AchieveQaRecoveryCandidate
+        if (transcript === undefined) {
+          candidate = {
+            callId: call.call_id,
+            existingResult: false,
+            input: null,
+            inputStatus: invalidTranscriptIds.has(call.call_id)
+              ? "invalid_input"
+              : "transcript_unavailable",
+          }
+        } else {
+          candidate = createInput(call, transcript)
+        }
+        return { ...candidate, existingResult: existingResultIds.has(call.call_id) }
+      })
+
+      try {
+        const { policy } = await new DatabaseService(env, client).getResolverPolicy()
+        return { _tag: "success", policy, candidates }
+      } catch {
+        return { _tag: "failure", reason: "read_unavailable" }
+      }
+    },
+  }
+}
+
+
+type OrdinaryResultInsert = {
+  readonly call_id: AchieveQaRecoveryCallId
+  readonly module_name: string
+  readonly result_json: unknown
+  readonly has_violation: boolean
+  readonly violation_type: string | null
+  readonly alert_sent: false
+  readonly alert_sent_at: null
+  readonly processing_time_ms: number
+}
+
+type ExecuteOrdinaryResultInsert = (
+  record: OrdinaryResultInsert,
+) => Promise<{ readonly error: { readonly code?: unknown } | null }>
+
+/** Build an insert-only finalizer that safely classifies the production unique-key race as already existing. */
+export function createAchieveQaRecoveryInsertOnlyFinalizer(
+  executeInsert: ExecuteOrdinaryResultInsert,
+): AchieveQaRecoveryExecutionDependencies["finalize"] {
+  return async (callId: AchieveQaRecoveryCallId, result: ModuleResult) => {
+    try {
+      const { error } = await executeInsert({
+        call_id: callId,
+        module_name: result.module_name,
+        result_json: result.result,
+        has_violation: result.has_violation,
+        violation_type: result.violation_type,
+        alert_sent: false,
+        alert_sent_at: null,
+        processing_time_ms: result.processing_time_ms,
+      })
+      if (error === null) return { _tag: "inserted" }
+      // Production enforces UNIQUE(call_id,module_name). INSERT never updates the
+      // winner; a concurrent ordinary or frozen audit row is preserved verbatim.
+      if (error.code === "23505") return { _tag: "already_exists" }
+      return { _tag: "failure", reason: "write_unavailable" }
+    } catch {
+      return { _tag: "failure", reason: "write_unavailable" }
+    }
+  }
+}
+
+/** Build production no-alert, one-shot execution capabilities for the dedicated recovery Workflow. */
+export function createSupabaseAchieveQaRecoveryDependencies(
+  env: Bindings,
+): AchieveQaRecoveryExecutionDependencies {
+  const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  const inspector = createSupabaseAchieveQaRecoveryInspector(env)
+  const llm = createAchieveBackfillOneShotLlm(env)
+
+  const finalize = createAchieveQaRecoveryInsertOnlyFinalizer(async (record) => {
+    return client.from("eavesly_module_results").insert(record)
+  })
+
+  return {
+    inspect: inspector.inspect,
+    async hasExistingResult(callId) {
+      try {
+        const response = await client.from("eavesly_module_results")
+          .select("call_id")
+          .eq("call_id", callId)
+          .eq("module_name", MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)
+          .limit(1)
+        if (response.error !== null) return { _tag: "failure", reason: "read_unavailable" }
+        const parsed = ResultRowsSchema.safeParse(response.data)
+        if (!parsed.success || parsed.data.some((row) => row.call_id !== callId)) {
+          return { _tag: "failure", reason: "invalid_response" }
+        }
+        return { _tag: "success", exists: parsed.data.length > 0 }
+      } catch {
+        return { _tag: "failure", reason: "read_unavailable" }
+      }
+    },
+    async grade(input) {
+      try {
+        const result = await achieveWelcomeCallQAModule.evaluate(
+          input.transcript.transcript,
+          input,
+          llm,
+          null,
+        )
+        return { _tag: "success", result }
+      } catch {
+        return { _tag: "failure", reason: "grading_unavailable" }
+      }
+    },
+    finalize,
+  }
+}

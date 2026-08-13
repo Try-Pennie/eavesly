@@ -12,6 +12,7 @@ DEEPGRAM_MODEL = "nova-3"
 
 # Secrets (set via `wrangler secret put`):
 # INTERNAL_API_KEY
+# ACHIEVE_QA_RECOVERY_APPROVED_DIGEST (set only after private review of the exact 17-ID dry run)
 # SKYFALL_PROFILE_RECAP_AUTH_KEY (32+ characters; set separately for staging and production)
 # SUPABASE_URL
 # SUPABASE_SERVICE_ROLE_KEY
@@ -52,6 +53,11 @@ name = "eavesly-achieve-backfill-resume27"
 binding = "ACHIEVE_BACKFILL_RESUME27_WORKFLOW"
 class_name = "AchieveBackfillResume27Workflow"
 
+[[workflows]]
+name = "eavesly-achieve-qa-recovery"
+binding = "ACHIEVE_QA_RECOVERY_WORKFLOW"
+class_name = "AchieveQaRecoveryWorkflow"
+
 [observability]
 [observability.logs]
 enabled = false
@@ -81,6 +87,11 @@ name = "eavesly-achieve-backfill-resume27-staging"
 binding = "ACHIEVE_BACKFILL_RESUME27_WORKFLOW"
 class_name = "AchieveBackfillResume27Workflow"
 
+[[env.staging.workflows]]
+name = "eavesly-achieve-qa-recovery-staging"
+binding = "ACHIEVE_QA_RECOVERY_WORKFLOW"
+class_name = "AchieveQaRecoveryWorkflow"
+
 [env.production]
 name = "eavesly-production"
 vars = { ENVIRONMENT = "production", OPENROUTER_MODEL = "openai/gpt-4.1", DISPOSITION_REVIEW_MODEL = "deepseek/deepseek-chat", DEEPGRAM_MODEL = "nova-3" }
@@ -107,3 +118,8 @@ class_name = "AchieveBackfillRemaining56Workflow"
 name = "eavesly-achieve-backfill-resume27-production"
 binding = "ACHIEVE_BACKFILL_RESUME27_WORKFLOW"
 class_name = "AchieveBackfillResume27Workflow"
+
+[[env.production.workflows]]
+name = "eavesly-achieve-qa-recovery-production"
+binding = "ACHIEVE_QA_RECOVERY_WORKFLOW"
+class_name = "AchieveQaRecoveryWorkflow"

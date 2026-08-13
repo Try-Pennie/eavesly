@@ -116,6 +116,23 @@ describe("E2E app tests", () => {
       })
     })
 
+    it("mounts the protected Achieve QA Gate 4 recovery endpoint", async () => {
+      const res = await app.request(
+        "/api/v1/admin/achieve-welcome-call-qa/recover-gaps",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+        createEnv(),
+      )
+
+      expect(res.status).toBe(401)
+      expect(await res.json()).toEqual({
+        error: "Missing or invalid Authorization header",
+      })
+    })
+
     it("rejects unauthenticated full-qa request", async () => {
       const res = await app.request("/api/v1/evaluate/full-qa", {
         method: "POST",
