@@ -11,6 +11,7 @@ import {
   ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH,
   AchieveQaTranscriptRecoverySourceEventSchema,
 } from "../schemas/achieve-qa-transcript-recovery"
+import { TranscriptAvailableEventSchema } from "../schemas/regal-events"
 import type { Bindings } from "../types/env"
 import type {
   AchieveQaRecoveryCandidate,
@@ -44,6 +45,23 @@ const EventRowsSchema = z.array(z.object({
   event_type: z.literal("transcript_available"),
   payload: z.unknown(),
 }).strict())
+
+// Secondary ledger rows corroborate a preferred legacy transcript; they do not
+// become a recovery source. This parser relaxes only recovery-only provenance.
+const ComparableTranscriptEventSchema = TranscriptAvailableEventSchema.extend({
+  regal_task_id: AchieveQaRecoveryCallIdSchema,
+  transcript: z.string().max(ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH),
+  transcript_is_truncated: z.literal(false),
+  source_event_id: z.string().optional(),
+}).strict().superRefine((event, context) => {
+  if (event.transcript.trim().length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Transcript must be nonblank",
+      path: ["transcript"],
+    })
+  }
+})
 
 const ResultRowsSchema = z.array(z.object({
   call_id: AchieveQaRecoveryCallIdSchema,
@@ -81,9 +99,9 @@ function createSourceCandidate(
       metadata: {
         duration: call.talk_time ?? 0,
         timestamp: call.started_at ?? "",
-        talk_time: call.talk_time ?? undefined,
-        disposition: call.disposition ?? undefined,
-        campaign_name: call.campaign_name ?? undefined,
+        ...(call.talk_time === null ? {} : { talk_time: call.talk_time }),
+        ...(call.disposition === null ? {} : { disposition: call.disposition }),
+        ...(call.campaign_name === null ? {} : { campaign_name: call.campaign_name }),
       },
       sfdcLeadId: call.sfdc_lead_id,
     },
@@ -180,33 +198,56 @@ export function createSupabaseAchieveQaRecoveryInspector(
           newestTranscriptByCallId.set(row.call_id, { ...current, ambiguousTie: true })
         }
       }
-      const eventTranscriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
-      const invalidEventIds = new Set<AchieveQaRecoveryCallId>()
+      const comparableEventTranscriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
+      const recoverySourceTranscriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
+      const invalidComparableEventIds = new Set<AchieveQaRecoveryCallId>()
+      const invalidRecoverySourceEventIds = new Set<AchieveQaRecoveryCallId>()
+      const seenEventIds = new Set<AchieveQaRecoveryCallId>()
       for (const row of events.data) {
-        const event = AchieveQaTranscriptRecoverySourceEventSchema.safeParse(row.payload)
-        if (!event.success || event.data.regal_task_id !== row.regal_task_id) {
-          invalidEventIds.add(row.regal_task_id)
-          continue
-        }
-        const transcript = event.data.transcript?.trim()
-        if (!transcript) {
-          invalidEventIds.add(row.regal_task_id)
-          continue
-        }
-        if (eventTranscriptByCallId.has(row.regal_task_id)) {
+        if (seenEventIds.has(row.regal_task_id)) {
           // The ledger primary key permits one row per task and event type. Any
           // duplicate response is ambiguous, even if its transcript happens to match.
-          invalidEventIds.add(row.regal_task_id)
+          invalidComparableEventIds.add(row.regal_task_id)
+          invalidRecoverySourceEventIds.add(row.regal_task_id)
           continue
         }
-        eventTranscriptByCallId.set(row.regal_task_id, event.data.transcript ?? transcript)
+        seenEventIds.add(row.regal_task_id)
+
+        const comparableEvent = ComparableTranscriptEventSchema.safeParse(row.payload)
+        if (
+          !comparableEvent.success
+          || comparableEvent.data.regal_task_id !== row.regal_task_id
+        ) {
+          invalidComparableEventIds.add(row.regal_task_id)
+        } else {
+          comparableEventTranscriptByCallId.set(
+            row.regal_task_id,
+            comparableEvent.data.transcript,
+          )
+        }
+
+        const recoverySourceEvent = AchieveQaTranscriptRecoverySourceEventSchema.safeParse(
+          row.payload,
+        )
+        if (
+          !recoverySourceEvent.success
+          || recoverySourceEvent.data.regal_task_id !== row.regal_task_id
+        ) {
+          invalidRecoverySourceEventIds.add(row.regal_task_id)
+        } else {
+          recoverySourceTranscriptByCallId.set(
+            row.regal_task_id,
+            recoverySourceEvent.data.transcript,
+          )
+        }
       }
 
       const existingResultIds = new Set(results.data.map((row) => row.call_id))
       const candidates = calls.data.map((call): AchieveQaRecoveryCandidate => {
         const selected = newestTranscriptByCallId.get(call.call_id)
         let candidate: AchieveQaRecoveryCandidate
-        const eventTranscript = eventTranscriptByCallId.get(call.call_id)
+        const comparableEventTranscript = comparableEventTranscriptByCallId.get(call.call_id)
+        const recoverySourceTranscript = recoverySourceTranscriptByCallId.get(call.call_id)
         if (selected?.ambiguousTie) {
           candidate = {
             callId: call.call_id,
@@ -215,8 +256,11 @@ export function createSupabaseAchieveQaRecoveryInspector(
             inputStatus: "invalid_input",
           }
         } else if (selected !== undefined) {
-          candidate = invalidEventIds.has(call.call_id)
-            || (eventTranscript !== undefined && eventTranscript !== selected.transcript)
+          candidate = invalidComparableEventIds.has(call.call_id)
+            || (
+              comparableEventTranscript !== undefined
+              && comparableEventTranscript !== selected.transcript
+            )
             ? {
                 callId: call.call_id,
                 existingResult: false,
@@ -226,7 +270,7 @@ export function createSupabaseAchieveQaRecoveryInspector(
             : createSourceCandidate(call, selected.transcript, "legacy_qa")
         } else if (
           invalidTranscriptIds.has(call.call_id)
-          || invalidEventIds.has(call.call_id)
+          || invalidRecoverySourceEventIds.has(call.call_id)
         ) {
           candidate = {
             callId: call.call_id,
@@ -235,14 +279,14 @@ export function createSupabaseAchieveQaRecoveryInspector(
             inputStatus: "invalid_input",
           }
         } else {
-          candidate = eventTranscript === undefined
+          candidate = recoverySourceTranscript === undefined
             ? {
                 callId: call.call_id,
                 existingResult: false,
                 source: null,
                 inputStatus: "transcript_unavailable",
               }
-            : createSourceCandidate(call, eventTranscript, "canonical_event")
+            : createSourceCandidate(call, recoverySourceTranscript, "canonical_event")
         }
         return { ...candidate, existingResult: existingResultIds.has(call.call_id) }
       })

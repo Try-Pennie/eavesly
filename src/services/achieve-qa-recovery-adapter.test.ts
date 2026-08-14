@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { MODULE_NAMES } from "../modules/constants"
 import { AchieveQaRecoveryCallIdSchema } from "../schemas/achieve-qa-recovery"
 import { createEnv } from "../../test/helpers/mock-env"
+import { inspectAchieveQaRecovery } from "./achieve-qa-recovery"
 import { DEFAULT_RESOLVER_POLICY } from "./regal-events"
 import {
   createAchieveQaRecoveryInsertOnlyFinalizer,
@@ -10,34 +11,40 @@ import {
 
 const recoveryCallId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
 
-async function inspectRecoveryRows({
-  transcripts = [],
-  events = [],
-}: {
+const defaultCallRow = {
+  call_id: recoveryCallId,
+  disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
+  talk_time: 301,
+  campaign_name: null,
+  sfdc_lead_id: "lead-01",
+  started_at: "2026-08-12T00:00:00Z",
+}
+
+type RecoveryRowFixture = {
+  readonly calls?: ReadonlyArray<unknown>
   readonly transcripts?: ReadonlyArray<unknown>
   readonly events?: ReadonlyArray<unknown>
-}) {
-  const inspector = createSupabaseAchieveQaRecoveryInspector(
+}
+
+function createRecoveryInspector({
+  calls = [defaultCallRow],
+  transcripts = [],
+  events = [],
+}: RecoveryRowFixture) {
+  return createSupabaseAchieveQaRecoveryInspector(
     createEnv(),
     async () => ({
-      calls: {
-        data: [{
-          call_id: recoveryCallId,
-          disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
-          talk_time: 301,
-          campaign_name: null,
-          sfdc_lead_id: "lead-01",
-          started_at: "2026-08-12T00:00:00Z",
-        }],
-        error: null,
-      },
+      calls: { data: calls, error: null },
       transcripts: { data: transcripts, error: null },
       events: { data: events, error: null },
       results: { data: [], error: null },
     }),
     async () => DEFAULT_RESOLVER_POLICY,
   )
-  return inspector.inspect([recoveryCallId])
+}
+
+async function inspectRecoveryRows(fixture: RecoveryRowFixture) {
+  return createRecoveryInspector(fixture).inspect([recoveryCallId])
 }
 
 describe("Achieve QA recovery adapter", () => {
@@ -116,50 +123,25 @@ describe("Achieve QA recovery adapter", () => {
     })
   })
 
-  it("prefers a valid QA-table transcript over the ledger event", async () => {
-    const callId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
-    const inspector = createSupabaseAchieveQaRecoveryInspector(
-      createEnv(),
-      async () => ({
-        calls: {
-          data: [{
-            call_id: callId,
-            disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
-            talk_time: 301,
-            campaign_name: null,
-            sfdc_lead_id: "lead-01",
-            started_at: "2026-08-12T00:00:00Z",
-          }],
-          error: null,
+  it("prefers a valid QA-table transcript when a matching ledger event has blank recovery provenance", async () => {
+    const inspected = await inspectRecoveryRows({
+      transcripts: [{
+        call_id: recoveryCallId,
+        original_transcript: "preferred QA transcript",
+        created_at: "2026-08-12T01:00:00Z",
+      }],
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "preferred QA transcript",
+          transcript_is_truncated: false,
+          source_event_id: "   ",
         },
-        transcripts: {
-          data: [{
-            call_id: callId,
-            original_transcript: "preferred QA transcript",
-            created_at: "2026-08-12T01:00:00Z",
-          }],
-          error: null,
-        },
-        events: {
-          data: [{
-            regal_task_id: callId,
-            event_type: "transcript_available",
-            payload: {
-              event_type: "transcript_available",
-              regal_task_id: callId,
-              transcript: "preferred QA transcript",
-              transcript_is_truncated: false,
-              source_event_id: "snowflake-event-01",
-            },
-          }],
-          error: null,
-        },
-        results: { data: [], error: null },
-      }),
-      async () => DEFAULT_RESOLVER_POLICY,
-    )
-
-    const inspected = await inspector.inspect([callId])
+      }],
+    })
 
     expect(inspected).toMatchObject({
       _tag: "success",
@@ -172,7 +154,7 @@ describe("Achieve QA recovery adapter", () => {
     })
   })
 
-  it("fails closed when canonical and legacy transcripts disagree", async () => {
+  it("fails closed when a blank-provenance canonical event and legacy transcript disagree", async () => {
     const inspected = await inspectRecoveryRows({
       transcripts: [{
         call_id: recoveryCallId,
@@ -187,7 +169,7 @@ describe("Achieve QA recovery adapter", () => {
           regal_task_id: recoveryCallId,
           transcript: "different canonical transcript",
           transcript_is_truncated: false,
-          source_event_id: "snowflake-event-01",
+          source_event_id: "",
         },
       }],
     })
@@ -196,6 +178,82 @@ describe("Achieve QA recovery adapter", () => {
       _tag: "success",
       candidates: [{ source: null, inputStatus: "invalid_input" }],
     })
+  })
+
+  it("fails closed when a matching secondary ledger transcript is marked truncated", async () => {
+    const inspected = await inspectRecoveryRows({
+      transcripts: [{
+        call_id: recoveryCallId,
+        original_transcript: "legacy transcript",
+        created_at: "2026-08-12T01:00:00Z",
+      }],
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "legacy transcript",
+          transcript_is_truncated: true,
+          source_event_id: "",
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{ source: null, inputStatus: "invalid_input" }],
+    })
+  })
+
+  it("rejects an event-only fallback with missing recovery provenance", async () => {
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "canonical private transcript",
+          transcript_is_truncated: false,
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{ source: null, inputStatus: "invalid_input" }],
+    })
+  })
+
+  it("omits absent optional metadata before canonical source hashing", async () => {
+    const inspector = createRecoveryInspector({
+      calls: [{
+        ...defaultCallRow,
+        disposition: null,
+        talk_time: null,
+        campaign_name: null,
+      }],
+      transcripts: [{
+        call_id: recoveryCallId,
+        original_transcript: "synthetic transcript without a gradeable welcome segment",
+        created_at: "2026-08-12T01:00:00Z",
+      }],
+    })
+
+    const inspected = await inspector.inspect([recoveryCallId])
+    expect(inspected).toMatchObject({ _tag: "success" })
+    if (inspected._tag !== "success") throw new Error("expected successful inspection")
+    expect(inspected.candidates[0]?.source?.metadata).toStrictEqual({
+      duration: 0,
+      timestamp: "2026-08-12T00:00:00Z",
+    })
+
+    const snapshot = await inspectAchieveQaRecovery(inspector, [recoveryCallId])
+    expect(snapshot).not.toHaveProperty("_tag")
+    if ("_tag" in snapshot) throw new Error("expected a canonical recovery snapshot")
+    expect(snapshot.summary.invalid_input_count).toBe(0)
+    expect(snapshot.summary.segment_unavailable_count).toBe(1)
   })
 
   it("fails closed when the only ledger payload is malformed", async () => {
