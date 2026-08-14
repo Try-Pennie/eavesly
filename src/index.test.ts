@@ -116,6 +116,21 @@ describe("E2E app tests", () => {
       })
     })
 
+    it("mounts the separately authenticated exact-12 transcript recovery endpoint", async () => {
+      const res = await app.request(
+        "/api/v1/admin/achieve-welcome-call-qa/recover-transcript-events",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+        createEnv(),
+      )
+
+      expect(res.status).toBe(401)
+      expect(await res.json()).toEqual({ error: "Unauthorized" })
+    })
+
     it("mounts the protected Achieve QA Gate 4 recovery endpoint", async () => {
       const res = await app.request(
         "/api/v1/admin/achieve-welcome-call-qa/recover-gaps",

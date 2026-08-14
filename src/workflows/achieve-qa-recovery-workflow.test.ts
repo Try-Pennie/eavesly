@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest"
 import { MODULE_NAMES } from "../modules/constants"
 import type { ModuleResult } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
-import type { AchieveQaRecoveryExecutionDependencies } from "../services/achieve-qa-recovery"
+import type {
+  AchieveQaRecoveryExecutionDependencies,
+  AchieveQaRecoveryGradeCandidate,
+  AchieveQaRecoverySource,
+} from "../services/achieve-qa-recovery"
 import { inspectAchieveQaRecovery } from "../services/achieve-qa-recovery"
 import { DEFAULT_RESOLVER_POLICY } from "../services/regal-events"
 import {
@@ -30,39 +34,52 @@ const GRADEABLE_TRANSCRIPT = [
   "[transfer agent]: Congratulations again and have a great evening!",
 ].join("\n")
 
-function input(callId: string, transcript = GRADEABLE_TRANSCRIPT): EvaluateRequest {
+function source(
+  callId: string,
+  transcript = GRADEABLE_TRANSCRIPT,
+  sourceKind: AchieveQaRecoverySource["sourceKind"] = "legacy_qa",
+): AchieveQaRecoverySource {
   return {
-    call_id: callId,
-    agent_id: "",
-    transcript: {
-      transcript,
-      metadata: {
-        duration: 301,
-        timestamp: "2026-08-12T00:00:00Z",
-        disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
-      },
+    sourceKind,
+    transcript,
+    metadata: {
+      duration: 301,
+      timestamp: "2026-08-12T00:00:00Z",
+      disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
     },
-    sfdc_lead_id: `lead-${callId}`,
+    sfdcLeadId: `lead-${callId}`,
   }
 }
 
 class RecordingRecoveryDependencies implements AchieveQaRecoveryExecutionDependencies {
-  readonly graded: Array<string> = []
+  readonly graded: Array<EvaluateRequest> = []
+  readonly gradedSegments: Array<AchieveQaRecoveryGradeCandidate["segment"]> = []
   readonly finalized: Array<{ callId: string; result: ModuleResult }> = []
   existingBeforeGrade = false
+  returnSkippedGrade = false
   transcript = GRADEABLE_TRANSCRIPT
+  availableCount = 5
+  canonicalStartIndex = Number.POSITIVE_INFINITY
 
   async inspect(requestedCallIds: ReadonlyArray<AchieveQaRecoveryCallId>) {
     return {
       _tag: "success" as const,
       policy: DEFAULT_RESOLVER_POLICY,
       candidates: requestedCallIds.map((callId, index) =>
-        index < 5
-          ? { callId, existingResult: false, input: input(callId, this.transcript) }
+        index < this.availableCount
+          ? {
+              callId,
+              existingResult: false,
+              source: source(
+                callId,
+                this.transcript,
+                index >= this.canonicalStartIndex ? "canonical_event" : "legacy_qa",
+              ),
+            }
           : {
               callId,
               existingResult: false,
-              input: null,
+              source: null,
               inputStatus: "transcript_unavailable" as const,
             },
       ),
@@ -73,13 +90,14 @@ class RecordingRecoveryDependencies implements AchieveQaRecoveryExecutionDepende
     return { _tag: "success" as const, exists: this.existingBeforeGrade }
   }
 
-  async grade(candidate: EvaluateRequest) {
-    this.graded.push(candidate.call_id)
+  async grade(candidate: AchieveQaRecoveryGradeCandidate) {
+    this.graded.push(candidate.input)
+    this.gradedSegments.push(candidate.segment)
     return {
       _tag: "success" as const,
       result: {
         module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
-        result: { partner_id: "achieve", grading_skipped: false },
+        result: { partner_id: "achieve", grading_skipped: this.returnSkippedGrade },
         has_violation: false,
         violation_type: null,
         processing_time_ms: 12,
@@ -155,6 +173,87 @@ describe("dedicated Achieve QA Gate 4 recovery Workflow", () => {
     })
     expect(dependencies.graded).toEqual([])
     expect(dependencies.finalized).toEqual([])
+  })
+
+  it("rejects a grade-time skipped result before any insert", async () => {
+    const dependencies = new RecordingRecoveryDependencies()
+    dependencies.returnSkippedGrade = true
+    const snapshot = await inspectAchieveQaRecovery(dependencies, callIds)
+    if ("_tag" in snapshot) throw new Error("fixture inspection failed")
+
+    const result = await executeAchieveQaRecoveryWorkflow(
+      { call_ids: callIds, digest: snapshot.digest },
+      { async execute(callback) { return callback() } },
+      dependencies,
+      snapshot.digest.value,
+    )
+
+    expect(result).toMatchObject({
+      status: "stopped",
+      reason: "invalid_response",
+      completed_count: 0,
+    })
+    expect(dependencies.graded).toHaveLength(1)
+    expect(dependencies.finalized).toEqual([])
+  })
+
+  it("classifies the complete five-legacy plus twelve-ledger source set", async () => {
+    const dependencies = new RecordingRecoveryDependencies()
+    dependencies.availableCount = 17
+    dependencies.canonicalStartIndex = 5
+
+    const snapshot = await inspectAchieveQaRecovery(dependencies, callIds)
+    if ("_tag" in snapshot) throw new Error("fixture inspection failed")
+
+    expect(snapshot.summary).toMatchObject({
+      candidate_count: 17,
+      transcript_available_count: 17,
+      transcript_unavailable_count: 0,
+      processable_count: 17,
+    })
+    expect(snapshot.manifest.candidates.filter((candidate) => candidate.source_kind === "legacy_qa")).toHaveLength(5)
+    expect(snapshot.manifest.candidates.filter((candidate) => candidate.source_kind === "canonical_event")).toHaveLength(12)
+  })
+
+  it("hashes oversized canonical sources but sends only deterministic bounded segments to grading", async () => {
+    const dependencies = new RecordingRecoveryDependencies()
+    dependencies.canonicalStartIndex = 0
+    dependencies.transcript = `[handling agent]: ${"x".repeat(205_000)}\n${GRADEABLE_TRANSCRIPT}`
+    const snapshot = await inspectAchieveQaRecovery(dependencies, callIds)
+    if ("_tag" in snapshot) throw new Error("fixture inspection failed")
+
+    const result = await executeAchieveQaRecoveryWorkflow(
+      { call_ids: callIds, digest: snapshot.digest },
+      { async execute(callback) { return callback() } },
+      dependencies,
+      snapshot.digest.value,
+    )
+
+    expect(result).toMatchObject({ status: "completed", processable_count: 5, completed_count: 5 })
+    expect(dependencies.graded).toHaveLength(5)
+    for (const input of dependencies.graded) {
+      expect(input.transcript.transcript.length).toBeLessThan(200_000)
+      expect(input.transcript.transcript).toBe(GRADEABLE_TRANSCRIPT.split("\n").slice(2).join("\n"))
+      expect(input.transcript.transcript).not.toContain("x".repeat(100))
+    }
+    expect(dependencies.gradedSegments).toEqual(snapshot.processableInputs.map((item) => item.segment))
+  })
+
+  it("changes the v2 digest when private source content changes outside an identical bounded segment", async () => {
+    const first = new RecordingRecoveryDependencies()
+    first.canonicalStartIndex = 0
+    first.transcript = `[handling agent]: source-a\n${GRADEABLE_TRANSCRIPT}`
+    const second = new RecordingRecoveryDependencies()
+    second.canonicalStartIndex = 0
+    second.transcript = `[handling agent]: source-b\n${GRADEABLE_TRANSCRIPT}`
+
+    const firstSnapshot = await inspectAchieveQaRecovery(first, callIds)
+    const secondSnapshot = await inspectAchieveQaRecovery(second, callIds)
+    if ("_tag" in firstSnapshot || "_tag" in secondSnapshot) throw new Error("fixture inspection failed")
+
+    expect(firstSnapshot.digest.canonicalization).toBe("achieve-qa-gap-recovery-v2")
+    expect(firstSnapshot.digest.value).not.toBe(secondSnapshot.digest.value)
+    expect(firstSnapshot.processableInputs[0]?.input).toEqual(secondSnapshot.processableInputs[0]?.input)
   })
 
   it("categorizes stored but unbounded transcripts and never grades or inserts a grading-skipped result", async () => {

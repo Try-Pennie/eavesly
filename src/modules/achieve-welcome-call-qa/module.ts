@@ -4,7 +4,7 @@ import type { EvaluateRequest } from "../../schemas/requests"
 import type { LLMClient } from "../../services/llm-client"
 import { AchieveWelcomeCallQAModelResponseSchema } from "../../schemas/achieve-welcome-call-qa"
 import { MODULE_NAMES, VIOLATION_TYPES } from "../constants"
-import { segmentWelcomeCall } from "./segment"
+import { segmentWelcomeCall, type WelcomeCallSegment } from "./segment"
 import { analyzeTransferExperience } from "./transfer-experience"
 import { finalizeScriptAdherence } from "./script-adherence"
 import systemPrompt from "../../../prompts/achieve-welcome-call-qa.txt"
@@ -15,108 +15,111 @@ const PARTNER_ID = "achieve" as const
 const SCRIPT_VERSION = "fdr_wholesale_db_pilot_v1" as const
 const SEGMENT_TYPE = "fdr_disclosure_and_welcome_call" as const
 
+/**
+ * Grade one already-computed production segment without segmenting its content again.
+ * The supplied segment metadata remains relative to the original full transcript.
+ */
+export async function gradeAchieveWelcomeCallSegment(
+  segment: WelcomeCallSegment,
+  _callData: EvaluateRequest,
+  llm: LLMClient,
+): Promise<ModuleResult> {
+  const start = Date.now()
+  const segmentMeta = {
+    segment_type: SEGMENT_TYPE,
+    start_line: segment.start_line,
+    end_line: segment.end_line,
+    marker: segment.marker,
+    segmentation_confidence: segment.segmentation_confidence,
+    segmentation_score: segment.segmentation_score,
+    used_full_transcript_fallback: segment.used_full_transcript_fallback,
+    segment_found: segment.segment_found,
+    skip_reason: segment.skip_reason,
+    transfer_agent_lines: segment.transfer_agent_lines,
+  }
+
+  if (!segment.segment_found) {
+    return {
+      module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      result: {
+        partner_id: PARTNER_ID,
+        script_version: SCRIPT_VERSION,
+        grading_skipped: true,
+        skip_reason: segment.skip_reason,
+        transcript_segment: segmentMeta,
+      },
+      has_violation: false,
+      violation_type: null,
+      processing_time_ms: Date.now() - start,
+    }
+  }
+
+  const preamble = [
+    "You are grading ONLY the bounded live Achieve/FDR welcome-call interaction below.",
+    "Automated menu/disclosure audio and transfer-partner content before or after this interaction are intentionally excluded.",
+    "Do NOT give credit for, and do NOT infer required elements from, content outside this segment.",
+    `Segment located via marker "${segment.marker}" (segmentation confidence: ${segment.segmentation_confidence}).`,
+    "",
+    "Please evaluate the following Achieve/FDR segment for script adherence:",
+  ].join(" ")
+
+  // External-partner privacy boundary: this function receives only the approved
+  // segment and never prior-call summaries, notes, or the complete source transcript.
+  const userPrompt = buildUserPrompt(preamble, segment.segment)
+  const result = await llm.getStructuredResponse(
+    systemPrompt,
+    userPrompt,
+    AchieveWelcomeCallQAModelResponseSchema,
+    "achieve_welcome_call_qa_evaluation",
+  )
+
+  // A quote that isn't literally in the graded segment is fabricated or lifted
+  // from outside the segment. Drop it before the result reaches the partner.
+  const normalize = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim()
+  const segmentNormalized = normalize(segment.segment)
+  const verifiedQuotes = result.script_adherence.key_evidence_quotes.filter((quote) => {
+    const normalized = normalize(quote)
+    return normalized.length > 0 && segmentNormalized.includes(normalized)
+  })
+
+  const transferExperience = analyzeTransferExperience(segment)
+  const stamped = {
+    ...result,
+    script_adherence: finalizeScriptAdherence({
+      ...result.script_adherence,
+      key_evidence_quotes: verifiedQuotes,
+    }),
+    partner_id: PARTNER_ID,
+    script_version: SCRIPT_VERSION,
+    transfer_experience: transferExperience,
+    transcript_segment: segmentMeta,
+  }
+  const hasViolation = stamped.script_adherence.violation
+    || stamped.transfer_experience.poor_transfer
+    || stamped.agent_identity_check?.correctly_identified_as_fdr === false
+
+  return {
+    module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+    result: stamped,
+    has_violation: hasViolation,
+    violation_type: hasViolation ? VIOLATION_TYPES.ACHIEVE_WELCOME_CALL : null,
+    processing_time_ms: Date.now() - start,
+  }
+}
+
 export const achieveWelcomeCallQAModule: EvalModule = {
   name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
 
   async evaluate(
     transcript: string,
-    _callData: EvaluateRequest,
+    callData: EvaluateRequest,
     llm: LLMClient,
     _callHistory?: CallHistoryContext | null,
   ): Promise<ModuleResult> {
-    const start = Date.now()
-
-    // Grade only the bounded live Achieve/FDR welcome-call interaction. IVR audio and
-    // transfer-partner content before/after that interaction are excluded.
-    const seg = segmentWelcomeCall(transcript)
-
-    const segmentMeta = {
-      segment_type: SEGMENT_TYPE,
-      start_line: seg.start_line,
-      end_line: seg.end_line,
-      marker: seg.marker,
-      segmentation_confidence: seg.segmentation_confidence,
-      segmentation_score: seg.segmentation_score,
-      used_full_transcript_fallback: seg.used_full_transcript_fallback,
-      segment_found: seg.segment_found,
-      skip_reason: seg.skip_reason,
-      transfer_agent_lines: seg.transfer_agent_lines,
-    }
-
-    if (!seg.segment_found) {
-      // No reliable Achieve/FDR boundary (mis-route or failed handoff). Never
-      // send an unbounded transcript to the model — record the skip instead.
-      return {
-        module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
-        result: {
-          partner_id: PARTNER_ID,
-          script_version: SCRIPT_VERSION,
-          grading_skipped: true,
-          skip_reason: seg.skip_reason,
-          transcript_segment: segmentMeta,
-        },
-        has_violation: false,
-        violation_type: null,
-        processing_time_ms: Date.now() - start,
-      }
-    }
-
-    const preamble = [
-      "You are grading ONLY the bounded live Achieve/FDR welcome-call interaction below.",
-      "Automated menu/disclosure audio and transfer-partner content before or after this interaction are intentionally excluded.",
-      "Do NOT give credit for, and do NOT infer required elements from, content outside this segment.",
-      `Segment located via marker "${seg.marker}" (segmentation confidence: ${seg.segmentation_confidence}).`,
-      "",
-      "Please evaluate the following Achieve/FDR segment for script adherence:",
-    ].join(" ")
-
-    // External-partner privacy boundary: prior-call summaries and notes may come
-    // from unrelated partners. This module intentionally sends only the bounded
-    // Achieve/FDR segment, regardless of history supplied by the workflow.
-    const userPrompt = buildUserPrompt(preamble, seg.segment)
-
-    const result = await llm.getStructuredResponse(
-      systemPrompt,
-      userPrompt,
-      AchieveWelcomeCallQAModelResponseSchema,
-      "achieve_welcome_call_qa_evaluation",
-    )
-
-    // A quote that isn't literally in the graded segment is fabricated or lifted
-    // from outside the segment (e.g. Pennie-side content). Drop it before the
-    // result reaches the external partner.
-    const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim()
-    const segmentNormalized = normalize(seg.segment)
-    const verifiedQuotes = result.script_adherence.key_evidence_quotes.filter((q) => {
-      // An empty/whitespace-only quote normalizes to "" and is a substring of every
-      // segment — never let it pass as "verified evidence".
-      const normalized = normalize(q)
-      return normalized.length > 0 && segmentNormalized.includes(normalized)
-    })
-
-    // Stamp partner/script, segmentation, and transfer-quality metadata regardless
-    // of what the model returns. The transfer analyzer sees only the bounded segment.
-    const transferExperience = analyzeTransferExperience(seg)
-    const stamped = {
-      ...result,
-      script_adherence: finalizeScriptAdherence({
-        ...result.script_adherence,
-        key_evidence_quotes: verifiedQuotes,
-      }),
-      partner_id: PARTNER_ID,
-      script_version: SCRIPT_VERSION,
-      transfer_experience: transferExperience,
-      transcript_segment: segmentMeta,
-    }
-    const hasViolation = stamped.script_adherence.violation || stamped.transfer_experience.poor_transfer || stamped.agent_identity_check?.correctly_identified_as_fdr === false
-
-    return {
-      module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
-      result: stamped,
-      has_violation: hasViolation,
-      violation_type: hasViolation ? VIOLATION_TYPES.ACHIEVE_WELCOME_CALL : null,
-      processing_time_ms: Date.now() - start,
-    }
+    // Ordinary evaluation owns full-source segmentation, then shares the exact
+    // grading path used by approved recovery without re-segmenting.
+    const segment = segmentWelcomeCall(transcript)
+    return gradeAchieveWelcomeCallSegment(segment, callData, llm)
   },
 
   extractAlerts: (result, callId, agentId, callData) =>

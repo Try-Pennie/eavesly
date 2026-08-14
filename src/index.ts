@@ -13,6 +13,7 @@ import { promptAdminRoutes } from "./routes/prompt-admin"
 import { createProfileRecapRoutes } from "./routes/profile-recap"
 import { createAchieveBackfillAdminRoutes } from "./routes/achieve-backfill-admin"
 import { createAchieveQaRecoveryAdminRoutes } from "./routes/achieve-qa-recovery-admin"
+import { createAchieveQaTranscriptRecoveryAdminRoutes } from "./routes/achieve-qa-transcript-recovery-admin"
 
 // Per-module evaluation endpoints. Each mounts /evaluate/<endpoint>,
 // /evaluate/<endpoint>/batch, and /evaluate/<endpoint>/from-recording under /api/v1.
@@ -44,6 +45,7 @@ app.route("/", healthRoutes)
 // Mount before the existing /api/v1 routers, whose wildcard auth middleware
 // otherwise handles every request under that prefix.
 app.route("/api/v1", createProfileRecapRoutes())
+app.route("/api/v1", createAchieveQaTranscriptRecoveryAdminRoutes())
 for (const config of EVAL_ROUTE_CONFIGS) {
   app.route("/api/v1", createEvalRoutes(config))
 }

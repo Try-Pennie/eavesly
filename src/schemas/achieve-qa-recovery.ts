@@ -17,7 +17,7 @@ export type AchieveQaRecoveryCallId = z.infer<typeof AchieveQaRecoveryCallIdSche
 /** Digest that binds an execution command to one exact dry-run classification. */
 export const AchieveQaRecoveryDigestSchema = z.object({
   algorithm: z.literal("SHA-256"),
-  canonicalization: z.literal("achieve-qa-gap-recovery-v1"),
+  canonicalization: z.literal("achieve-qa-gap-recovery-v2"),
   value: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict()
 

@@ -12,6 +12,7 @@ export function createEnv(overrides: Partial<Bindings> = {}): Bindings {
     ENVIRONMENT: "test",
     OPENROUTER_MODEL: "test-model",
     INTERNAL_API_KEY: TEST_API_KEY,
+    ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY: "test-achieve-transcript-recovery-key-32chars",
     SKYFALL_PROFILE_RECAP_AUTH_KEY: "test-skyfall-profile-recap-key-32chars",
     SUPABASE_URL: "https://test.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "test-key",

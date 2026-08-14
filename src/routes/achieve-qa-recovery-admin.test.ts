@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Hono } from "hono"
 import type { AppEnv, Bindings } from "../types/env"
-import type { EvaluateRequest } from "../schemas/requests"
+import type { AchieveQaRecoverySource } from "../services/achieve-qa-recovery"
 import { DEFAULT_RESOLVER_POLICY } from "../services/regal-events"
 import { createEnv, TEST_API_KEY } from "../../test/helpers/mock-env"
 import {
@@ -22,18 +22,16 @@ const GRADEABLE_TRANSCRIPT = [
   "[transfer agent]: Congratulations again and have a great evening!",
 ].join("\n")
 
-function processableInput(callId: string): EvaluateRequest {
+function processableSource(callId: string): AchieveQaRecoverySource {
   return {
-    call_id: callId,
-    agent_id: "",
-    transcript: {
-      transcript: GRADEABLE_TRANSCRIPT,
-      metadata: {
-        duration: 301,
-        timestamp: "2026-08-12T00:00:00Z",
-        disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
-      },
+    sourceKind: "legacy_qa",
+    transcript: GRADEABLE_TRANSCRIPT,
+    metadata: {
+      duration: 301,
+      timestamp: "2026-08-12T00:00:00Z",
+      disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
     },
+    sfdcLeadId: `lead-${callId}`,
   }
 }
 
@@ -94,12 +92,12 @@ describe("Achieve QA Gate 4 recovery admin route", () => {
             ? {
                 callId,
                 existingResult: false,
-                input: processableInput(callId),
+                source: processableSource(callId),
               }
             : {
                 callId,
                 existingResult: false,
-                input: null,
+                source: null,
                 inputStatus: "transcript_unavailable" as const,
               },
         ),
@@ -137,7 +135,7 @@ describe("Achieve QA Gate 4 recovery admin route", () => {
     expect(JSON.stringify(body)).not.toContain(callIds[0])
     expect(body.digest).toMatchObject({
       algorithm: "SHA-256",
-      canonicalization: "achieve-qa-gap-recovery-v1",
+      canonicalization: "achieve-qa-gap-recovery-v2",
       value: expect.stringMatching(/^[a-f0-9]{64}$/),
     })
     expect(workflow.creations).toEqual([])
@@ -168,7 +166,7 @@ describe("Achieve QA Gate 4 recovery admin route", () => {
     const app = createApp(inspector)
     const dryRun = await recoveryRequest(app, { call_ids: [...callIds].reverse() })
     const dryBody = await dryRun.json() as {
-      digest: { algorithm: "SHA-256"; canonicalization: "achieve-qa-gap-recovery-v1"; value: string }
+      digest: { algorithm: "SHA-256"; canonicalization: "achieve-qa-gap-recovery-v2"; value: string }
     }
     const workflow = new RecordingWorkflow()
     const env = createEnv({

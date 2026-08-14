@@ -1,10 +1,91 @@
-# Achieve QA Gate 4 — ordinary gap recovery
+# Achieve QA — exact transcript-ledger and ordinary gap recovery
 
-This capability is separate from the frozen PSAI-245 audit-only backfill. It may recover only the privately reviewed 17-call Achieve QA gap artifact. It does not mutate PSAI-245 manifests, progress, authorizations, or audit rows; it does not use the generic evaluation Workflow; and it never dispatches alerts.
+These capabilities are separate from the frozen PSAI-245 audit-only backfill. They may restore only the privately reviewed 12-event Snowflake artifact and recover only the privately reviewed 17-call Achieve QA gap artifact. They do not mutate PSAI-245 files, manifests, progress, authorizations, or audit rows; they do not use the generic resolver/evaluation Workflow; and they never dispatch alerts.
 
-No production execution was performed as part of implementation.
+No production mutation or execution was performed as part of implementation.
 
-## Route contract
+## Stage A: restore the exact 12 transcript events
+
+### Authentication and route
+
+```text
+POST /api/v1/admin/achieve-welcome-call-qa/recover-transcript-events
+Authorization: Bearer $ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY
+Content-Type: application/json
+```
+
+This route does not accept `INTERNAL_API_KEY`. Provision a dedicated, random credential of at least 32 characters as the Cloudflare secret `ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY` and the matching Pipedream secret. Missing/short server configuration fails closed with `503`; missing or incorrect credentials return `401`. Authentication uses constant-time digest comparison and runs before body reading, parsing, or database construction.
+
+The route has a route-local 4 MiB byte limit. This admits the reviewed approximately 1.8 MiB source transcript payload plus JSON overhead while bounding memory use. The strict request contains exactly 12 unique canonical `transcript_available` events:
+
+```json
+{
+  "events": [
+    {
+      "event_type": "transcript_available",
+      "regal_task_id": "<private ID>",
+      "transcript": "<private source transcript>",
+      "transcript_is_truncated": false,
+      "source_event_id": "<private unique Snowflake event ID>"
+    }
+  ]
+}
+```
+
+The recovery-only source schema requires a nonblank transcript, explicit `transcript_is_truncated: false`, and a nonblank `source_event_id`; all 12 source-event IDs and Regal task IDs must be unique. Each transcript is capped at 262,144 characters. The schema extends the canonical transcript event shape but does not weaken the ordinary `TranscriptAvailableEventSchema` or `EvaluateRequestSchema` 200,000-character limits.
+
+Dry run is the default. Its response is aggregate-only and `Cache-Control: no-store`:
+
+```json
+{
+  "status": "dry_run_complete",
+  "dry_run": true,
+  "candidate_count": 12,
+  "ready_insert_count": 12,
+  "already_restored_count": 0,
+  "digest": {
+    "algorithm": "SHA-256",
+    "canonicalization": "achieve-qa-transcript-recovery-v1",
+    "value": "<private exact-source digest>"
+  }
+}
+```
+
+The digest binds all 12 complete canonical source events in deterministic ID order, but neither events, IDs, transcripts, nor a private manifest are returned or logged.
+
+### Separate approval and execution
+
+After private dry-run review, configure only the approved digest as `ACHIEVE_QA_TRANSCRIPT_RECOVERY_APPROVED_DIGEST`. Execution repeats the exact 12 events and supplies the reviewed digest:
+
+```json
+{
+  "events": ["<same 12 private canonical events>"],
+  "dry_run": false,
+  "digest": {
+    "algorithm": "SHA-256",
+    "canonicalization": "achieve-qa-transcript-recovery-v1",
+    "value": "<separately approved digest>"
+  }
+}
+```
+
+The submitted digest and server-owned approval must both match the freshly recomputed source digest. The route performs no resolver-plan creation, Workflow launch, alerting, legacy QA write, or module-result write.
+
+### Insert and state safety
+
+- Reads and writes are bounded to the 12 submitted IDs and persisted `event_type = transcript_available`.
+- Persisted rows and payloads are parsed with the strict recovery source schema.
+- All 12 absent rows may be inserted in one bulk plain `INSERT`; no upsert is used.
+- All 12 canonically identical payloads are an idempotent `already_restored` replay and cause no write.
+- Any partial cohort, conflicting payload, malformed row/payload, duplicate row, wrong type, or out-of-cohort response fails closed without filling gaps.
+- A unique-key race is re-read and succeeds only if all 12 winners are now identical. Otherwise execution stops categorically.
+- Responses and logs contain aggregate counts, categorical reasons, and at most a short digest fingerprint—never IDs, transcripts, event payloads, or customer metadata.
+
+Current production evidence shows all 12 Snowflake events are nonblank and untruncated. Ten source transcripts are at most 200,000 characters; the other two are 205,990 and 206,690 characters, within the recovery-only 262,144 bound.
+
+## Stage B: classify and recover the exact 17 QA gaps
+
+### Route contract
 
 ```text
 POST /api/v1/admin/achieve-welcome-call-qa/recover-gaps
@@ -12,7 +93,7 @@ Authorization: Bearer $INTERNAL_API_KEY
 Content-Type: application/json
 ```
 
-Dry run (the default) accepts exactly 17 unique opaque IDs:
+Dry run accepts exactly 17 unique opaque IDs:
 
 ```json
 {
@@ -20,82 +101,46 @@ Dry run (the default) accepts exactly 17 unique opaque IDs:
 }
 ```
 
-The strict parser rejects unknown fields, malformed/duplicate IDs, and any count other than 17. The response is aggregate-only and `Cache-Control: no-store`:
+The strict parser rejects unknown fields, malformed/duplicate IDs, and any count other than 17. The aggregate-only response uses `Cache-Control: no-store`. After exact-12 ledger restoration, and only if the reviewed database state is otherwise unchanged, expect 17 transcript-available and zero transcript-unavailable candidates. `processable_count` remains determined by current policy and deterministic production segmentation.
+
+The v2 recovery manifest privately hashes each complete selected source, its source kind, the complete first-pass `WelcomeCallSegment` (including full-source-relative line and confidence metadata), and the bounded `EvaluateRequest`. A source or segmentation change therefore changes the digest:
 
 ```json
 {
-  "status": "dry_run_complete",
-  "dry_run": true,
-  "candidate_count": 17,
-  "transcript_available_count": 5,
-  "transcript_unavailable_count": 12,
-  "processable_count": 0,
-  "segment_unavailable_count": 0,
-  "invalid_input_count": 0,
-  "unknown_call_count": 0,
-  "ineligible_count": 0,
-  "existing_result_count": 0,
-  "digest": {
-    "algorithm": "SHA-256",
-    "canonicalization": "achieve-qa-gap-recovery-v1",
-    "value": "<private exact-snapshot digest>"
-  }
+  "algorithm": "SHA-256",
+  "canonicalization": "achieve-qa-gap-recovery-v2",
+  "value": "<private exact-snapshot digest>"
 }
 ```
 
-Counts above illustrate fields, not a predicted processable count. Current evidence establishes five stored QA transcripts and twelve `transcript_unavailable` calls. Only stored inputs for which the production `segmentWelcomeCall` returns `segment_found=true` can be processable. A stored but unbounded transcript is `segment_unavailable` and is never inserted as `grading_skipped` merely to clear a gap.
+A valid newest legacy QA transcript is preferred. If both legacy QA and canonical ledger sources exist, they must agree exactly; disagreement fails closed as `invalid_input`. Blank, oversized, ambiguous, or otherwise invalid legacy state does not authorize ledger fallback.
 
-The digest binds sorted IDs, every categorical status, and the SHA-256 of each complete processable `EvaluateRequest`. Changing an ID, transcript, metadata, eligibility, segmentation, or existing-result state changes the digest.
+Canonical ledger sources may be as large as 262,144 characters. The inspector hashes the complete private source, then runs `segmentWelcomeCall` exactly once before constructing an `EvaluateRequest`. The approved first-pass `WelcomeCallSegment` travels through the private in-process grading seam with the bounded input, so the module uses its exact content and full-source-relative metadata without re-identification or a second segmentation pass. Neither the source nor segment is emitted in responses, logs, Workflow commands, or durable step outputs. Only a deterministic segment accepted by the unchanged 200,000-character `EvaluateRequestSchema` can become processable or reach the LLM. The full source is never silently truncated. Unbounded sources remain `segment_unavailable`, and any unexpected grade-time `grading_skipped: true` result is rejected before finalization.
 
-## Separate approval and execution
+Production evidence shows the two oversized source transcripts produce deterministic transfer-leg segments of approximately 21–23k characters with strong welcome evidence; the dry run must still recompute and privately review their actual classifications.
 
-Implementation approval is not execution approval. After private review of one exact dry run, separately configure that exact digest as the server-owned `ACHIEVE_QA_RECOVERY_APPROVED_DIGEST`. Without it, execution fails closed with `server_approval_missing`.
+### Approval, execution, and retry safety
 
-Execution must resubmit the same 17 IDs and exact dry-run digest:
+Implementation approval is not execution approval. After private review of one exact v2 dry run, configure that digest as `ACHIEVE_QA_RECOVERY_APPROVED_DIGEST`. Execution must resubmit the same 17 IDs and exact digest. The route and dedicated Workflow recompute the source hashes, segmentation, input hashes, policy, result absence, and complete digest before any grading.
 
-```json
-{
-  "call_ids": ["<same 17 privately held IDs>"],
-  "dry_run": false,
-  "digest": {
-    "algorithm": "SHA-256",
-    "canonicalization": "achieve-qa-gap-recovery-v1",
-    "value": "<separately approved digest>"
-  }
-}
-```
-
-The route recomputes the full private snapshot and requires both the submitted digest and server-owned allowlist to match before creating one deterministic `ACHIEVE_QA_RECOVERY_WORKFLOW` instance. The Workflow repeats the full parse, server approval, inspection, eligibility, segmentation, input-digest, and result-absence checks.
-
-## Write and retry safety
-
-- The dedicated Workflow has `retries.limit = 0` and uses the one-shot OpenAI client (`maxRetries = 0`, provider fallback disabled).
+- The dedicated Workflow has `retries.limit = 0`; the one-shot LLM client has `maxRetries = 0` and provider fallback disabled.
 - Inputs are processed sequentially and execution stops on the first read, state, grading, or write anomaly.
-- The newest stored QA transcript is selected by `created_at`. The repository has no verified stable unique transcript-row field for breaking equal-`created_at` ties, so differing newest rows at the same timestamp fail closed as `invalid_input` rather than choosing nondeterministically.
 - Immediately before each grade, the Workflow rechecks exact-module result absence.
-- Finalization is a plain `INSERT`, never an upsert. Production enforces `UNIQUE(call_id,module_name)`; SQLSTATE `23505` is classified as `already_exists`, preserving the winning ordinary or frozen audit row without update.
-- Inserted `result_json` is the ordinary production module result. No `backfill.audit_only` or recovery marker is added.
+- The Workflow and insert adapter both reject `grading_skipped: true`; such a result can never reach persistence.
+- Finalization is a plain `INSERT`, never an upsert. SQLSTATE `23505` is classified as `already_exists` without updating the winner.
+- Inserted `result_json` is the ordinary module result. No recovery/audit marker is added.
 - Inserts force `alert_sent=false`/`alert_sent_at=null` and omit agent, contact, phone, recording, summary, transcript URL, and lead metadata columns.
-- No alert extraction/dispatch or generic evaluation request metrics run.
-- Responses, logs, and durable step outputs contain only aggregate counts, categorical reasons, and a short digest fingerprint in logs. They never contain IDs, transcripts, result content, or customer metadata.
+- No alert extraction/dispatch or generic evaluation metrics run.
 
-## Expected capability and stop rules
+Do not execute either stage unless its counts, digest, and categorical state are privately reviewed. Never place transcript text in logs, responses, tickets, shell history, or this runbook; Pipedream must send the private JSON body directly from controlled source data.
 
-A safe dry run should account for all 17 as a categorical partition. Current source evidence predicts:
+## Safe partial-stop re-drive for Stage B
 
-- `transcript_available_count = 5`;
-- `transcript_unavailable_count = 12` (clearly unprocessable by this capability);
-- `processable_count <= 5`, determined only by the production eligibility and exact segment preflight.
+A digest-derived QA Workflow instance is terminal after it stops; do not delete it, invent another ID for the same digest, or restart it. Resolve the categorical failure without changing or deleting completed ordinary results or frozen audit rows, then:
 
-Do not execute if counts, digest, existing-result state, or expected segment classification are not privately reviewed. Never add transcript text to the request, logs, ticket, shell history, or runbook.
+1. Run a fresh Stage B dry run with the same exact 17 private IDs. Completed rows must classify as `existing_result`.
+2. Privately compare all aggregates, source/segment classifications, and the new digest with investigated database state.
+3. Obtain separate execution approval for the new exact v2 manifest and configure only its digest as `ACHIEVE_QA_RECOVERY_APPROVED_DIGEST`.
+4. Submit a new execution command with the same 17 IDs and newly approved digest.
 
-## Safe partial-stop re-drive
-
-A digest-derived Workflow instance is terminal after it stops; do not delete it, invent another ID for the same digest, or try to restart it. First investigate and resolve the categorical failure without changing or deleting any completed ordinary result or frozen audit row. Then:
-
-1. Run a fresh dry run with the same exact 17 private IDs. Rows completed by the prior instance must now classify as `existing_result`; remaining eligible rows may still classify as `processable`.
-2. Privately compare all new aggregates and the new digest with the investigated database state. Stop if completed counts, `existing_result_count`, transcript/segment classifications, or any other category are unexpected.
-3. Obtain separate execution approval for this newly computed exact manifest and configure only its exact digest as `ACHIEVE_QA_RECOVERY_APPROVED_DIGEST`.
-4. Submit a new execution command with the same 17 IDs and newly approved digest. Its new deterministic instance ID is legitimate only because completed rows and therefore the reviewed manifest changed.
-
-This is a re-drive of the remaining reviewed gaps, not a bypass. Never approve an unchanged/new digest merely to route around a terminal instance, never delete an old Workflow instance, and never skip the fresh dry run and private review.
+This is a re-drive of remaining reviewed gaps, not a bypass. Never approve a digest merely to route around a terminal instance, delete an old Workflow instance, or skip fresh dry-run review.

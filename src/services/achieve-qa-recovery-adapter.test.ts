@@ -8,7 +8,326 @@ import {
   createSupabaseAchieveQaRecoveryInspector,
 } from "./achieve-qa-recovery-adapter"
 
-describe("Achieve QA recovery insert-only finalizer", () => {
+const recoveryCallId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
+
+async function inspectRecoveryRows({
+  transcripts = [],
+  events = [],
+}: {
+  readonly transcripts?: ReadonlyArray<unknown>
+  readonly events?: ReadonlyArray<unknown>
+}) {
+  const inspector = createSupabaseAchieveQaRecoveryInspector(
+    createEnv(),
+    async () => ({
+      calls: {
+        data: [{
+          call_id: recoveryCallId,
+          disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
+          talk_time: 301,
+          campaign_name: null,
+          sfdc_lead_id: "lead-01",
+          started_at: "2026-08-12T00:00:00Z",
+        }],
+        error: null,
+      },
+      transcripts: { data: transcripts, error: null },
+      events: { data: events, error: null },
+      results: { data: [], error: null },
+    }),
+    async () => DEFAULT_RESOLVER_POLICY,
+  )
+  return inspector.inspect([recoveryCallId])
+}
+
+describe("Achieve QA recovery adapter", () => {
+  it("uses a canonical transcript ledger event when the QA table has no transcript", async () => {
+    const callId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
+    const inspector = createSupabaseAchieveQaRecoveryInspector(
+      createEnv(),
+      async () => ({
+        calls: {
+          data: [{
+            call_id: callId,
+            disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
+            talk_time: 301,
+            campaign_name: null,
+            sfdc_lead_id: "lead-01",
+            started_at: "2026-08-12T00:00:00Z",
+          }],
+          error: null,
+        },
+        transcripts: { data: [], error: null },
+        events: {
+          data: [{
+            regal_task_id: callId,
+            event_type: "transcript_available",
+            payload: {
+              event_type: "transcript_available",
+              regal_task_id: callId,
+              transcript: "canonical private transcript",
+              transcript_is_truncated: false,
+              source_event_id: "snowflake-event-01",
+            },
+          }],
+          error: null,
+        },
+        results: { data: [], error: null },
+      }),
+      async () => DEFAULT_RESOLVER_POLICY,
+    )
+
+    const inspected = await inspector.inspect([callId])
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        callId,
+        existingResult: false,
+        source: {
+          sourceKind: "canonical_event",
+          transcript: "canonical private transcript",
+        },
+      }],
+    })
+  })
+
+  it("accepts an oversized-for-evaluation ledger source within the recovery cap", async () => {
+    const sourceTranscript = "x".repeat(206_690)
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: sourceTranscript,
+          transcript_is_truncated: false,
+          source_event_id: "snowflake-event-01",
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        source: { sourceKind: "canonical_event", transcript: sourceTranscript },
+      }],
+    })
+  })
+
+  it("prefers a valid QA-table transcript over the ledger event", async () => {
+    const callId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
+    const inspector = createSupabaseAchieveQaRecoveryInspector(
+      createEnv(),
+      async () => ({
+        calls: {
+          data: [{
+            call_id: callId,
+            disposition: DEFAULT_RESOLVER_POLICY.enrollmentDisposition,
+            talk_time: 301,
+            campaign_name: null,
+            sfdc_lead_id: "lead-01",
+            started_at: "2026-08-12T00:00:00Z",
+          }],
+          error: null,
+        },
+        transcripts: {
+          data: [{
+            call_id: callId,
+            original_transcript: "preferred QA transcript",
+            created_at: "2026-08-12T01:00:00Z",
+          }],
+          error: null,
+        },
+        events: {
+          data: [{
+            regal_task_id: callId,
+            event_type: "transcript_available",
+            payload: {
+              event_type: "transcript_available",
+              regal_task_id: callId,
+              transcript: "preferred QA transcript",
+              transcript_is_truncated: false,
+              source_event_id: "snowflake-event-01",
+            },
+          }],
+          error: null,
+        },
+        results: { data: [], error: null },
+      }),
+      async () => DEFAULT_RESOLVER_POLICY,
+    )
+
+    const inspected = await inspector.inspect([callId])
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        source: {
+          sourceKind: "legacy_qa",
+          transcript: "preferred QA transcript",
+        },
+      }],
+    })
+  })
+
+  it("fails closed when canonical and legacy transcripts disagree", async () => {
+    const inspected = await inspectRecoveryRows({
+      transcripts: [{
+        call_id: recoveryCallId,
+        original_transcript: "legacy transcript",
+        created_at: "2026-08-12T01:00:00Z",
+      }],
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "different canonical transcript",
+          transcript_is_truncated: false,
+          source_event_id: "snowflake-event-01",
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{ source: null, inputStatus: "invalid_input" }],
+    })
+  })
+
+  it("fails closed when the only ledger payload is malformed", async () => {
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          regal_task_id: recoveryCallId,
+          transcript: "private transcript without canonical event type",
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        callId: recoveryCallId,
+        source: null,
+        inputStatus: "invalid_input",
+      }],
+    })
+  })
+
+  it.each([
+    {
+      condition: "marked truncated",
+      payload: {
+        event_type: "transcript_available",
+        regal_task_id: recoveryCallId,
+        transcript: "incomplete private transcript",
+        transcript_is_truncated: true,
+        source_event_id: "snowflake-event-01",
+      },
+    },
+    {
+      condition: "blank",
+      payload: {
+        event_type: "transcript_available",
+        regal_task_id: recoveryCallId,
+        transcript: "   ",
+        transcript_is_truncated: false,
+        source_event_id: "snowflake-event-01",
+      },
+    },
+    {
+      condition: "over the 262,144-character recovery-source limit",
+      payload: {
+        event_type: "transcript_available",
+        regal_task_id: recoveryCallId,
+        transcript: "x".repeat(262_145),
+        transcript_is_truncated: false,
+        source_event_id: "snowflake-event-01",
+      },
+    },
+  ])("fails closed when a ledger transcript is $condition", async ({ payload }) => {
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload,
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        callId: recoveryCallId,
+        source: null,
+        inputStatus: "invalid_input",
+      }],
+    })
+  })
+
+  it("fails closed when ledger rows contain conflicting transcripts", async () => {
+    const inspected = await inspectRecoveryRows({
+      events: ["first", "second"].map((transcript, index) => ({
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript,
+          transcript_is_truncated: false,
+          source_event_id: `snowflake-event-${index + 1}`,
+        },
+      })),
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        callId: recoveryCallId,
+        source: null,
+        inputStatus: "invalid_input",
+      }],
+    })
+  })
+
+  it("rejects a ledger row outside the requested cohort", async () => {
+    const outOfCohortCallId = AchieveQaRecoveryCallIdSchema.parse("not-requested")
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: outOfCohortCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: outOfCohortCallId,
+          transcript: "private transcript",
+        },
+      }],
+    })
+
+    expect(inspected).toEqual({ _tag: "failure", reason: "invalid_response" })
+  })
+
+  it("rejects a non-transcript ledger row even if its payload looks usable", async () => {
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "call_completed",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "private transcript",
+        },
+      }],
+    })
+
+    expect(inspected).toEqual({ _tag: "failure", reason: "invalid_response" })
+  })
+
   it("classifies the production UNIQUE(call_id,module_name) race without updating or attaching metadata", async () => {
     const inserts: Array<unknown> = []
     const finalize = createAchieveQaRecoveryInsertOnlyFinalizer(async (record) => {
@@ -42,6 +361,25 @@ describe("Achieve QA recovery insert-only finalizer", () => {
     expect(inserts[0]).not.toHaveProperty("recording_link")
   })
 
+  it("refuses to insert a grading-skipped result even when called directly", async () => {
+    let inserts = 0
+    const finalize = createAchieveQaRecoveryInsertOnlyFinalizer(async () => {
+      inserts += 1
+      return { error: null }
+    })
+
+    const result = await finalize(recoveryCallId, {
+      module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      result: { grading_skipped: true, skip_reason: "unexpected_second_segmentation" },
+      has_violation: false,
+      violation_type: null,
+      processing_time_ms: 1,
+    })
+
+    expect(result).toEqual({ _tag: "failure", reason: "invalid_response" })
+    expect(inserts).toBe(0)
+  })
+
   it("fails closed deterministically when newest transcript rows tie without a stable unique tie-break field", async () => {
     const callId = AchieveQaRecoveryCallIdSchema.parse("approved-gap-01")
     const call = {
@@ -63,6 +401,7 @@ describe("Achieve QA recovery insert-only finalizer", () => {
         async () => ({
           calls: { data: [call], error: null },
           transcripts: { data: transcripts, error: null },
+          events: { data: [], error: null },
           results: { data: [], error: null },
         }),
         async () => DEFAULT_RESOLVER_POLICY,
@@ -79,7 +418,7 @@ describe("Achieve QA recovery insert-only finalizer", () => {
       candidates: [{
         callId,
         existingResult: false,
-        input: null,
+        source: null,
         inputStatus: "invalid_input",
       }],
     })
