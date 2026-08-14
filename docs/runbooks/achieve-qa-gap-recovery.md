@@ -27,8 +27,8 @@ The strict parser rejects unknown fields, malformed/duplicate IDs, and any count
   "status": "dry_run_complete",
   "dry_run": true,
   "candidate_count": 17,
-  "transcript_available_count": 5,
-  "transcript_unavailable_count": 12,
+  "transcript_available_count": 15,
+  "transcript_unavailable_count": 2,
   "processable_count": 0,
   "segment_unavailable_count": 0,
   "invalid_input_count": 0,
@@ -43,7 +43,9 @@ The strict parser rejects unknown fields, malformed/duplicate IDs, and any count
 }
 ```
 
-Counts above illustrate fields, not a predicted processable count. Current evidence establishes five stored QA transcripts and twelve `transcript_unavailable` calls. Only stored inputs for which the production `segmentWelcomeCall` returns `segment_found=true` can be processable. A stored but unbounded transcript is `segment_unavailable` and is never inserted as `grading_skipped` merely to clear a gap.
+Counts above illustrate the expected storage classification only after the separately controlled first event-ledger backfill; they do not predict a processable count. Current evidence establishes five stored QA transcripts. The twelve remaining Snowflake transcript events are nonblank and untruncated, but their lengths range from 126,836 to 206,690 characters. Ten are within the canonical 200,000-character bound and may be restored by that first bounded backfill, producing 15 transcript-available and two transcript-unavailable candidates if the reviewed storage state is otherwise unchanged. Only stored inputs for which the production `segmentWelcomeCall` returns `segment_found=true` can be processable. A stored but unbounded transcript is `segment_unavailable` and is never inserted as `grading_skipped` merely to clear a gap.
+
+The two events over 200,000 characters are not eligible for that first backfill. Do not weaken `TranscriptAvailableEventSchema` or `EvaluateRequestSchema`, and do not silently truncate them. They require a separate, privately reviewed deterministic segmentation/source-input design before any recovery or persistence is authorized.
 
 The digest binds sorted IDs, every categorical status, and the SHA-256 of each complete processable `EvaluateRequest`. Changing an ID, transcript, metadata, eligibility, segmentation, or existing-result state changes the digest.
 
@@ -71,7 +73,9 @@ The route recomputes the full private snapshot and requires both the submitted d
 
 - The dedicated Workflow has `retries.limit = 0` and uses the one-shot OpenAI client (`maxRetries = 0`, provider fallback disabled).
 - Inputs are processed sequentially and execution stops on the first read, state, grading, or write anomaly.
-- The newest stored QA transcript is selected by `created_at`. The repository has no verified stable unique transcript-row field for breaking equal-`created_at` ties, so differing newest rows at the same timestamp fail closed as `invalid_input` rather than choosing nondeterministically.
+- The newest nonblank stored QA transcript is selected by `created_at` and, when valid, always takes precedence over the event ledger. The ledger is consulted only when the QA transcript is absent; a blank, oversized, ambiguous, or otherwise invalid QA transcript does not authorize fallback. The repository has no verified stable unique transcript-row field for breaking equal-`created_at` ties, so differing newest rows at the same timestamp fail closed as `invalid_input` rather than choosing nondeterministically.
+- Event fallback reads only requested IDs and rows whose persisted `event_type` is exactly `transcript_available`. Both the row and payload are parsed at the boundary, and the canonical payload `regal_task_id` must match the row and requested ID. An out-of-cohort or wrong-type persisted row rejects the inspection as `invalid_response`.
+- Event fallback accepts only a nonblank, untruncated transcript of at most 200,000 characters. A malformed canonical payload or a truncated, oversized, mismatched, or duplicate/conflicting event fails closed as `invalid_input`; event transcripts are never truncated or copied into `eavesly_transcription_qa`.
 - Immediately before each grade, the Workflow rechecks exact-module result absence.
 - Finalization is a plain `INSERT`, never an upsert. Production enforces `UNIQUE(call_id,module_name)`; SQLSTATE `23505` is classified as `already_exists`, preserving the winning ordinary or frozen audit row without update.
 - Inserted `result_json` is the ordinary production module result. No `backfill.audit_only` or recovery marker is added.
@@ -81,11 +85,14 @@ The route recomputes the full private snapshot and requires both the submitted d
 
 ## Expected capability and stop rules
 
-A safe dry run should account for all 17 as a categorical partition. Current source evidence predicts:
+A safe dry run should account for all 17 as a categorical partition. Before any event-ledger backfill, current source evidence predicts five QA transcripts and twelve unavailable transcripts. After a separately reviewed first backfill of only the ten canonical events within the 200,000-character bound, and only if the reviewed storage state is otherwise unchanged, expect:
 
-- `transcript_available_count = 5`;
-- `transcript_unavailable_count = 12` (clearly unprocessable by this capability);
-- `processable_count <= 5`, determined only by the production eligibility and exact segment preflight.
+- `transcript_available_count = 15`;
+- `transcript_unavailable_count = 2`;
+- `invalid_input_count = 0` (an oversized event row appearing in the ledger instead must fail closed here);
+- `processable_count <= 15`, determined only by production eligibility and exact segment preflight.
+
+The two oversized source events remain outside this recovery input set until a separate deterministic segmentation/source-input design is reviewed. Stop if they appear as restored ledger rows, if either schema bound has changed, or if any implementation truncates their content.
 
 Do not execute if counts, digest, existing-result state, or expected segment classification are not privately reviewed. Never add transcript text to the request, logs, ticket, shell history, or runbook.
 

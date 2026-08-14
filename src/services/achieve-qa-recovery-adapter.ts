@@ -8,6 +8,7 @@ import {
   type AchieveQaRecoveryCallId,
 } from "../schemas/achieve-qa-recovery"
 import { EvaluateRequestSchema } from "../schemas/requests"
+import { TranscriptAvailableEventSchema } from "../schemas/regal-events"
 import type { Bindings } from "../types/env"
 import type {
   AchieveQaRecoveryCandidate,
@@ -36,6 +37,12 @@ const TranscriptRowsSchema = z.array(z.object({
   created_at: z.string().datetime({ offset: true }),
 }).strict())
 
+const EventRowsSchema = z.array(z.object({
+  regal_task_id: AchieveQaRecoveryCallIdSchema,
+  event_type: z.literal("transcript_available"),
+  payload: z.unknown(),
+}).strict())
+
 const ResultRowsSchema = z.array(z.object({
   call_id: AchieveQaRecoveryCallIdSchema,
 }).strict())
@@ -44,6 +51,7 @@ type BoundaryResponse = { readonly data: unknown; readonly error: unknown | null
 type RecoveryReads = {
   readonly calls: BoundaryResponse
   readonly transcripts: BoundaryResponse
+  readonly events: BoundaryResponse
   readonly results: BoundaryResponse
 }
 type ExecuteRecoveryReads = (
@@ -87,7 +95,7 @@ export function createSupabaseAchieveQaRecoveryInspector(
 ): AchieveQaRecoveryInspector {
   const client: SupabaseClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   const execute: ExecuteRecoveryReads = executeReads ?? (async (callIds) => {
-    const [calls, transcripts, results] = await Promise.all([
+    const [calls, transcripts, events, results] = await Promise.all([
       client.from("eavesly_calls")
         .select("call_id,disposition,talk_time,campaign_name,sfdc_lead_id,started_at")
         .in("call_id", [...callIds]),
@@ -95,12 +103,16 @@ export function createSupabaseAchieveQaRecoveryInspector(
         .select("call_id,original_transcript,created_at")
         .in("call_id", [...callIds])
         .order("created_at", { ascending: false }),
+      client.from("eavesly_regal_call_events")
+        .select("regal_task_id,event_type,payload")
+        .eq("event_type", "transcript_available")
+        .in("regal_task_id", [...callIds]),
       client.from("eavesly_module_results")
         .select("call_id")
         .eq("module_name", MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA)
         .in("call_id", [...callIds]),
     ])
-    return { calls, transcripts, results }
+    return { calls, transcripts, events, results }
   })
 
   return {
@@ -111,14 +123,20 @@ export function createSupabaseAchieveQaRecoveryInspector(
       } catch {
         return { _tag: "failure", reason: "read_unavailable" }
       }
-      if (reads.calls.error !== null || reads.transcripts.error !== null || reads.results.error !== null) {
+      if (
+        reads.calls.error !== null
+        || reads.transcripts.error !== null
+        || reads.events.error !== null
+        || reads.results.error !== null
+      ) {
         return { _tag: "failure", reason: "read_unavailable" }
       }
 
       const calls = CallRowsSchema.safeParse(reads.calls.data)
       const transcripts = TranscriptRowsSchema.safeParse(reads.transcripts.data)
+      const events = EventRowsSchema.safeParse(reads.events.data)
       const results = ResultRowsSchema.safeParse(reads.results.data)
-      if (!calls.success || !transcripts.success || !results.success) {
+      if (!calls.success || !transcripts.success || !events.success || !results.success) {
         return { _tag: "failure", reason: "invalid_response" }
       }
 
@@ -126,6 +144,7 @@ export function createSupabaseAchieveQaRecoveryInspector(
       if (
         calls.data.some((row) => !requested.has(row.call_id))
         || transcripts.data.some((row) => !requested.has(row.call_id))
+        || events.data.some((row) => !requested.has(row.regal_task_id))
         || results.data.some((row) => !requested.has(row.call_id))
       ) {
         return { _tag: "failure", reason: "invalid_response" }
@@ -158,6 +177,28 @@ export function createSupabaseAchieveQaRecoveryInspector(
           newestTranscriptByCallId.set(row.call_id, { ...current, ambiguousTie: true })
         }
       }
+      const eventTranscriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
+      const invalidEventIds = new Set<AchieveQaRecoveryCallId>()
+      for (const row of events.data) {
+        const event = TranscriptAvailableEventSchema.safeParse(row.payload)
+        if (!event.success || event.data.regal_task_id !== row.regal_task_id) {
+          invalidEventIds.add(row.regal_task_id)
+          continue
+        }
+        const transcript = event.data.transcript?.trim()
+        if (!transcript || event.data.transcript_is_truncated === true) {
+          invalidEventIds.add(row.regal_task_id)
+          continue
+        }
+        if (eventTranscriptByCallId.has(row.regal_task_id)) {
+          // The ledger primary key permits one row per task and event type. Any
+          // duplicate response is ambiguous, even if its transcript happens to match.
+          invalidEventIds.add(row.regal_task_id)
+          continue
+        }
+        eventTranscriptByCallId.set(row.regal_task_id, event.data.transcript ?? transcript)
+      }
+
       const existingResultIds = new Set(results.data.map((row) => row.call_id))
       const candidates = calls.data.map((call): AchieveQaRecoveryCandidate => {
         const selected = newestTranscriptByCallId.get(call.call_id)
@@ -169,17 +210,28 @@ export function createSupabaseAchieveQaRecoveryInspector(
             input: null,
             inputStatus: "invalid_input",
           }
-        } else if (selected === undefined) {
+        } else if (selected !== undefined) {
+          candidate = createInput(call, selected.transcript)
+        } else if (
+          invalidTranscriptIds.has(call.call_id)
+          || invalidEventIds.has(call.call_id)
+        ) {
           candidate = {
             callId: call.call_id,
             existingResult: false,
             input: null,
-            inputStatus: invalidTranscriptIds.has(call.call_id)
-              ? "invalid_input"
-              : "transcript_unavailable",
+            inputStatus: "invalid_input",
           }
         } else {
-          candidate = createInput(call, selected.transcript)
+          const eventTranscript = eventTranscriptByCallId.get(call.call_id)
+          candidate = eventTranscript === undefined
+            ? {
+                callId: call.call_id,
+                existingResult: false,
+                input: null,
+                inputStatus: "transcript_unavailable",
+              }
+            : createInput(call, eventTranscript)
         }
         return { ...candidate, existingResult: existingResultIds.has(call.call_id) }
       })
