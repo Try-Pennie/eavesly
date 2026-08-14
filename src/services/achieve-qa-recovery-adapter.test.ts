@@ -82,7 +82,33 @@ describe("Achieve QA recovery adapter", () => {
       candidates: [{
         callId,
         existingResult: false,
-        input: { transcript: { transcript: "canonical private transcript" } },
+        source: {
+          sourceKind: "canonical_event",
+          transcript: "canonical private transcript",
+        },
+      }],
+    })
+  })
+
+  it("accepts an oversized-for-evaluation ledger source within the recovery cap", async () => {
+    const sourceTranscript = "x".repeat(206_690)
+    const inspected = await inspectRecoveryRows({
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: sourceTranscript,
+          transcript_is_truncated: false,
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{
+        source: { sourceKind: "canonical_event", transcript: sourceTranscript },
       }],
     })
   })
@@ -118,7 +144,7 @@ describe("Achieve QA recovery adapter", () => {
             payload: {
               event_type: "transcript_available",
               regal_task_id: callId,
-              transcript: "ledger transcript must not win",
+              transcript: "preferred QA transcript",
             },
           }],
           error: null,
@@ -133,8 +159,35 @@ describe("Achieve QA recovery adapter", () => {
     expect(inspected).toMatchObject({
       _tag: "success",
       candidates: [{
-        input: { transcript: { transcript: "preferred QA transcript" } },
+        source: {
+          sourceKind: "legacy_qa",
+          transcript: "preferred QA transcript",
+        },
       }],
+    })
+  })
+
+  it("fails closed when canonical and legacy transcripts disagree", async () => {
+    const inspected = await inspectRecoveryRows({
+      transcripts: [{
+        call_id: recoveryCallId,
+        original_transcript: "legacy transcript",
+        created_at: "2026-08-12T01:00:00Z",
+      }],
+      events: [{
+        regal_task_id: recoveryCallId,
+        event_type: "transcript_available",
+        payload: {
+          event_type: "transcript_available",
+          regal_task_id: recoveryCallId,
+          transcript: "different canonical transcript",
+        },
+      }],
+    })
+
+    expect(inspected).toMatchObject({
+      _tag: "success",
+      candidates: [{ source: null, inputStatus: "invalid_input" }],
     })
   })
 
@@ -154,7 +207,7 @@ describe("Achieve QA recovery adapter", () => {
       _tag: "success",
       candidates: [{
         callId: recoveryCallId,
-        input: null,
+        source: null,
         inputStatus: "invalid_input",
       }],
     })
@@ -179,11 +232,11 @@ describe("Achieve QA recovery adapter", () => {
       },
     },
     {
-      condition: "over the 200,000-character canonical limit",
+      condition: "over the 262,144-character recovery-source limit",
       payload: {
         event_type: "transcript_available",
         regal_task_id: recoveryCallId,
-        transcript: "x".repeat(200_001),
+        transcript: "x".repeat(262_145),
       },
     },
   ])("fails closed when a ledger transcript is $condition", async ({ payload }) => {
@@ -199,7 +252,7 @@ describe("Achieve QA recovery adapter", () => {
       _tag: "success",
       candidates: [{
         callId: recoveryCallId,
-        input: null,
+        source: null,
         inputStatus: "invalid_input",
       }],
     })
@@ -222,7 +275,7 @@ describe("Achieve QA recovery adapter", () => {
       _tag: "success",
       candidates: [{
         callId: recoveryCallId,
-        input: null,
+        source: null,
         inputStatus: "invalid_input",
       }],
     })
@@ -332,7 +385,7 @@ describe("Achieve QA recovery adapter", () => {
       candidates: [{
         callId,
         existingResult: false,
-        input: null,
+        source: null,
         inputStatus: "invalid_input",
       }],
     })

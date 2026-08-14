@@ -1,7 +1,7 @@
 import { MODULE_NAMES } from "../modules/constants"
 import { segmentWelcomeCall } from "../modules/achieve-welcome-call-qa/segment"
 import type { ModuleResult } from "../modules/types"
-import type { EvaluateRequest } from "../schemas/requests"
+import { EvaluateRequestSchema, type EvaluateRequest } from "../schemas/requests"
 import {
   AchieveQaRecoveryDigestSchema,
   AchieveQaRecoveryCallIdSchema,
@@ -13,11 +13,19 @@ import type { ResolverPolicy } from "./regal-events"
 import { isAchieveWelcomeCallEligible } from "../workflows/partner-routing"
 import { sha256CanonicalJson } from "./canonical-json"
 
-/** A parsed private input reconstructed from stored call and QA transcript rows. */
+/** Parsed private transcript source reconstructed from bounded persisted recovery rows. */
+export type AchieveQaRecoverySource = {
+  readonly sourceKind: "legacy_qa" | "canonical_event"
+  readonly transcript: string
+  readonly metadata: EvaluateRequest["transcript"]["metadata"]
+  readonly sfdcLeadId: string
+}
+
+/** One parsed private source candidate reconstructed by the recovery adapter. */
 export type AchieveQaRecoveryCandidate = {
   readonly callId: AchieveQaRecoveryCallId
   readonly existingResult: boolean
-  readonly input: EvaluateRequest | null
+  readonly source: AchieveQaRecoverySource | null
   readonly inputStatus?: "transcript_unavailable" | "invalid_input"
 }
 
@@ -48,6 +56,8 @@ type CandidateStatus =
 type ManifestCandidate = {
   readonly call_id: AchieveQaRecoveryCallId
   readonly status: CandidateStatus
+  readonly source_kind?: AchieveQaRecoverySource["sourceKind"]
+  readonly source_digest?: string
   readonly input_digest?: string
 }
 
@@ -72,14 +82,14 @@ export type AchieveQaRecoverySnapshot = {
     readonly input: EvaluateRequest
   }>
   readonly manifest: {
-    readonly representation_version: "achieve-qa-gap-recovery-v1"
+    readonly representation_version: "achieve-qa-gap-recovery-v2"
     readonly module_name: typeof MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA
     readonly candidates: ReadonlyArray<ManifestCandidate>
   }
   readonly summary: AchieveQaRecoverySummary
   readonly digest: {
     readonly algorithm: "SHA-256"
-    readonly canonicalization: "achieve-qa-gap-recovery-v1"
+    readonly canonicalization: "achieve-qa-gap-recovery-v2"
     readonly value: string
   }
 }
@@ -88,35 +98,81 @@ function compareCallIds(left: AchieveQaRecoveryCallId, right: AchieveQaRecoveryC
   return left < right ? -1 : left > right ? 1 : 0
 }
 
+type ClassifiedCandidate = {
+  readonly manifest: ManifestCandidate
+  readonly processableInput?: EvaluateRequest
+}
+
 async function classifyCandidate(
   callId: AchieveQaRecoveryCallId,
   candidate: AchieveQaRecoveryCandidate | undefined,
   policy: ResolverPolicy,
-): Promise<ManifestCandidate> {
-  if (candidate === undefined) return { call_id: callId, status: "unknown_call" }
-  if (candidate.existingResult) return { call_id: callId, status: "existing_result" }
-  if (candidate.input === null) {
+): Promise<ClassifiedCandidate> {
+  if (candidate === undefined) {
+    return { manifest: { call_id: callId, status: "unknown_call" } }
+  }
+  if (candidate.source === null) {
     return {
-      call_id: callId,
-      status: candidate.inputStatus === "invalid_input" ? "invalid_input" : "transcript_unavailable",
+      manifest: {
+        call_id: callId,
+        status: candidate.existingResult
+          ? "existing_result"
+          : candidate.inputStatus === "invalid_input"
+            ? "invalid_input"
+            : "transcript_unavailable",
+      },
     }
   }
-  if (candidate.input.call_id !== callId) return { call_id: callId, status: "invalid_input" }
 
-  const eligibility = isAchieveWelcomeCallEligible(candidate.input, policy)
-  if (!eligibility.eligible) return { call_id: callId, status: "ineligible" }
-  // Ordinary recovery must never persist the module's deterministic grading_skipped
-  // output merely to clear a gap. Exact production segmentation is mandatory.
-  if (!segmentWelcomeCall(candidate.input.transcript.transcript).segment_found) {
-    return { call_id: callId, status: "segment_unavailable" }
+  const sourceDigest = await sha256CanonicalJson(candidate.source)
+  if (sourceDigest._tag === "failure") {
+    return { manifest: { call_id: callId, status: "invalid_input" } }
+  }
+  const sourceFields = {
+    source_kind: candidate.source.sourceKind,
+    source_digest: sourceDigest.value,
+  }
+  if (candidate.existingResult) {
+    return {
+      manifest: { call_id: callId, status: "existing_result", ...sourceFields },
+    }
+  }
+  const segmented = segmentWelcomeCall(candidate.source.transcript)
+  if (!segmented.segment_found) {
+    return {
+      manifest: { call_id: callId, status: "segment_unavailable", ...sourceFields },
+    }
   }
 
-  const inputDigest = await sha256CanonicalJson(candidate.input)
-  if (inputDigest._tag === "failure") return { call_id: callId, status: "invalid_input" }
-  return {
+  const input = EvaluateRequestSchema.safeParse({
     call_id: callId,
-    status: "processable",
-    input_digest: inputDigest.value,
+    agent_id: "",
+    transcript: {
+      transcript: segmented.segment,
+      metadata: candidate.source.metadata,
+    },
+    sfdc_lead_id: candidate.source.sfdcLeadId,
+  })
+  if (!input.success) {
+    return { manifest: { call_id: callId, status: "invalid_input", ...sourceFields } }
+  }
+
+  const eligibility = isAchieveWelcomeCallEligible(input.data, policy)
+  if (!eligibility.eligible) {
+    return { manifest: { call_id: callId, status: "ineligible", ...sourceFields } }
+  }
+  const inputDigest = await sha256CanonicalJson(input.data)
+  if (inputDigest._tag === "failure") {
+    return { manifest: { call_id: callId, status: "invalid_input", ...sourceFields } }
+  }
+  return {
+    manifest: {
+      call_id: callId,
+      status: "processable",
+      ...sourceFields,
+      input_digest: inputDigest.value,
+    },
+    processableInput: input.data,
   }
 }
 
@@ -153,27 +209,23 @@ export async function inspectAchieveQaRecovery(
     byId.set(candidate.callId, candidate)
   }
 
-  const candidates = await Promise.all(
+  const classified = await Promise.all(
     callIds.map((callId) => classifyCandidate(callId, byId.get(callId), inspected.policy)),
   )
+  const candidates = classified.map((candidate) => candidate.manifest)
   const manifest = {
-    representation_version: "achieve-qa-gap-recovery-v1" as const,
+    representation_version: "achieve-qa-gap-recovery-v2" as const,
     module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
     candidates,
   }
   const digest = await sha256CanonicalJson(manifest)
   if (digest._tag === "failure") return { _tag: "failure", reason: "invalid_response" }
 
-  const processableIds = new Set(
-    candidates
-      .filter((candidate) => candidate.status === "processable")
-      .map((candidate) => candidate.call_id),
-  )
-  const processableInputs = callIds.flatMap((callId) => {
-    const input = byId.get(callId)?.input
-    return processableIds.has(callId) && input !== null && input !== undefined
-      ? [{ callId, input }]
-      : []
+  const processableInputs = classified.flatMap((candidate, index) => {
+    const callId = callIds[index]
+    return candidate.processableInput === undefined || callId === undefined
+      ? []
+      : [{ callId, input: candidate.processableInput }]
   })
 
   return {
@@ -182,7 +234,7 @@ export async function inspectAchieveQaRecovery(
     summary: summarize(candidates),
     digest: {
       algorithm: "SHA-256",
-      canonicalization: "achieve-qa-gap-recovery-v1",
+      canonicalization: "achieve-qa-gap-recovery-v2",
       value: digest.value,
     },
   }

@@ -6,6 +6,10 @@ export interface Bindings {
   INTERNAL_API_KEY: string
   /** Server-owned allowlist digest for the one approved 17-call Achieve QA recovery artifact. */
   ACHIEVE_QA_RECOVERY_APPROVED_DIGEST?: string
+  /** Dedicated 32+ character credential for the exact-12 transcript-ledger recovery route. */
+  ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY?: string
+  /** Server-owned allowlist digest for one exact-12 transcript-ledger source snapshot. */
+  ACHIEVE_QA_TRANSCRIPT_RECOVERY_APPROVED_DIGEST?: string
   /** Dedicated 32+ character server-to-server credential for the Skyfall profile recap endpoint. */
   SKYFALL_PROFILE_RECAP_AUTH_KEY?: string
   SUPABASE_URL: string

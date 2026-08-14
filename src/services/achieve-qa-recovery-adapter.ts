@@ -7,8 +7,10 @@ import {
   AchieveQaRecoveryCallIdSchema,
   type AchieveQaRecoveryCallId,
 } from "../schemas/achieve-qa-recovery"
-import { EvaluateRequestSchema } from "../schemas/requests"
-import { TranscriptAvailableEventSchema } from "../schemas/regal-events"
+import {
+  ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH,
+  AchieveQaTranscriptRecoverySourceEventSchema,
+} from "../schemas/achieve-qa-transcript-recovery"
 import type { Bindings } from "../types/env"
 import type {
   AchieveQaRecoveryCandidate,
@@ -59,17 +61,22 @@ type ExecuteRecoveryReads = (
 ) => Promise<RecoveryReads>
 type LoadResolverPolicy = () => Promise<ResolverPolicy>
 
-function createInput(
+function createSourceCandidate(
   call: z.infer<typeof CallRowsSchema>[number],
   transcript: string,
+  sourceKind: "legacy_qa" | "canonical_event",
 ): AchieveQaRecoveryCandidate {
-  if (call.sfdc_lead_id === null) {
-    return { callId: call.call_id, existingResult: false, input: null, inputStatus: "invalid_input" }
+  if (
+    call.sfdc_lead_id === null
+    || transcript.length > ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH
+  ) {
+    return { callId: call.call_id, existingResult: false, source: null, inputStatus: "invalid_input" }
   }
-  const parsed = EvaluateRequestSchema.safeParse({
-    call_id: call.call_id,
-    agent_id: "",
-    transcript: {
+  return {
+    callId: call.call_id,
+    existingResult: false,
+    source: {
+      sourceKind,
       transcript,
       metadata: {
         duration: call.talk_time ?? 0,
@@ -78,13 +85,9 @@ function createInput(
         disposition: call.disposition ?? undefined,
         campaign_name: call.campaign_name ?? undefined,
       },
+      sfdcLeadId: call.sfdc_lead_id,
     },
-    sfdc_lead_id: call.sfdc_lead_id,
-  })
-  if (!parsed.success) {
-    return { callId: call.call_id, existingResult: false, input: null, inputStatus: "invalid_input" }
   }
-  return { callId: call.call_id, existingResult: false, input: parsed.data }
 }
 
 /** Build the parsed Supabase inspector for the exact 17-call recovery artifact. */
@@ -180,13 +183,13 @@ export function createSupabaseAchieveQaRecoveryInspector(
       const eventTranscriptByCallId = new Map<AchieveQaRecoveryCallId, string>()
       const invalidEventIds = new Set<AchieveQaRecoveryCallId>()
       for (const row of events.data) {
-        const event = TranscriptAvailableEventSchema.safeParse(row.payload)
+        const event = AchieveQaTranscriptRecoverySourceEventSchema.safeParse(row.payload)
         if (!event.success || event.data.regal_task_id !== row.regal_task_id) {
           invalidEventIds.add(row.regal_task_id)
           continue
         }
         const transcript = event.data.transcript?.trim()
-        if (!transcript || event.data.transcript_is_truncated === true) {
+        if (!transcript) {
           invalidEventIds.add(row.regal_task_id)
           continue
         }
@@ -203,15 +206,24 @@ export function createSupabaseAchieveQaRecoveryInspector(
       const candidates = calls.data.map((call): AchieveQaRecoveryCandidate => {
         const selected = newestTranscriptByCallId.get(call.call_id)
         let candidate: AchieveQaRecoveryCandidate
+        const eventTranscript = eventTranscriptByCallId.get(call.call_id)
         if (selected?.ambiguousTie) {
           candidate = {
             callId: call.call_id,
             existingResult: false,
-            input: null,
+            source: null,
             inputStatus: "invalid_input",
           }
         } else if (selected !== undefined) {
-          candidate = createInput(call, selected.transcript)
+          candidate = invalidEventIds.has(call.call_id)
+            || (eventTranscript !== undefined && eventTranscript !== selected.transcript)
+            ? {
+                callId: call.call_id,
+                existingResult: false,
+                source: null,
+                inputStatus: "invalid_input",
+              }
+            : createSourceCandidate(call, selected.transcript, "legacy_qa")
         } else if (
           invalidTranscriptIds.has(call.call_id)
           || invalidEventIds.has(call.call_id)
@@ -219,19 +231,18 @@ export function createSupabaseAchieveQaRecoveryInspector(
           candidate = {
             callId: call.call_id,
             existingResult: false,
-            input: null,
+            source: null,
             inputStatus: "invalid_input",
           }
         } else {
-          const eventTranscript = eventTranscriptByCallId.get(call.call_id)
           candidate = eventTranscript === undefined
             ? {
                 callId: call.call_id,
                 existingResult: false,
-                input: null,
+                source: null,
                 inputStatus: "transcript_unavailable",
               }
-            : createInput(call, eventTranscript)
+            : createSourceCandidate(call, eventTranscript, "canonical_event")
         }
         return { ...candidate, existingResult: existingResultIds.has(call.call_id) }
       })

@@ -13,6 +13,8 @@ DEEPGRAM_MODEL = "nova-3"
 # Secrets (set via `wrangler secret put`):
 # INTERNAL_API_KEY
 # ACHIEVE_QA_RECOVERY_APPROVED_DIGEST (set only after private review of the exact 17-ID dry run)
+# ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY (dedicated 32+ character Pipedream credential)
+# ACHIEVE_QA_TRANSCRIPT_RECOVERY_APPROVED_DIGEST (set only after private exact-12 source dry-run review)
 # SKYFALL_PROFILE_RECAP_AUTH_KEY (32+ characters; set separately for staging and production)
 # SUPABASE_URL
 # SUPABASE_SERVICE_ROLE_KEY
