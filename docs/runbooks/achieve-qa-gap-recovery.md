@@ -16,7 +16,7 @@ Content-Type: application/json
 
 This route does not accept `INTERNAL_API_KEY`. Provision a dedicated, random credential of at least 32 characters as the Cloudflare secret `ACHIEVE_QA_TRANSCRIPT_RECOVERY_AUTH_KEY` and the matching Pipedream secret. Missing/short server configuration fails closed with `503`; missing or incorrect credentials return `401`. Authentication uses constant-time digest comparison and runs before body reading, parsing, or database construction.
 
-The route has a route-local 4 MiB byte limit. This admits the reviewed approximately 2.5 MiB JSON artifact while bounding memory use. The strict request contains exactly 12 unique canonical `transcript_available` events:
+The route has a route-local 4 MiB byte limit. This admits the reviewed approximately 1.8 MiB source transcript payload plus JSON overhead while bounding memory use. The strict request contains exactly 12 unique canonical `transcript_available` events:
 
 ```json
 {
