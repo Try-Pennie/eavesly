@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { MODULE_NAMES } from "../modules/constants"
 import type { ModuleResult } from "../modules/types"
-import { achieveWelcomeCallQAModule } from "../modules/achieve-welcome-call-qa/module"
+import { gradeAchieveWelcomeCallSegment } from "../modules/achieve-welcome-call-qa/module"
 import {
   AchieveQaRecoveryCallIdSchema,
   type AchieveQaRecoveryCallId,
@@ -280,6 +280,15 @@ export function createAchieveQaRecoveryInsertOnlyFinalizer(
   executeInsert: ExecuteOrdinaryResultInsert,
 ): AchieveQaRecoveryExecutionDependencies["finalize"] {
   return async (callId: AchieveQaRecoveryCallId, result: ModuleResult) => {
+    if (
+      typeof result.result === "object"
+      && result.result !== null
+      && !Array.isArray(result.result)
+      && "grading_skipped" in result.result
+      && result.result.grading_skipped === true
+    ) {
+      return { _tag: "failure", reason: "invalid_response" }
+    }
     try {
       const { error } = await executeInsert({
         call_id: callId,
@@ -337,13 +346,12 @@ export function createSupabaseAchieveQaRecoveryDependencies(
         return { _tag: "failure", reason: "read_unavailable" }
       }
     },
-    async grade(input) {
+    async grade(candidate) {
       try {
-        const result = await achieveWelcomeCallQAModule.evaluate(
-          input.transcript.transcript,
-          input,
+        const result = await gradeAchieveWelcomeCallSegment(
+          candidate.segment,
+          candidate.input,
           llm,
-          null,
         )
         return { _tag: "success", result }
       } catch {

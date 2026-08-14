@@ -1,5 +1,8 @@
 import { MODULE_NAMES } from "../modules/constants"
-import { segmentWelcomeCall } from "../modules/achieve-welcome-call-qa/segment"
+import {
+  segmentWelcomeCall,
+  type WelcomeCallSegment,
+} from "../modules/achieve-welcome-call-qa/segment"
 import type { ModuleResult } from "../modules/types"
 import { EvaluateRequestSchema, type EvaluateRequest } from "../schemas/requests"
 import {
@@ -10,7 +13,7 @@ import {
 } from "../schemas/achieve-qa-recovery"
 import { z } from "zod"
 import type { ResolverPolicy } from "./regal-events"
-import { isAchieveWelcomeCallEligible } from "../workflows/partner-routing"
+import { isAchieveWelcomeCallEligibleWithSegment } from "../workflows/partner-routing"
 import { sha256CanonicalJson } from "./canonical-json"
 
 /** Parsed private transcript source reconstructed from bounded persisted recovery rows. */
@@ -58,6 +61,7 @@ type ManifestCandidate = {
   readonly status: CandidateStatus
   readonly source_kind?: AchieveQaRecoverySource["sourceKind"]
   readonly source_digest?: string
+  readonly segment_digest?: string
   readonly input_digest?: string
 }
 
@@ -80,6 +84,7 @@ export type AchieveQaRecoverySnapshot = {
   readonly processableInputs: ReadonlyArray<{
     readonly callId: AchieveQaRecoveryCallId
     readonly input: EvaluateRequest
+    readonly segment: WelcomeCallSegment
   }>
   readonly manifest: {
     readonly representation_version: "achieve-qa-gap-recovery-v2"
@@ -101,6 +106,7 @@ function compareCallIds(left: AchieveQaRecoveryCallId, right: AchieveQaRecoveryC
 type ClassifiedCandidate = {
   readonly manifest: ManifestCandidate
   readonly processableInput?: EvaluateRequest
+  readonly processableSegment?: WelcomeCallSegment
 }
 
 async function classifyCandidate(
@@ -138,9 +144,14 @@ async function classifyCandidate(
     }
   }
   const segmented = segmentWelcomeCall(candidate.source.transcript)
+  const segmentDigest = await sha256CanonicalJson(segmented)
+  if (segmentDigest._tag === "failure") {
+    return { manifest: { call_id: callId, status: "invalid_input", ...sourceFields } }
+  }
+  const segmentedFields = { ...sourceFields, segment_digest: segmentDigest.value }
   if (!segmented.segment_found) {
     return {
-      manifest: { call_id: callId, status: "segment_unavailable", ...sourceFields },
+      manifest: { call_id: callId, status: "segment_unavailable", ...segmentedFields },
     }
   }
 
@@ -154,25 +165,26 @@ async function classifyCandidate(
     sfdc_lead_id: candidate.source.sfdcLeadId,
   })
   if (!input.success) {
-    return { manifest: { call_id: callId, status: "invalid_input", ...sourceFields } }
+    return { manifest: { call_id: callId, status: "invalid_input", ...segmentedFields } }
   }
 
-  const eligibility = isAchieveWelcomeCallEligible(input.data, policy)
+  const eligibility = isAchieveWelcomeCallEligibleWithSegment(input.data, policy, segmented)
   if (!eligibility.eligible) {
-    return { manifest: { call_id: callId, status: "ineligible", ...sourceFields } }
+    return { manifest: { call_id: callId, status: "ineligible", ...segmentedFields } }
   }
   const inputDigest = await sha256CanonicalJson(input.data)
   if (inputDigest._tag === "failure") {
-    return { manifest: { call_id: callId, status: "invalid_input", ...sourceFields } }
+    return { manifest: { call_id: callId, status: "invalid_input", ...segmentedFields } }
   }
   return {
     manifest: {
       call_id: callId,
       status: "processable",
-      ...sourceFields,
+      ...segmentedFields,
       input_digest: inputDigest.value,
     },
     processableInput: input.data,
+    processableSegment: segmented,
   }
 }
 
@@ -223,9 +235,15 @@ export async function inspectAchieveQaRecovery(
 
   const processableInputs = classified.flatMap((candidate, index) => {
     const callId = callIds[index]
-    return candidate.processableInput === undefined || callId === undefined
+    return candidate.processableInput === undefined
+      || candidate.processableSegment === undefined
+      || callId === undefined
       ? []
-      : [{ callId, input: candidate.processableInput }]
+      : [{
+          callId,
+          input: candidate.processableInput,
+          segment: candidate.processableSegment,
+        }]
   })
 
   return {
@@ -256,6 +274,12 @@ export const AchieveQaRecoveryWorkflowCommandSchema = z.object({
 /** Parsed private command carried into the dedicated recovery Workflow. */
 export type AchieveQaRecoveryWorkflowCommand = z.infer<typeof AchieveQaRecoveryWorkflowCommandSchema>
 
+/** Private bounded grading input plus its approved full-source-relative segment metadata. */
+export type AchieveQaRecoveryGradeCandidate = {
+  readonly input: EvaluateRequest
+  readonly segment: WelcomeCallSegment
+}
+
 /** Insert-only, no-alert capabilities used by the dedicated recovery execution. */
 export interface AchieveQaRecoveryExecutionDependencies extends AchieveQaRecoveryInspector {
   /** Recheck exact-module absence immediately before one grading attempt. */
@@ -263,8 +287,8 @@ export interface AchieveQaRecoveryExecutionDependencies extends AchieveQaRecover
     | { readonly _tag: "success"; readonly exists: boolean }
     | { readonly _tag: "failure"; readonly reason: "read_unavailable" | "invalid_response" }
   >
-  /** Grade one already bounded and eligibility-approved stored input once. */
-  grade(input: EvaluateRequest): Promise<
+  /** Grade one already bounded input with its approved precomputed segment exactly once. */
+  grade(candidate: AchieveQaRecoveryGradeCandidate): Promise<
     | { readonly _tag: "success"; readonly result: ModuleResult }
     | { readonly _tag: "failure"; readonly reason: "grading_unavailable" | "invalid_response" }
   >
@@ -375,7 +399,10 @@ export async function runApprovedAchieveQaRecovery(
       return executionResult(snapshot, "stopped", completedCount, "existing_result_detected")
     }
 
-    const graded = await dependencies.grade(candidate.input)
+    const graded = await dependencies.grade({
+      input: candidate.input,
+      segment: candidate.segment,
+    })
     if (graded._tag === "failure") {
       return executionResult(snapshot, "stopped", completedCount, graded.reason)
     }
@@ -384,6 +411,8 @@ export async function runApprovedAchieveQaRecovery(
       || typeof graded.result.result !== "object"
       || graded.result.result === null
       || Array.isArray(graded.result.result)
+      || ("grading_skipped" in graded.result.result
+        && graded.result.result.grading_skipped === true)
     ) {
       return executionResult(snapshot, "stopped", completedCount, "invalid_response")
     }

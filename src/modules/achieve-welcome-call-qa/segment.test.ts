@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { segmentWelcomeCall } from "./segment"
-import { achieveWelcomeCallQAModule } from "./module"
+import {
+  achieveWelcomeCallQAModule,
+  gradeAchieveWelcomeCallSegment,
+} from "./module"
 import { createMockLLM } from "../../../test/helpers/mock-llm"
 import { createEvaluateRequest } from "../../../test/helpers/create-request"
 import { AchieveWelcomeCallQASchema } from "../../schemas/achieve-welcome-call-qa"
@@ -408,6 +411,43 @@ describe("segmentWelcomeCall", () => {
 })
 
 describe("achieveWelcomeCallQAModule.evaluate", () => {
+  it("grades an approved three-line-fallback segment exactly once with full-source metadata", async () => {
+    const fullSource = [
+      PRE_HANDOFF,
+      "[transfer agent]: Welcome call.",
+      "[transfer agent]: This is Julissa.",
+      "[contact]: Hello.",
+      "[transfer agent]: Welcome to your Freedom Debt Relief program.",
+      "[transfer agent]: Your deposits go into a dedicated account.",
+      "[transfer agent]: We negotiate with each creditor.",
+      "[transfer agent]: You authorize settlements from your dashboard.",
+      "[transfer agent]: Let us set up your client dashboard.",
+      "[transfer agent]: Your program guide explains the available tools.",
+      "[transfer agent]: Congratulations and have a great day.",
+    ].join("\n")
+    const approvedSegment = segmentWelcomeCall(fullSource)
+    const secondPass = segmentWelcomeCall(approvedSegment.segment)
+    expect(approvedSegment.segment_found).toBe(true)
+    expect(approvedSegment.start_line).toBe(5)
+    expect(secondPass.segment_found).toBe(false)
+
+    const llm = createMockLLM(mockResponse)
+    const result = await gradeAchieveWelcomeCallSegment(
+      approvedSegment,
+      createEvaluateRequest(),
+      llm as any,
+    )
+
+    expect(llm.getStructuredResponse).toHaveBeenCalledTimes(1)
+    const [, userPrompt] = llm.getStructuredResponse.mock.calls[0]
+    expect(userPrompt.endsWith(approvedSegment.segment)).toBe(true)
+    expect((result.result as any).transcript_segment).toMatchObject({
+      start_line: approvedSegment.start_line,
+      end_line: approvedSegment.end_line,
+      transfer_agent_lines: approvedSegment.transfer_agent_lines,
+    })
+  })
+
   it("sends only the post-handoff segment to the LLM", async () => {
     const llm = createMockLLM(mockResponse)
     const request = createEvaluateRequest()

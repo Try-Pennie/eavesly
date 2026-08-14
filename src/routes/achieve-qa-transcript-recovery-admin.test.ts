@@ -17,6 +17,7 @@ const events = Array.from(
     regal_task_id: `achieve-gap-${String(index + 1).padStart(2, "0")}`,
     transcript: `private transcript ${index + 1}`,
     transcript_is_truncated: false,
+    source_event_id: `snowflake-event-${index + 1}`,
   }),
 )
 
@@ -139,6 +140,36 @@ describe("Achieve QA exact-12 transcript recovery admin route", () => {
       candidate_count: 12,
     })
     expect(ledger.restores).toBe(0)
+  })
+
+  it.each([
+    [
+      "missing explicit truncation proof",
+      events.map((event, index) => index === 0
+        ? { ...event, transcript_is_truncated: undefined }
+        : event),
+    ],
+    [
+      "missing source event provenance",
+      events.map((event, index) => index === 0
+        ? { ...event, source_event_id: undefined }
+        : event),
+    ],
+    [
+      "duplicate source event provenance",
+      events.map((event, index) => index === 1
+        ? { ...event, source_event_id: events[0].source_event_id }
+        : event),
+    ],
+  ])("rejects %s before DB construction", async (_case, invalidEvents) => {
+    let constructions = 0
+    const response = await request(createApp(() => {
+      constructions += 1
+      return new RecordingLedger()
+    }), { events: invalidEvents })
+
+    expect(response.status).toBe(400)
+    expect(constructions).toBe(0)
   })
 
   it("fails closed on partial persisted state without restoring", async () => {

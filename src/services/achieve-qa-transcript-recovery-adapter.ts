@@ -31,7 +31,7 @@ type EventInsertRecord = {
   readonly regal_task_id: AchieveQaRecoveryCallId
   readonly event_type: "transcript_available"
   readonly agent_email: string | null
-  readonly source_event_id: string | null
+  readonly source_event_id: string
   readonly payload: AchieveQaTranscriptRecoverySourceEvent
 }
 
@@ -120,7 +120,7 @@ export function createSupabaseAchieveQaTranscriptRecoveryLedger(
         regal_task_id: event.regal_task_id,
         event_type: "transcript_available",
         agent_email: event.agent_email ?? null,
-        source_event_id: event.source_event_id ?? null,
+        source_event_id: event.source_event_id,
         payload: event,
       }))
       let response: { readonly error: { readonly code?: unknown } | null }

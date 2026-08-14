@@ -12,7 +12,10 @@ export const ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH = 262_144 as const
 export const AchieveQaTranscriptRecoverySourceEventSchema = TranscriptAvailableEventSchema.extend({
   regal_task_id: AchieveQaRecoveryCallIdSchema,
   transcript: z.string().max(ACHIEVE_QA_TRANSCRIPT_RECOVERY_SOURCE_MAX_LENGTH),
-  transcript_is_truncated: z.literal(false).optional(),
+  transcript_is_truncated: z.literal(false),
+  source_event_id: z.string().min(1).refine((value) => value.trim().length > 0, {
+    message: "Source event ID must be nonblank",
+  }),
 }).strict().superRefine((event, context) => {
   if (event.transcript.trim().length === 0) {
     context.addIssue({
@@ -44,6 +47,9 @@ export const AchieveQaTranscriptRecoveryRequestSchema = z.object({
 }).strict().superRefine((command, context) => {
   if (new Set(command.events.map((event) => event.regal_task_id)).size !== command.events.length) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate event IDs", path: ["events"] })
+  }
+  if (new Set(command.events.map((event) => event.source_event_id)).size !== command.events.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate source event IDs", path: ["events"] })
   }
   if (!command.dry_run && command.digest === undefined) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Execution digest required", path: ["digest"] })

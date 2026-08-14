@@ -25,13 +25,14 @@ The route has a route-local 4 MiB byte limit. This admits the reviewed approxima
       "event_type": "transcript_available",
       "regal_task_id": "<private ID>",
       "transcript": "<private source transcript>",
-      "transcript_is_truncated": false
+      "transcript_is_truncated": false,
+      "source_event_id": "<private unique Snowflake event ID>"
     }
   ]
 }
 ```
 
-The recovery-only source schema requires nonblank, untruncated transcripts and caps each at 262,144 characters. It extends the canonical transcript event shape but does not weaken the ordinary `TranscriptAvailableEventSchema` or `EvaluateRequestSchema` 200,000-character limits.
+The recovery-only source schema requires a nonblank transcript, explicit `transcript_is_truncated: false`, and a nonblank `source_event_id`; all 12 source-event IDs and Regal task IDs must be unique. Each transcript is capped at 262,144 characters. The schema extends the canonical transcript event shape but does not weaken the ordinary `TranscriptAvailableEventSchema` or `EvaluateRequestSchema` 200,000-character limits.
 
 Dry run is the default. Its response is aggregate-only and `Cache-Control: no-store`:
 
@@ -102,7 +103,7 @@ Dry run accepts exactly 17 unique opaque IDs:
 
 The strict parser rejects unknown fields, malformed/duplicate IDs, and any count other than 17. The aggregate-only response uses `Cache-Control: no-store`. After exact-12 ledger restoration, and only if the reviewed database state is otherwise unchanged, expect 17 transcript-available and zero transcript-unavailable candidates. `processable_count` remains determined by current policy and deterministic production segmentation.
 
-The v2 recovery manifest privately hashes each complete selected source and records its source kind before hashing the bounded `EvaluateRequest`. A source change therefore changes the digest even when its deterministic transfer-leg segment is unchanged:
+The v2 recovery manifest privately hashes each complete selected source, its source kind, the complete first-pass `WelcomeCallSegment` (including full-source-relative line and confidence metadata), and the bounded `EvaluateRequest`. A source or segmentation change therefore changes the digest:
 
 ```json
 {
@@ -114,7 +115,7 @@ The v2 recovery manifest privately hashes each complete selected source and reco
 
 A valid newest legacy QA transcript is preferred. If both legacy QA and canonical ledger sources exist, they must agree exactly; disagreement fails closed as `invalid_input`. Blank, oversized, ambiguous, or otherwise invalid legacy state does not authorize ledger fallback.
 
-Canonical ledger sources may be as large as 262,144 characters. The inspector hashes the complete private source, then runs `segmentWelcomeCall` before constructing an `EvaluateRequest`. Only a deterministic segment accepted by the unchanged 200,000-character `EvaluateRequestSchema` can become processable or reach grading. The full source is never silently truncated and never reaches the LLM. Unbounded sources remain `segment_unavailable` and are never inserted as `grading_skipped` merely to clear a gap.
+Canonical ledger sources may be as large as 262,144 characters. The inspector hashes the complete private source, then runs `segmentWelcomeCall` exactly once before constructing an `EvaluateRequest`. The approved first-pass `WelcomeCallSegment` travels through the private in-process grading seam with the bounded input, so the module uses its exact content and full-source-relative metadata without re-identification or a second segmentation pass. Neither the source nor segment is emitted in responses, logs, Workflow commands, or durable step outputs. Only a deterministic segment accepted by the unchanged 200,000-character `EvaluateRequestSchema` can become processable or reach the LLM. The full source is never silently truncated. Unbounded sources remain `segment_unavailable`, and any unexpected grade-time `grading_skipped: true` result is rejected before finalization.
 
 Production evidence shows the two oversized source transcripts produce deterministic transfer-leg segments of approximately 21–23k characters with strong welcome evidence; the dry run must still recompute and privately review their actual classifications.
 
@@ -125,6 +126,7 @@ Implementation approval is not execution approval. After private review of one e
 - The dedicated Workflow has `retries.limit = 0`; the one-shot LLM client has `maxRetries = 0` and provider fallback disabled.
 - Inputs are processed sequentially and execution stops on the first read, state, grading, or write anomaly.
 - Immediately before each grade, the Workflow rechecks exact-module result absence.
+- The Workflow and insert adapter both reject `grading_skipped: true`; such a result can never reach persistence.
 - Finalization is a plain `INSERT`, never an upsert. SQLSTATE `23505` is classified as `already_exists` without updating the winner.
 - Inserted `result_json` is the ordinary module result. No recovery/audit marker is added.
 - Inserts force `alert_sent=false`/`alert_sent_at=null` and omit agent, contact, phone, recording, summary, transcript URL, and lead metadata columns.

@@ -4,6 +4,7 @@ import type { ModuleResult } from "../modules/types"
 import type { EvaluateRequest } from "../schemas/requests"
 import type {
   AchieveQaRecoveryExecutionDependencies,
+  AchieveQaRecoveryGradeCandidate,
   AchieveQaRecoverySource,
 } from "../services/achieve-qa-recovery"
 import { inspectAchieveQaRecovery } from "../services/achieve-qa-recovery"
@@ -52,8 +53,10 @@ function source(
 
 class RecordingRecoveryDependencies implements AchieveQaRecoveryExecutionDependencies {
   readonly graded: Array<EvaluateRequest> = []
+  readonly gradedSegments: Array<AchieveQaRecoveryGradeCandidate["segment"]> = []
   readonly finalized: Array<{ callId: string; result: ModuleResult }> = []
   existingBeforeGrade = false
+  returnSkippedGrade = false
   transcript = GRADEABLE_TRANSCRIPT
   availableCount = 5
   canonicalStartIndex = Number.POSITIVE_INFINITY
@@ -87,13 +90,14 @@ class RecordingRecoveryDependencies implements AchieveQaRecoveryExecutionDepende
     return { _tag: "success" as const, exists: this.existingBeforeGrade }
   }
 
-  async grade(candidate: EvaluateRequest) {
-    this.graded.push(candidate)
+  async grade(candidate: AchieveQaRecoveryGradeCandidate) {
+    this.graded.push(candidate.input)
+    this.gradedSegments.push(candidate.segment)
     return {
       _tag: "success" as const,
       result: {
         module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
-        result: { partner_id: "achieve", grading_skipped: false },
+        result: { partner_id: "achieve", grading_skipped: this.returnSkippedGrade },
         has_violation: false,
         violation_type: null,
         processing_time_ms: 12,
@@ -171,6 +175,28 @@ describe("dedicated Achieve QA Gate 4 recovery Workflow", () => {
     expect(dependencies.finalized).toEqual([])
   })
 
+  it("rejects a grade-time skipped result before any insert", async () => {
+    const dependencies = new RecordingRecoveryDependencies()
+    dependencies.returnSkippedGrade = true
+    const snapshot = await inspectAchieveQaRecovery(dependencies, callIds)
+    if ("_tag" in snapshot) throw new Error("fixture inspection failed")
+
+    const result = await executeAchieveQaRecoveryWorkflow(
+      { call_ids: callIds, digest: snapshot.digest },
+      { async execute(callback) { return callback() } },
+      dependencies,
+      snapshot.digest.value,
+    )
+
+    expect(result).toMatchObject({
+      status: "stopped",
+      reason: "invalid_response",
+      completed_count: 0,
+    })
+    expect(dependencies.graded).toHaveLength(1)
+    expect(dependencies.finalized).toEqual([])
+  })
+
   it("classifies the complete five-legacy plus twelve-ledger source set", async () => {
     const dependencies = new RecordingRecoveryDependencies()
     dependencies.availableCount = 17
@@ -210,6 +236,7 @@ describe("dedicated Achieve QA Gate 4 recovery Workflow", () => {
       expect(input.transcript.transcript).toBe(GRADEABLE_TRANSCRIPT.split("\n").slice(2).join("\n"))
       expect(input.transcript.transcript).not.toContain("x".repeat(100))
     }
+    expect(dependencies.gradedSegments).toEqual(snapshot.processableInputs.map((item) => item.segment))
   })
 
   it("changes the v2 digest when private source content changes outside an identical bounded segment", async () => {

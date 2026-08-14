@@ -13,6 +13,7 @@ const events = Array.from(
     regal_task_id: `achieve-gap-${String(index + 1).padStart(2, "0")}`,
     transcript: `private transcript ${index + 1}`,
     transcript_is_truncated: false,
+    source_event_id: `snowflake-event-${index + 1}`,
   }),
 )
 
@@ -43,7 +44,7 @@ describe("Achieve QA transcript recovery ledger adapter", () => {
       regal_task_id: event.regal_task_id,
       event_type: "transcript_available",
       agent_email: event.agent_email ?? null,
-      source_event_id: event.source_event_id ?? null,
+      source_event_id: event.source_event_id,
       payload: event,
     })))
   })

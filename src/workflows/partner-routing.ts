@@ -1,7 +1,12 @@
 import type { Bindings } from "../types/env"
 import type { EvaluateRequest } from "../schemas/requests"
 import type { DatabaseService } from "../services/database"
-import { segmentWelcomeCall, type SegmentSkipReason, type SegmentationConfidence } from "../modules/achieve-welcome-call-qa/segment"
+import {
+  segmentWelcomeCall,
+  type SegmentSkipReason,
+  type SegmentationConfidence,
+  type WelcomeCallSegment,
+} from "../modules/achieve-welcome-call-qa/segment"
 import { log } from "../utils/logger"
 import { workflowRetentionForEnvironment } from "./workflow-retention"
 
@@ -99,7 +104,19 @@ export function isAchieveWelcomeCallEligible(
   callData: EvaluateRequest,
   policy: { enrollmentDisposition: string; achieveMinDurationSeconds: number },
 ): AchieveWelcomeCallEligibility {
-  const segment = segmentWelcomeCall(callData.transcript.transcript)
+  return isAchieveWelcomeCallEligibleWithSegment(
+    callData,
+    policy,
+    segmentWelcomeCall(callData.transcript.transcript),
+  )
+}
+
+/** Apply Achieve eligibility policy to one already-computed production segment. */
+export function isAchieveWelcomeCallEligibleWithSegment(
+  callData: EvaluateRequest,
+  policy: { enrollmentDisposition: string; achieveMinDurationSeconds: number },
+  segment: WelcomeCallSegment,
+): AchieveWelcomeCallEligibility {
   const segmentEvidence: WelcomeCallSegmentEvidence = {
     found: segment.segment_found,
     skipReason: segment.skip_reason,

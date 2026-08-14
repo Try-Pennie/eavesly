@@ -10,6 +10,7 @@ const events = Array.from({ length: ACHIEVE_QA_TRANSCRIPT_RECOVERY_EVENT_COUNT }
   regal_task_id: `achieve-gap-${String(index + 1).padStart(2, "0")}`,
   transcript: `canonical transcript ${index + 1}`,
   transcript_is_truncated: false as const,
+  source_event_id: `snowflake-event-${index + 1}`,
 }))
 
 describe("Achieve QA transcript recovery request", () => {
@@ -29,6 +30,9 @@ describe("Achieve QA transcript recovery request", () => {
     ["duplicate IDs", { events: [...events.slice(0, 11), events[0]] }],
     ["blank transcript", { events: events.map((event, index) => index === 0 ? { ...event, transcript: "  " } : event) }],
     ["truncated transcript", { events: events.map((event, index) => index === 0 ? { ...event, transcript_is_truncated: true } : event) }],
+    ["missing truncation proof", { events: events.map((event, index) => index === 0 ? { ...event, transcript_is_truncated: undefined } : event) }],
+    ["blank source event ID", { events: events.map((event, index) => index === 0 ? { ...event, source_event_id: "  " } : event) }],
+    ["duplicate source event IDs", { events: events.map((event, index) => index === 1 ? { ...event, source_event_id: events[0].source_event_id } : event) }],
     ["oversized transcript", { events: events.map((event, index) => index === 0 ? { ...event, transcript: "x".repeat(262_145) } : event) }],
     ["unknown field", { events, extra: true }],
   ])("rejects %s", (_name, value) => {

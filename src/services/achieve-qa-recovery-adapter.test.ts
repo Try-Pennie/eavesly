@@ -66,6 +66,8 @@ describe("Achieve QA recovery adapter", () => {
               event_type: "transcript_available",
               regal_task_id: callId,
               transcript: "canonical private transcript",
+              transcript_is_truncated: false,
+              source_event_id: "snowflake-event-01",
             },
           }],
           error: null,
@@ -101,6 +103,7 @@ describe("Achieve QA recovery adapter", () => {
           regal_task_id: recoveryCallId,
           transcript: sourceTranscript,
           transcript_is_truncated: false,
+          source_event_id: "snowflake-event-01",
         },
       }],
     })
@@ -145,6 +148,8 @@ describe("Achieve QA recovery adapter", () => {
               event_type: "transcript_available",
               regal_task_id: callId,
               transcript: "preferred QA transcript",
+              transcript_is_truncated: false,
+              source_event_id: "snowflake-event-01",
             },
           }],
           error: null,
@@ -181,6 +186,8 @@ describe("Achieve QA recovery adapter", () => {
           event_type: "transcript_available",
           regal_task_id: recoveryCallId,
           transcript: "different canonical transcript",
+          transcript_is_truncated: false,
+          source_event_id: "snowflake-event-01",
         },
       }],
     })
@@ -221,6 +228,7 @@ describe("Achieve QA recovery adapter", () => {
         regal_task_id: recoveryCallId,
         transcript: "incomplete private transcript",
         transcript_is_truncated: true,
+        source_event_id: "snowflake-event-01",
       },
     },
     {
@@ -229,6 +237,8 @@ describe("Achieve QA recovery adapter", () => {
         event_type: "transcript_available",
         regal_task_id: recoveryCallId,
         transcript: "   ",
+        transcript_is_truncated: false,
+        source_event_id: "snowflake-event-01",
       },
     },
     {
@@ -237,6 +247,8 @@ describe("Achieve QA recovery adapter", () => {
         event_type: "transcript_available",
         regal_task_id: recoveryCallId,
         transcript: "x".repeat(262_145),
+        transcript_is_truncated: false,
+        source_event_id: "snowflake-event-01",
       },
     },
   ])("fails closed when a ledger transcript is $condition", async ({ payload }) => {
@@ -260,13 +272,15 @@ describe("Achieve QA recovery adapter", () => {
 
   it("fails closed when ledger rows contain conflicting transcripts", async () => {
     const inspected = await inspectRecoveryRows({
-      events: ["first", "second"].map((transcript) => ({
+      events: ["first", "second"].map((transcript, index) => ({
         regal_task_id: recoveryCallId,
         event_type: "transcript_available",
         payload: {
           event_type: "transcript_available",
           regal_task_id: recoveryCallId,
           transcript,
+          transcript_is_truncated: false,
+          source_event_id: `snowflake-event-${index + 1}`,
         },
       })),
     })
@@ -345,6 +359,25 @@ describe("Achieve QA recovery adapter", () => {
     expect(inserts[0]).not.toHaveProperty("contact_name")
     expect(inserts[0]).not.toHaveProperty("contact_phone")
     expect(inserts[0]).not.toHaveProperty("recording_link")
+  })
+
+  it("refuses to insert a grading-skipped result even when called directly", async () => {
+    let inserts = 0
+    const finalize = createAchieveQaRecoveryInsertOnlyFinalizer(async () => {
+      inserts += 1
+      return { error: null }
+    })
+
+    const result = await finalize(recoveryCallId, {
+      module_name: MODULE_NAMES.ACHIEVE_WELCOME_CALL_QA,
+      result: { grading_skipped: true, skip_reason: "unexpected_second_segmentation" },
+      has_violation: false,
+      violation_type: null,
+      processing_time_ms: 1,
+    })
+
+    expect(result).toEqual({ _tag: "failure", reason: "invalid_response" })
+    expect(inserts).toBe(0)
   })
 
   it("fails closed deterministically when newest transcript rows tie without a stable unique tie-break field", async () => {

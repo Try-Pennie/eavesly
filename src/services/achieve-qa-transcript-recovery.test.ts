@@ -14,6 +14,8 @@ const events = Array.from(
     event_type: "transcript_available",
     regal_task_id: `achieve-gap-${String(index + 1).padStart(2, "0")}`,
     transcript: `private source ${index + 1}`,
+    transcript_is_truncated: false,
+    source_event_id: `snowflake-event-${index + 1}`,
   }),
 )
 
