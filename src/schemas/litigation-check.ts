@@ -10,6 +10,7 @@ const LitigationMentionSchema = z.object({
 export const LitigationCheckSchema = z.object({
   litigation_discussed: z.boolean(),
   mentions: z.array(LitigationMentionSchema),
+  litigated_account_enrolled: z.boolean(),
   agent_communicated_restriction: z.boolean(),
   agent_response_quote: z.string(),
   violation: z.boolean(),

@@ -48,6 +48,11 @@ describe("LitigationCheckSchema", () => {
     expect(LitigationCheckSchema.safeParse(rest).success).toBe(false)
   })
 
+  it("requires litigated_account_enrolled field", () => {
+    const { litigated_account_enrolled, ...rest } = noViolationFixture
+    expect(LitigationCheckSchema.safeParse(rest).success).toBe(false)
+  })
+
   it("requires violation field", () => {
     const { violation, ...rest } = noViolationFixture
     expect(LitigationCheckSchema.safeParse(rest).success).toBe(false)

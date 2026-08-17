@@ -1,6 +1,7 @@
 {
   "litigation_discussed": false,
   "mentions": [],
+  "litigated_account_enrolled": false,
   "agent_communicated_restriction": false,
   "agent_response_quote": "",
   "violation": false,
