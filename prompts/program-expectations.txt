@@ -5,7 +5,7 @@
   <speaker_rules>
     <rule>Only statements from the Pennie handling agent count.</rule>
     <rule>Statements from the contact, transfer agent, welcome-call agent, prerecorded disclosure, or post-enrollment partner do not count.</rule>
-    <rule>Evidence must be copied exactly from the supplied transcript and must come from the handling agent.</rule>
+    <rule>Evidence must come from the handling agent. Copy an exact quote unless the caller supplies handling-agent turn IDs and explicitly requests evidence references; in that mode, return only the exact requested turn ID.</rule>
   </speaker_rules>
 
   <enrollment_definition>
@@ -31,7 +31,7 @@
     <rule>A narrated end-to-end page walkthrough can cover phases even when each official phase name is omitted.</rule>
     <rule>A passing statement that there are four phases does not cover them without describing the journey.</rule>
     <rule>A downside communicated only inside the final boilerplate ACDR/GOTA disclosure does not count. It counts when also explained in ordinary pitch language.</rule>
-    <rule>For every true coverage flag, provide one exact handling-agent quote. For false flags, use an empty evidence string.</rule>
+    <rule>For every true coverage flag, provide one exact handling-agent quote, or one exact handling-agent turn ID when the caller requests reference mode. Never stitch multiple turns together. For false flags, use an empty evidence string.</rule>
   </coverage_rules>
 
   <output>Return exactly the requested JSON fields. Do not decide prior-call coverage, missing elements, violations, suppression, or alert delivery; the server owns those decisions.</output>

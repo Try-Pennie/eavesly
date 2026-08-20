@@ -1,3 +1,4 @@
+import { z } from "zod"
 import type { EvalModule, ModuleResult } from "../types"
 import { extractAlerts } from "../types"
 import type { EvaluateRequest } from "../../schemas/requests"
@@ -13,23 +14,92 @@ import {
 } from "./resolver"
 import systemPrompt from "../../../prompts/program-expectations.txt"
 
+const PriorEvidenceReferenceSchema = z.string().regex(/^(?:HA-\d{6})?$/)
+const PriorProgramExpectationsModelResponseSchema = ProgramExpectationsAssessmentSchema.extend({
+  enrollment_evidence_quote: PriorEvidenceReferenceSchema,
+  phase_activation_evidence: PriorEvidenceReferenceSchema,
+  phase_traction_evidence: PriorEvidenceReferenceSchema,
+  phase_momentum_evidence: PriorEvidenceReferenceSchema,
+  phase_graduation_evidence: PriorEvidenceReferenceSchema,
+  credit_impact_evidence: PriorEvidenceReferenceSchema,
+  payments_withheld_evidence: PriorEvidenceReferenceSchema,
+  accounts_may_close_evidence: PriorEvidenceReferenceSchema,
+  adjustment_period_evidence: PriorEvidenceReferenceSchema,
+  key_evidence_quote: PriorEvidenceReferenceSchema,
+})
+
+const PRIOR_EVIDENCE_FIELDS = [
+  { covered: "enrollment_completed", evidence: "enrollment_evidence_quote" },
+  { covered: "phase_activation_covered", evidence: "phase_activation_evidence" },
+  { covered: "phase_traction_covered", evidence: "phase_traction_evidence" },
+  { covered: "phase_momentum_covered", evidence: "phase_momentum_evidence" },
+  { covered: "phase_graduation_covered", evidence: "phase_graduation_evidence" },
+  { covered: "credit_impact_downside_covered", evidence: "credit_impact_evidence" },
+  { covered: "payments_withheld_downside_covered", evidence: "payments_withheld_evidence" },
+  { covered: "accounts_may_close_downside_covered", evidence: "accounts_may_close_evidence" },
+  { covered: "adjustment_period_downside_covered", evidence: "adjustment_period_evidence" },
+] as const
+
+type PriorEvidenceTranscript = {
+  readonly promptTranscript: string
+  readonly quoteByReference: ReadonlyMap<string, string>
+}
+
+function annotatePriorEvidenceTranscript(transcript: string): PriorEvidenceTranscript {
+  const quoteByReference = new Map<string, string>()
+  let handlingTurn = 0
+  const promptTranscript = transcript.split("\n").map((line) => {
+    const content = /^(?:\s*\[handling agent\]\s*:\s*)(.*)$/i.exec(line)?.[1]
+    if (content === undefined || content.trim().length === 0) return line
+    const reference = `HA-${String(++handlingTurn).padStart(6, "0")}`
+    quoteByReference.set(reference, content)
+    return `[${reference}] ${line}`
+  }).join("\n")
+
+  return { promptTranscript, quoteByReference }
+}
+
+function materializePriorEvidence(
+  model: z.infer<typeof PriorProgramExpectationsModelResponseSchema>,
+  quoteByReference: ReadonlyMap<string, string>,
+): ProgramExpectationsAssessment {
+  const evidence = Object.fromEntries(PRIOR_EVIDENCE_FIELDS.map(({ covered, evidence }) => [
+    evidence,
+    model[covered] ? quoteByReference.get(model[evidence]) ?? "" : "",
+  ]))
+
+  return ProgramExpectationsAssessmentSchema.parse({
+    ...model,
+    ...evidence,
+    key_evidence_quote: quoteByReference.get(model.key_evidence_quote) ?? "",
+  })
+}
+
 /** Grade one transcript only; history and final alert policy remain server-owned. */
 export async function assessProgramExpectationsTranscript(
   transcript: string,
   llm: LLMClient,
   purpose: "current_enrollment" | "prior_coverage",
 ): Promise<ProgramExpectationsAssessment> {
-  const instruction = purpose === "current_enrollment"
-    ? "Evaluate this enrollment call for Program Expectations coverage."
-    : "Evaluate only what Program Expectations content the handling agent covered on this earlier call. Grade all eight requirements even if enrollment did not complete."
+  if (purpose === "current_enrollment") {
+    return await llm.getStructuredResponse(
+      systemPrompt,
+      `Evaluate this enrollment call for Program Expectations coverage.\n\n${transcript}`,
+      ProgramExpectationsAssessmentSchema,
+      "program_expectations_assessment",
+      { temperature: 0 },
+    )
+  }
 
-  return await llm.getStructuredResponse(
+  const annotated = annotatePriorEvidenceTranscript(transcript)
+  const model = await llm.getStructuredResponse(
     systemPrompt,
-    `${instruction}\n\n${transcript}`,
-    ProgramExpectationsAssessmentSchema,
-    "program_expectations_assessment",
+    `Evaluate only what Program Expectations content the handling agent covered on this earlier call. Grade all eight requirements even if enrollment did not complete. The transcript labels each handling-agent turn with a stable ID such as [HA-000001]. For every true finding, return only one matching ID without brackets in its evidence field; for false findings, return an empty evidence string. Do not copy or combine transcript speech into evidence fields.\n\n${annotated.promptTranscript}`,
+    PriorProgramExpectationsModelResponseSchema,
+    "program_expectations_prior_assessment_v2",
     { temperature: 0 },
   )
+  return materializePriorEvidence(model, annotated.quoteByReference)
 }
 
 export const programExpectationsModule: EvalModule = {
