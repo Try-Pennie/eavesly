@@ -11,6 +11,10 @@ import { processAlert, lookupManagerEmail } from "../services/alerts"
 import { routePartnerFollowup, isAchieveWelcomeCallEligible, isAchieveGotaCheckEligible } from "./partner-routing"
 import { MODULE_NAMES } from "../modules/constants"
 import { log } from "../utils/logger"
+import {
+  holdProgramExpectationsCandidateForReview,
+  resolveProgramExpectationsCandidate,
+} from "../services/program-expectations-rescue"
 
 type EvaluationParams = {
   moduleName: string
@@ -99,13 +103,38 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     // step.do() constrains its callback return to Workflows' Serializable<T>, which
     // rejects our domain types; these values are plain JSON round-tripping, so cast
     // at the boundary and keep the logical type on the result.
-    const result: ModuleResult = await step.do("evaluate-llm", {
+    let result: ModuleResult = await step.do("evaluate-llm", {
       retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
       timeout: "5 minutes",
     }, async () => {
-      const llm = createLLMClient(this.env, modelForModule(this.env, moduleName))
+      const llm = createLLMClient(
+        this.env,
+        modelForModule(this.env, moduleName),
+        moduleName === MODULE_NAMES.PROGRAM_EXPECTATIONS
+          ? { invalidResponseLogging: "categorical_only" }
+          : {},
+      )
       return await mod.evaluate(callData.transcript.transcript, callData, llm, callHistory, dispositions, audience) as any
     })
+
+    // Candidate-only two-call rescue. Prior full transcripts are loaded and
+    // graded only when the current enrollment call would otherwise alert.
+    if (moduleName === MODULE_NAMES.PROGRAM_EXPECTATIONS && result.has_violation) {
+      try {
+        result = await step.do("resolve-program-expectations-history", {
+          retries: { limit: 2, delay: "5 seconds", backoff: "exponential" },
+          timeout: "10 minutes",
+        }, async () => {
+          return await resolveProgramExpectationsCandidate(this.env, callData, result) as any
+        })
+      } catch (err) {
+        log("error", "Program Expectations history resolution failed; holding for review", {
+          callId: callData.call_id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+        result = holdProgramExpectationsCandidateForReview(result)
+      }
+    }
 
     // Step 2: Store result in Supabase
     const alerts: Alert[] = await step.do("store-result", {
@@ -114,7 +143,12 @@ export class EvaluationWorkflow extends WorkflowEntrypoint<Bindings, EvaluationP
     }, async () => {
       const db = new DatabaseService(this.env)
       const alerts = mod.extractAlerts(result, callData.call_id, callData.agent_id, callData)
-      await db.storeModuleResult(callData.call_id, result, alerts.length > 0, callData)
+      // Program Expectations is shadow-only while the transcript resolver is
+      // calibrated. Candidates remain queryable with alert_sent=false.
+      const alertSent = moduleName === MODULE_NAMES.PROGRAM_EXPECTATIONS
+        ? false
+        : alerts.length > 0
+      await db.storeModuleResult(callData.call_id, result, alertSent, callData)
       return alerts as any
     })
 
