@@ -104,24 +104,23 @@ describe("programExpectationsModule", () => {
       expect(r.missing_elements).toContain("Downside: credit score may decline")
     })
 
-    it("suppresses violation when prior_call_program_expectations_covered is true even if this call missed everything", async () => {
-      const priorCallCoveredFixture = {
+    it("does not let an LLM-owned prior-call boolean suppress a violation", async () => {
+      const llm = createMockLLM({
         ...violationFixture,
         prior_call_program_expectations_covered: true,
-        prior_call_evidence_quote: "Customer enrolled in a debt resolution program with payment setup and expectations reviewed",
-      }
-      const llm = createMockLLM(priorCallCoveredFixture)
+        prior_call_evidence_quote: "generic summary",
+      })
       const request = createEvaluateRequest()
       const result = await programExpectationsModule.evaluate(
         request.transcript.transcript,
         request,
         llm as any,
       )
-      expect(result.has_violation).toBe(false)
-      expect(result.violation_type).toBeNull()
-      // missing_elements still records what this call missed — useful for diagnostics
+      expect(result.has_violation).toBe(true)
+      expect(result.violation_type).toBe(VIOLATION_TYPES.PROGRAM_EXPECTATIONS)
       const r = result.result as any
-      expect(r.missing_elements).toHaveLength(8)
+      expect(r.prior_call_program_expectations_covered).toBe(false)
+      expect(r.decision.status).toBe("alert_missing")
     })
 
     it("passes correct schema name to LLM", async () => {
@@ -133,7 +132,7 @@ describe("programExpectationsModule", () => {
         llm as any,
       )
       const [, , , schemaName] = llm.getStructuredResponse.mock.calls[0]
-      expect(schemaName).toBe("program_expectations_evaluation")
+      expect(schemaName).toBe("program_expectations_assessment")
     })
 
     it("includes transcript in user prompt", async () => {

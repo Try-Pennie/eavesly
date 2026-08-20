@@ -937,6 +937,22 @@ describe("Achieve module alert suppression", () => {
     vi.restoreAllMocks()
   })
 
+  it("mutes Program Expectations alerts during transcript-resolver shadow launch", async () => {
+    const ctx = createMockCtx()
+    const env = createEnv()
+    const alert = createAlert({
+      module_name: MODULE_NAMES.PROGRAM_EXPECTATIONS,
+      violation_type: VIOLATION_TYPES.PROGRAM_EXPECTATIONS,
+      agent_email: "agent@trypennie.com",
+      result: {},
+    })
+
+    await dispatchAlerts([alert], ctx, env)
+    await (ctx.waitUntil as any).mock.calls[0][0]
+
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it("mutes Slack alerts for achieve_welcome_call_qa module — no manager routing", async () => {
     const ctx = createMockCtx()
     const env = createEnv()

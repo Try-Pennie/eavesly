@@ -42,6 +42,15 @@ function isGotaCheckAlert(alert: Alert): boolean {
   )
 }
 
+// TEMPORARY: Program Expectations is shadow-only while transcript-backed
+// two-call resolution is calibrated against manager-reviewed calls.
+function isProgramExpectationsAlert(alert: Alert): boolean {
+  return (
+    alert.module_name === MODULE_NAMES.PROGRAM_EXPECTATIONS ||
+    alert.violation_type === VIOLATION_TYPES.PROGRAM_EXPECTATIONS
+  )
+}
+
 function shouldMirrorToJoel(alert: Alert): boolean {
   if (alert.agent_email?.toLowerCase() !== JOEL_NELSON_EMAIL) return false
 
@@ -92,6 +101,14 @@ export async function processAlert(alert: Alert, env: Bindings): Promise<void> {
   // Achieve GOTA process beds in and the module is validated on real calls.
   if (isGotaCheckAlert(alert)) {
     log("info", "GOTA-check Slack alert muted (soft launch)", {
+      callId: alert.call_id,
+      agentEmail: alert.agent_email,
+    })
+    return
+  }
+
+  if (isProgramExpectationsAlert(alert)) {
+    log("info", "Program Expectations Slack alert muted (two-call resolver shadow launch)", {
       callId: alert.call_id,
       agentEmail: alert.agent_email,
     })
