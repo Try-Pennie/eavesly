@@ -7,7 +7,7 @@ import type {
 import { findHandlingAgentEvidence } from "../gota-check/logic"
 
 export const PROGRAM_EXPECTATIONS_RUBRIC_VERSION = "program_expectations_activation_v1"
-export const PROGRAM_EXPECTATIONS_EVALUATOR_VERSION = "transcript_resolver_v1"
+export const PROGRAM_EXPECTATIONS_EVALUATOR_VERSION = "transcript_resolver_v2"
 export const PROGRAM_EXPECTATIONS_LOOKBACK_DAYS = 30
 export const PROGRAM_EXPECTATIONS_MAX_PRIOR_CALLS = 5
 export const PROGRAM_EXPECTATIONS_MAX_PRIOR_EVALUATIONS = 2

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ProgramExpectationsAssessment } from "../../schemas/program-expectations"
+import { createMockLLM } from "../../../test/helpers/mock-llm"
+import { assessProgramExpectationsTranscript } from "./module"
 import {
   finalizeCurrentAssessment,
   resolvePriorAssessments,
@@ -51,6 +53,19 @@ const COMPLETE_PRIOR: ProgramExpectationsAssessment = {
   adjustment_period_evidence: "That early adjustment is normal and it gets better.",
 }
 
+const COMPLETE_PRIOR_REFERENCES: ProgramExpectationsAssessment = {
+  ...COMPLETE_PRIOR,
+  phase_activation_evidence: "HA-000001",
+  phase_traction_evidence: "HA-000002",
+  phase_momentum_evidence: "HA-000003",
+  phase_graduation_evidence: "HA-000004",
+  credit_impact_evidence: "HA-000005",
+  payments_withheld_evidence: "HA-000006",
+  accounts_may_close_evidence: "HA-000007",
+  adjustment_period_evidence: "HA-000008",
+  key_evidence_quote: "HA-000001",
+}
+
 function transcriptFor(assessment: ProgramExpectationsAssessment): string {
   return [
     assessment.phase_activation_evidence,
@@ -81,15 +96,18 @@ function currentCandidate() {
 
 describe("Program Expectations prior-call resolver", () => {
   it("suppresses a Joel-like two-call close only from complete transcript evidence", async () => {
-    const assessment = await validatePriorAssessment(
-      priorCall(),
-      COMPLETE_PRIOR,
-      "joel@example.com",
+    const call = priorCall()
+    const llm = createMockLLM(COMPLETE_PRIOR_REFERENCES)
+    const modelAssessment = await assessProgramExpectationsTranscript(
+      call.transcript,
+      llm as any,
+      "prior_coverage",
     )
+    const assessment = await validatePriorAssessment(call, modelAssessment, "joel@example.com")
     const result = resolvePriorAssessments(currentCandidate(), {
       status: "ready",
       lead_id: "lead-1",
-      calls: [priorCall()],
+      calls: [call],
       total_eligible_calls: 1,
       unavailable_transcript_count: 0,
     }, [assessment])
@@ -102,6 +120,30 @@ describe("Program Expectations prior-call resolver", () => {
       same_agent: true,
     })
     expect(result.prior_call_assessments[0]?.evidence).toHaveLength(8)
+  })
+
+  it("holds an unknown prior turn reference for review", async () => {
+    const call = priorCall()
+    const llm = createMockLLM({
+      ...COMPLETE_PRIOR_REFERENCES,
+      phase_activation_evidence: "HA-999999",
+    })
+    const modelAssessment = await assessProgramExpectationsTranscript(
+      call.transcript,
+      llm as any,
+      "prior_coverage",
+    )
+    const assessment = await validatePriorAssessment(call, modelAssessment, "joel@example.com")
+    const result = resolvePriorAssessments(currentCandidate(), {
+      status: "ready",
+      lead_id: "lead-1",
+      calls: [call],
+      total_eligible_calls: 1,
+      unavailable_transcript_count: 0,
+    }, [assessment])
+
+    expect(result.violation).toBe(false)
+    expect(result.decision).toEqual({ status: "needs_review", reason: "evidence_invalid" })
   })
 
   it("keeps a genuine omission alertable after all prior transcripts are assessed", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { programExpectationsModule } from "./module"
+import { assessProgramExpectationsTranscript, programExpectationsModule } from "./module"
 import { createMockLLM, createFailingLLM } from "../../../test/helpers/mock-llm"
 import { createEvaluateRequest } from "../../../test/helpers/create-request"
 import noViolationFixture from "../../../test/fixtures/responses/program-expectations-no-violation.json"
@@ -145,6 +145,47 @@ describe("programExpectationsModule", () => {
       )
       const [, userPrompt] = llm.getStructuredResponse.mock.calls[0]
       expect(userPrompt).toContain(request.transcript.transcript)
+    })
+
+    it("materializes prior handling-agent turn references into literal evidence", async () => {
+      const activation = "The first three months build toward your first settlement."
+      const llm = createMockLLM({
+        ...noEnrollmentFixture,
+        phase_activation_covered: true,
+        phase_activation_evidence: "HA-000001",
+        key_evidence_quote: "HA-000001",
+      })
+      const transcript = `[contact]: Does it start now?\n[handling agent]: ${activation}`
+
+      const result = await assessProgramExpectationsTranscript(
+        transcript,
+        llm as any,
+        "prior_coverage",
+      )
+
+      expect(result.phase_activation_evidence).toBe(activation)
+      expect(result.key_evidence_quote).toBe(activation)
+      const [, userPrompt, , schemaName] = llm.getStructuredResponse.mock.calls[0]
+      expect(userPrompt).toContain(`[HA-000001] [handling agent]: ${activation}`)
+      expect(userPrompt).not.toContain("[HA-000001] [contact]")
+      expect(schemaName).toBe("program_expectations_prior_assessment_v2")
+    })
+
+    it("materializes an unknown prior evidence reference as invalid evidence", async () => {
+      const llm = createMockLLM({
+        ...noEnrollmentFixture,
+        phase_activation_covered: true,
+        phase_activation_evidence: "HA-999999",
+      })
+
+      const result = await assessProgramExpectationsTranscript(
+        "[handling agent]: Your first settlement comes during activation.",
+        llm as any,
+        "prior_coverage",
+      )
+
+      expect(result.phase_activation_covered).toBe(true)
+      expect(result.phase_activation_evidence).toBe("")
     })
 
     it("propagates LLM errors", async () => {
